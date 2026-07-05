@@ -6,6 +6,7 @@ import os
 import secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.parse import quote_plus
 from typing import Any, List, Optional
 
 import httpx
@@ -318,25 +319,44 @@ async def gemini_reply(prompt: str, fallback: str) -> str:
 
 async def google_places(city: str, state: str, query: str) -> tuple[bool, list[dict[str, Any]]]:
     fallback = [
-        {"title": "Veteran Coffee Meetup", "location": f"{city}, {state}", "type": "Community", "description": "A local meetup-style suggestion for veteran connection."},
-        {"title": "VFW / American Legion Post Visit", "location": f"Near {city}", "type": "Veteran community", "description": "Search nearby veteran organizations and social events."},
-        {"title": "VA Resource Check-in", "location": f"{city} area", "type": "Benefits", "description": "Look for VA support services, clinics, or resource offices."},
-        {"title": "Outdoor Walk or Park Check-in", "location": f"Near {city}", "type": "Wellness", "description": "A simple positive activity to reset the day."},
+        {"title": "Veteran Coffee Meetup", "location": f"{city}, {state}", "type": "Community", "description": "Demo suggestion. Add GOOGLE_PLACES_API_KEY on Render for live local results.", "maps_url": f"https://www.google.com/maps/search/veteran+coffee+near+{city}+{state}"},
+        {"title": "VFW or American Legion Post", "location": f"Near {city}", "type": "Veteran community", "description": "Demo suggestion for veteran organizations and social connection.", "maps_url": f"https://www.google.com/maps/search/VFW+American+Legion+near+{city}+{state}"},
+        {"title": "VA Resource Check-in", "location": f"{city} area", "type": "Benefits", "description": "Demo suggestion for VA clinics, benefits offices, or resource centers.", "maps_url": f"https://www.google.com/maps/search/VA+clinic+near+{city}+{state}"},
+        {"title": "Outdoor Walk or Park Check-in", "location": f"Near {city}", "type": "Wellness", "description": "Demo suggestion for a simple positive reset activity.", "maps_url": f"https://www.google.com/maps/search/parks+near+{city}+{state}"},
     ]
     if not GOOGLE_MAPS_API_KEY:
         return False, fallback
-    text_query = f"{query or 'veteran events VFW American Legion VA community'} near {city}, {state}"
+    clean_query = (query or "veteran events VFW American Legion VA community").strip()
+    text_query = f"{clean_query} near {city}, {state}"
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.get("https://maps.googleapis.com/maps/api/place/textsearch/json", params={"query": text_query, "key": GOOGLE_MAPS_API_KEY})
             r.raise_for_status()
             data = r.json()
+        status = data.get("status")
+        if status not in ("OK", "ZERO_RESULTS"):
+            return False, [{**x, "description": f"Google Places returned {status}. Check API key, billing, and Places API access."} for x in fallback]
         results = []
-        for item in data.get("results", [])[:6]:
-            results.append({"title": item.get("name"), "location": item.get("formatted_address", f"{city}, {state}"), "type": ", ".join(item.get("types", [])[:2]), "rating": item.get("rating"), "description": "Live Google Places result", "place_id": item.get("place_id")})
+        seen = set()
+        for item in data.get("results", [])[:8]:
+            name = item.get("name") or "Local option"
+            if name.lower() in seen:
+                continue
+            seen.add(name.lower())
+            address = item.get("formatted_address", f"{city}, {state}")
+            place_id = item.get("place_id")
+            results.append({
+                "title": name,
+                "location": address,
+                "type": ", ".join(item.get("types", [])[:3]),
+                "rating": item.get("rating"),
+                "description": f"Live Google Places result for: {clean_query}",
+                "place_id": place_id,
+                "maps_url": f"https://www.google.com/maps/search/?api=1&query={quote_plus(name + ' ' + address)}" + (f"&query_place_id={place_id}" if place_id else ""),
+            })
         return True, results or fallback
-    except Exception:
-        return False, fallback
+    except Exception as exc:
+        return False, [{**x, "description": f"Google Places call failed: {type(exc).__name__}. Check Render env vars and API restrictions."} for x in fallback]
 
 
 def benefits_lookup(query: str, state: str, branch: str) -> dict[str, Any]:
@@ -519,7 +539,7 @@ async def today_briefing(user: User = Depends(get_current_user), db: Session = D
     p = user.profile
     rems = db.query(Reminder).filter(Reminder.user_id == user.id, Reminder.status == "active").order_by(Reminder.id.desc()).limit(3).all()
     live, events = await google_places(p.city, p.state, "veteran events VA VFW American Legion")
-    return {"greeting": f"Good to see you, {p.first_name}. How is your day going?", "location": f"{p.city}, {p.state}", "reminders": [{"title": r.title, "when_text": r.when_text} for r in rems], "events": events[:3], "wellness_prompt": "Take a steady breath, check your plan for today, and choose one positive action."}
+    return {"greeting": f"Good to see you, {p.first_name}. How is your day going?", "location": f"{p.city}, {p.state}", "reminders": [{"title": r.title, "when_text": r.when_text} for r in rems], "events": events[:3], "wellness_prompt": ("Live Google Places is connected." if live else "Google Places is in demo mode. Add GOOGLE_PLACES_API_KEY in Render to make activities live.")}
 
 
 @app.post("/api/companion/chat")
@@ -583,8 +603,14 @@ async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db))
     state = payload.state or (user.profile.state if user and user.profile else "TX")
 
     if intent == "find_local_veteran_activities":
-        live, items = await google_places(city, state, payload.query or text or "veteran events")
-        response = f"{first_name}, I found {len(items)} veteran-friendly options near {city}. The top options are: " + "; ".join([i.get("title", "Option") for i in items[:3]]) + "."
+        search_text = payload.query or text or "veteran events"
+        live, items = await google_places(city, state, search_text)
+        source = "live Google Places" if live else "demo/local fallback"
+        details = []
+        for i, item in enumerate(items[:3], 1):
+            rating = f", rating {item.get('rating')}" if item.get("rating") else ""
+            details.append(f"{i}) {item.get('title', 'Option')} — {item.get('location', city)}{rating}")
+        response = f"{first_name}, here are {len(items)} {source} options near {city}: " + " | ".join(details) + ". Tap a card for directions or ask me for benefits, reminders, documents, music, or a daily plan."
         return {"response": response, "intent": intent, "data": {"live": live, "items": items}}
     if intent == "create_reminder":
         title = payload.title or text or "Reminder"
