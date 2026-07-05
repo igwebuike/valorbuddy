@@ -1,24 +1,33 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import os
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import httpx
-from fastapi import FastAPI, UploadFile, File, Form, Request
+import jwt
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
-from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, JSON, Boolean
-from sqlalchemy.orm import declarative_base, sessionmaker
+from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, create_engine, func
+from sqlalchemy.orm import Session, declarative_base, relationship, sessionmaker
 
-APP_NAME = os.getenv("APP_NAME", "ValorBuddy API")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY") or os.getenv("GOOGLE_MAPS_API_KEY")
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
+APP_NAME = os.getenv("APP_NAME", "ValorBuddy Enterprise API")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./valorbuddy.db")
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-change-me-valorbuddy")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY") or os.getenv("GOOGLE_MAPS_API_KEY")
+GOOGLE_CALENDAR_ENABLED = os.getenv("GOOGLE_CALENDAR_ENABLED", "false").lower() == "true"
 DATA_DIR = Path(os.getenv("DATA_DIR", "/tmp/valorbuddy"))
 UPLOAD_DIR = DATA_DIR / "uploads"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -30,25 +39,66 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 Base = declarative_base()
 
 
-class UserProfileDB(Base):
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True)
+    email = Column(String(255), unique=True, index=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(String(50), nullable=False, default="veteran")
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    profile = relationship("UserProfile", back_populates="user", uselist=False)
+
+
+class UserProfile(Base):
     __tablename__ = "user_profiles"
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String(255), unique=True, index=True, nullable=False, default="local")
-    name = Column(String(120), nullable=False, default="Veteran")
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    first_name = Column(String(120), nullable=False)
+    last_name = Column(String(120), nullable=True)
     branch = Column(String(80), nullable=False, default="Army")
     city = Column(String(120), nullable=False, default="Dallas")
     state = Column(String(80), nullable=False, default="TX")
     interests = Column(JSON, nullable=False, default=list)
-    preferred_tone = Column(String(120), nullable=False, default="calm and positive")
+    preferred_tone = Column(String(120), nullable=False, default="calm, practical, encouraging")
     companion_mode = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    user = relationship("User", back_populates="profile")
 
 
-class MemoryDB(Base):
+class AuthToken(Base):
+    __tablename__ = "auth_tokens"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    token = Column(Text, nullable=False)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    source = Column(String(80), nullable=False, default="web")
+    title = Column(String(255), nullable=False, default="ValorBuddy conversation")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class Message(Base):
+    __tablename__ = "messages"
+    id = Column(Integer, primary_key=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    role = Column(String(50), nullable=False)
+    content = Column(Text, nullable=False)
+    metadata_json = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class Memory(Base):
     __tablename__ = "memories"
-    id = Column(Integer, primary_key=True, index=True)
-    profile_email = Column(String(255), index=True, nullable=False, default="local")
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     title = Column(String(255), nullable=False)
     note = Column(Text, nullable=True)
     tags = Column(JSON, nullable=False, default=list)
@@ -56,52 +106,62 @@ class MemoryDB(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
-class ReminderDB(Base):
+class Reminder(Base):
     __tablename__ = "reminders"
-    id = Column(Integer, primary_key=True, index=True)
-    profile_email = Column(String(255), index=True, nullable=False, default="local")
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     title = Column(String(255), nullable=False)
-    when_text = Column(String(255), nullable=False)
+    date = Column(String(80), nullable=True)
+    time = Column(String(80), nullable=True)
+    when_text = Column(String(255), nullable=True)
     note = Column(Text, nullable=True)
     status = Column(String(50), nullable=False, default="active")
+    calendar_event_id = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
-class ConversationDB(Base):
-    __tablename__ = "companion_conversations"
-    id = Column(Integer, primary_key=True, index=True)
-    profile_email = Column(String(255), index=True, nullable=False, default="local")
-    user_message = Column(Text, nullable=False)
-    ai_reply = Column(Text, nullable=False)
-    mode = Column(String(80), nullable=False, default="companion")
-    source = Column(String(80), nullable=False, default="fallback")
+class Document(Base):
+    __tablename__ = "documents"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    filename = Column(String(255), nullable=False)
+    doc_type = Column(String(100), nullable=False, default="general")
+    file_url = Column(String(500), nullable=True)
+    extracted_text = Column(Text, nullable=True)
+    ai_summary = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
-class ActivityCacheDB(Base):
+class ActivitySearch(Base):
     __tablename__ = "activity_searches"
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     city = Column(String(120), nullable=False)
     state = Column(String(80), nullable=False)
-    interest = Column(String(255), nullable=False)
-    provider = Column(String(120), nullable=False)
+    query = Column(String(255), nullable=False)
+    provider = Column(String(120), nullable=False, default="Google Places")
     live = Column(Boolean, nullable=False, default=False)
     results = Column(JSON, nullable=False, default=list)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
-class MusicFavoriteDB(Base):
+class MusicFavorite(Base):
     __tablename__ = "music_favorites"
-    id = Column(Integer, primary_key=True, index=True)
-    profile_email = Column(String(255), index=True, nullable=False, default="local")
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     title = Column(String(255), nullable=False)
     url = Column(String(500), nullable=True)
     mood = Column(String(80), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
-def create_tables():
-    Base.metadata.create_all(bind=engine)
+class AdminAuditLog(Base):
+    __tablename__ = "admin_audit_logs"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    action = Column(String(255), nullable=False)
+    details = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 def get_db():
@@ -112,60 +172,116 @@ def get_db():
         db.close()
 
 
-app = FastAPI(title=APP_NAME, version="2.2.0")
-origins = [x.strip() for x in CORS_ORIGINS.split(",") if x.strip()]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins or ["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+def hash_password(password: str) -> str:
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 120_000).hex()
+    return f"pbkdf2_sha256${salt}${digest}"
 
 
-class Profile(BaseModel):
-    name: str = "Veteran"
+def verify_password(password: str, stored: str) -> bool:
+    try:
+        algo, salt, digest = stored.split("$", 2)
+        if algo != "pbkdf2_sha256":
+            return False
+        candidate = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 120_000).hex()
+        return secrets.compare_digest(candidate, digest)
+    except Exception:
+        return False
+
+
+def create_access_token(user: User) -> str:
+    exp = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    return jwt.encode({"sub": str(user.id), "email": user.email, "role": user.role, "exp": exp}, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def get_current_user(authorization: str | None = Header(default=None), db: Session = Depends(get_db)) -> User:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    token = authorization.split(" ", 1)[1].strip()
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = int(payload["sub"])
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    user = db.get(User, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Invalid user")
+    return user
+
+
+def get_optional_user(authorization: str | None = Header(default=None), db: Session = Depends(get_db)) -> Optional[User]:
+    try:
+        return get_current_user(authorization, db)
+    except Exception:
+        return None
+
+
+def admin_required(user: User = Depends(get_current_user)) -> User:
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=6)
+    first_name: str
+    last_name: str = ""
     branch: str = "Army"
     city: str = "Dallas"
     state: str = "TX"
     interests: List[str] = []
-    preferred_tone: str = "calm and positive"
 
 
-class ProfileIn(Profile):
-    email: str = "local"
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+
+class ProfileOut(BaseModel):
+    id: int
+    email: str
+    role: str
+    first_name: str
+    last_name: str | None = ""
+    branch: str
+    city: str
+    state: str
+    interests: List[str] = []
+
+
+class LoginResponse(BaseModel):
+    token: str
+    user: ProfileOut
 
 
 class CompanionRequest(BaseModel):
-    profile: Profile = Field(default_factory=Profile)
     message: str
+    conversation_id: int | None = None
     mode: str = "companion"
-    recent_memories: List[str] = []
-    profile_email: str = "local"
-
-
-class MemoryIn(BaseModel):
-    profile_email: str = "local"
-    title: str
-    note: str = ""
-    tags: List[str] = []
-    image_url: Optional[str] = None
 
 
 class ReminderIn(BaseModel):
-    profile_email: str = "local"
     title: str
-    when_text: str
+    date: str = ""
+    time: str = ""
+    when_text: str = ""
     note: str = ""
+
+
+class MemoryIn(BaseModel):
+    title: str
+    note: str = ""
+    tags: List[str] = []
+    image_url: str | None = None
 
 
 class VapiActionRequest(BaseModel):
     intent: str = "general"
     query: str = ""
     message: str = ""
-    first_name: str = "Veteran"
-    email: str = "local"
+    first_name: str = ""
+    email: str = ""
     branch: str = "Army"
     city: str = "Dallas"
     state: str = "TX"
@@ -176,392 +292,321 @@ class VapiActionRequest(BaseModel):
     mood: str = "calm"
 
 
-def normalize_intent(text: str) -> str:
+def profile_out(user: User) -> ProfileOut:
+    p = user.profile
+    return ProfileOut(id=user.id, email=user.email, role=user.role, first_name=p.first_name if p else "Veteran", last_name=p.last_name if p else "", branch=p.branch if p else "Army", city=p.city if p else "Dallas", state=p.state if p else "TX", interests=p.interests if p else [])
+
+
+async def gemini_reply(prompt: str, fallback: str) -> str:
+    if not GEMINI_API_KEY:
+        return fallback
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
+    payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.55, "maxOutputTokens": 700}}
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            r = await client.post(url, json=payload)
+            r.raise_for_status()
+            data = r.json()
+        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+    except Exception:
+        return fallback
+
+
+async def google_places(city: str, state: str, query: str) -> tuple[bool, list[dict[str, Any]]]:
+    fallback = [
+        {"title": "Veteran Coffee Meetup", "location": f"{city}, {state}", "type": "Community", "description": "A local meetup-style suggestion for veteran connection."},
+        {"title": "VFW / American Legion Post Visit", "location": f"Near {city}", "type": "Veteran community", "description": "Search nearby veteran organizations and social events."},
+        {"title": "VA Resource Check-in", "location": f"{city} area", "type": "Benefits", "description": "Look for VA support services, clinics, or resource offices."},
+        {"title": "Outdoor Walk or Park Check-in", "location": f"Near {city}", "type": "Wellness", "description": "A simple positive activity to reset the day."},
+    ]
+    if not GOOGLE_MAPS_API_KEY:
+        return False, fallback
+    text_query = f"{query or 'veteran events VFW American Legion VA community'} near {city}, {state}"
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get("https://maps.googleapis.com/maps/api/place/textsearch/json", params={"query": text_query, "key": GOOGLE_MAPS_API_KEY})
+            r.raise_for_status()
+            data = r.json()
+        results = []
+        for item in data.get("results", [])[:6]:
+            results.append({"title": item.get("name"), "location": item.get("formatted_address", f"{city}, {state}"), "type": ", ".join(item.get("types", [])[:2]), "rating": item.get("rating"), "description": "Live Google Places result", "place_id": item.get("place_id")})
+        return True, results or fallback
+    except Exception:
+        return False, fallback
+
+
+def benefits_lookup(query: str, state: str, branch: str) -> dict[str, Any]:
+    q = (query or "benefits").lower()
+    items = []
+    if any(x in q for x in ["education", "school", "gi", "tuition"]):
+        items.append({"title": "GI Bill and education benefits", "summary": "Review Post-9/11 GI Bill, school certification, housing allowance basics, and state education programs.", "next_step": "Gather DD214, school/program details, and check eligibility on VA.gov."})
+    if any(x in q for x in ["disability", "claim", "rating", "compensation"]):
+        items.append({"title": "VA disability compensation", "summary": "You can organize evidence and questions for a service-connected claim. ValorBuddy can help prepare a checklist, not decide eligibility.", "next_step": "Speak with a VSO or VA-accredited representative."})
+    if any(x in q for x in ["home", "loan", "mortgage"]):
+        items.append({"title": "VA home loan", "summary": "VA-backed home loans may support buying, refinancing, or repairing a home.", "next_step": "Check Certificate of Eligibility and talk with a VA-approved lender."})
+    if not items:
+        items = [{"title": "Benefits starting point", "summary": "Common categories include healthcare, disability compensation, education, home loan, employment, pension, and survivor benefits.", "next_step": "Ask about one category and ValorBuddy will build a plain-English checklist."}]
+    return {"disclaimer": "Informational only. Use VA.gov or a VA-accredited representative for official guidance.", "items": items, "state": state, "branch": branch}
+
+
+def music_suggestions(mood: str, branch: str) -> list[dict[str, str]]:
+    mood_l = (mood or "calm").lower()
+    if "patriotic" in mood_l or "military" in mood_l:
+        return [{"title": "Patriotic instrumental playlist", "url": "https://www.youtube.com/results?search_query=patriotic+instrumental+music", "mood": mood}, {"title": f"{branch} cadence and heritage music", "url": f"https://www.youtube.com/results?search_query={branch}+military+cadence", "mood": mood}]
+    if "gospel" in mood_l:
+        return [{"title": "Calming gospel playlist", "url": "https://www.youtube.com/results?search_query=calming+gospel+playlist", "mood": mood}]
+    if "country" in mood_l:
+        return [{"title": "Classic country calm mix", "url": "https://www.youtube.com/results?search_query=classic+country+calm+playlist", "mood": mood}]
+    return [{"title": "Calm instrumental focus", "url": "https://www.youtube.com/results?search_query=calm+instrumental+music", "mood": mood}, {"title": "Relaxing old school classics", "url": "https://www.youtube.com/results?search_query=relaxing+old+school+classics", "mood": mood}]
+
+
+def infer_intent(text: str) -> str:
     t = (text or "").lower()
-    if any(x in t for x in ["event", "activity", "vfw", "american legion", "near me", "place", "coffee", "park"]):
+    if any(x in t for x in ["event", "activity", "vfw", "american legion", "near me", "places", "coffee", "park", "va facility", "clinic"]):
         return "find_local_veteran_activities"
-    if any(x in t for x in ["remind", "reminder", "appointment", "call the va"]):
+    if any(x in t for x in ["remind", "reminder", "appointment", "call the va", "schedule"]):
         return "create_reminder"
-    if any(x in t for x in ["remember", "memory", "save this", "photo"]):
+    if any(x in t for x in ["remember", "memory", "save this"]):
         return "save_memory"
-    if any(x in t for x in ["benefit", "benefits", "claim", "gi bill", "disability", "va loan", "dd214"]):
+    if any(x in t for x in ["benefit", "claim", "gi bill", "disability", "home loan", "va loan"]):
         return "search_benefits"
-    if any(x in t for x in ["music", "song", "play", "calm", "relax"]):
+    if any(x in t for x in ["music", "song", "playlist", "play something"]):
         return "suggest_music"
-    if any(x in t for x in ["briefing", "today", "schedule", "what do i have"]):
+    if any(x in t for x in ["briefing", "today", "how is my day", "schedule"]):
         return "get_today_briefing"
-    if any(x in t for x in ["profile", "who am i", "my info"]):
-        return "get_user_profile"
     return "general"
 
 
-def profile_payload(row, fallback_email="local"):
-    if not row:
-        return {"email": fallback_email, "name": "Veteran", "branch": "Army", "city": "Dallas", "state": "TX", "interests": [], "preferred_tone": "calm and positive"}
-    return {"email": row.email, "name": row.name, "branch": row.branch, "city": row.city, "state": row.state, "interests": row.interests or [], "preferred_tone": row.preferred_tone}
-
-
-def benefits_response(query: str, state: str = "TX", branch: str = "Army"):
-    q = (query or "benefits").lower()
-    items = []
-    if any(x in q for x in ["gi", "education", "school", "tuition"]):
-        items.append({"title": "GI Bill and education benefits", "summary": "Review Post-9/11 GI Bill, Montgomery GI Bill, transferability, school certification, and housing allowance basics.", "next_step": "Check eligibility on VA.gov and gather DD214, school program details, and prior education records."})
-    if any(x in q for x in ["disability", "claim", "rating", "compensation"]):
-        items.append({"title": "VA disability compensation", "summary": "You may be able to file or update a claim for service-connected conditions. ValorBuddy can help organize questions and documents, but cannot guarantee outcomes.", "next_step": "Work with a VSO, VA-accredited representative, or VA.gov to review evidence and file officially."})
-    if any(x in q for x in ["home", "loan", "mortgage", "house"]):
-        items.append({"title": "VA home loan benefit", "summary": "VA-backed home loans can help eligible veterans buy, build, repair, or refinance a home.", "next_step": "Check Certificate of Eligibility and speak with a VA-approved lender."})
-    if not items:
-        items = [
-            {"title": "Benefits starting point", "summary": "Common areas include healthcare, disability compensation, education, VA home loans, employment support, and pension programs.", "next_step": "Tell me which benefit area you want, and I’ll build a plain-English checklist."},
-            {"title": "Find a VSO", "summary": "A Veteran Service Officer can help review claims and paperwork.", "next_step": f"Search for a VSO near your location in {state} or ask ValorBuddy to find nearby veteran organizations."},
-        ]
-    return {"query": query, "branch": branch, "state": state, "disclaimer": "Informational only. For official decisions use VA.gov or a VA-accredited representative.", "items": items}
+app = FastAPI(title=APP_NAME, version="3.0.0")
+origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
+app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 
 @app.on_event("startup")
-def on_startup():
-    create_tables()
+def startup():
+    Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     try:
-        existing = db.query(UserProfileDB).filter(UserProfileDB.email == "local").first()
-        if not existing:
-            db.add(UserProfileDB(email="local", name="Veteran", branch="Army", city="Dallas", state="TX", interests=["local events", "benefits", "memories"]))
-            db.commit()
+        if not db.query(User).filter(User.email == "admin@valorbuddy.com").first():
+            admin = User(email="admin@valorbuddy.com", password_hash=hash_password("ValorAdmin123!"), role="admin")
+            db.add(admin); db.flush()
+            db.add(UserProfile(user_id=admin.id, first_name="Eugene", last_name="", branch="Army", city="Dallas", state="TX", interests=["analytics", "veteran pilots"]))
+        if not db.query(User).filter(User.email == "demo@valorbuddy.com").first():
+            demo = User(email="demo@valorbuddy.com", password_hash=hash_password("ValorDemo123!"), role="veteran")
+            db.add(demo); db.flush()
+            db.add(UserProfile(user_id=demo.id, first_name="James", last_name="", branch="Army", city="Dallas", state="TX", interests=["events", "benefits", "music", "memories"]))
+        db.commit()
     finally:
         db.close()
 
 
 @app.get("/health")
 def health():
-    return {
-        "status": "ok",
-        "service": APP_NAME,
-        "version": "2.2.0",
-        "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite",
-        "tables_auto_create": True,
-        "gemini": bool(GEMINI_API_KEY),
-        "google_maps": bool(GOOGLE_MAPS_API_KEY),
-    }
+    return {"status": "ok", "app": APP_NAME, "version": "3.0.0", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
 
 
 @app.get("/db/tables")
 def db_tables():
-    return {
-        "tables": [
-            "user_profiles",
-            "memories",
-            "reminders",
-            "companion_conversations",
-            "activity_searches",
-            "music_favorites",
-        ]
-    }
+    return {"tables": sorted(Base.metadata.tables.keys())}
 
 
-async def gemini_answer(req: CompanionRequest) -> str | None:
-    if not GEMINI_API_KEY:
-        return None
-    profile = req.profile
-    system = (
-        "You are ValorBuddy, a warm, positive AI companion and practical assistant for veterans. "
-        "You are not a clinician, therapist, emergency service, or legal representative. "
-        "Do not diagnose or treat PTSD. You may provide grounding, encouragement, practical reminders, resource navigation, "
-        "local activity suggestions, benefits guidance in plain English, and gentle companionship. "
-        "If the user mentions immediate danger, self-harm, harming others, or crisis, urge them to call 988 and press 1 in the U.S., "
-        "call emergency services, or contact a trusted person now. Keep responses concise, personal, and action-oriented. "
-        f"Call the user by first name: {profile.name}. Their branch is {profile.branch}. Location: {profile.city}, {profile.state}. "
-        f"Tone preference: {profile.preferred_tone}."
-    )
-    memories = "\n".join(f"- {m}" for m in req.recent_memories[:5]) or "No memories shared yet."
-    prompt = f"{system}\n\nRecent memories to use gently if relevant:\n{memories}\n\nUser message: {req.message}"
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
-    payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.55, "maxOutputTokens": 420}}
-    try:
-        async with httpx.AsyncClient(timeout=25) as client:
-            r = await client.post(url, json=payload)
-            r.raise_for_status()
-            data = r.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
-    except Exception:
-        return None
+@app.post("/auth/register", response_model=LoginResponse)
+def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+    if db.query(User).filter(User.email == payload.email).first():
+        raise HTTPException(status_code=409, detail="Email already exists")
+    user = User(email=str(payload.email).lower(), password_hash=hash_password(payload.password), role="veteran")
+    db.add(user); db.flush()
+    db.add(UserProfile(user_id=user.id, first_name=payload.first_name, last_name=payload.last_name, branch=payload.branch, city=payload.city, state=payload.state, interests=payload.interests))
+    db.add(AdminAuditLog(user_id=user.id, action="user.registered", details=user.email))
+    db.commit(); db.refresh(user)
+    token = create_access_token(user)
+    return LoginResponse(token=token, user=profile_out(user))
 
 
-def fallback_answer(req: CompanionRequest) -> str:
-    name = req.profile.name or "friend"
-    msg = req.message.lower()
-    if any(x in msg for x in ["crisis", "suicide", "kill myself", "harm myself", "can't go on"]):
-        return f"{name}, I’m really glad you said something. If you might hurt yourself or someone else, call 988 and press 1 now, call emergency services, or reach a trusted person immediately. Stay with someone and move away from anything dangerous."
-    if any(x in msg for x in ["ptsd", "anxious", "panic", "stress", "nightmare"]):
-        return f"{name}, I’m here with you. Let’s take one small step: breathe in for four, hold for two, breathe out for six. Look around and name five things you can see. You’re not alone. I can also remind you about calming routines, play a gentle instrumental tone, or help find a nearby veteran-friendly activity."
-    if any(x in msg for x in ["memory", "photo", "picture", "remember"]):
-        return f"{name}, you can add that to your Memory Wall so ValorBuddy can bring it back later as a positive reminder. Add a title, a note, and a photo if you want."
-    if any(x in msg for x in ["song", "music", "play"]):
-        return f"{name}, I can play a calming instrumental sound here and suggest uplifting playlists. For licensed songs, use the Music Companion links to open Spotify or YouTube."
-    if any(x in msg for x in ["event", "activity", "near", "local"]):
-        return f"{name}, I’ll look for veteran-friendly events and activities near {req.profile.city}, {req.profile.state}. Try community meetups, VFW/American Legion posts, job fairs, parks, coffee groups, museums, or service opportunities."
-    if any(x in msg for x in ["benefit", "claim", "va", "dd214"]):
-        return f"{name}, I can help you organize the next steps in plain English. For official benefits action, use VA.gov or a certified VSO. Tell me the benefit type and I’ll build a checklist."
-    return f"{name}, I’m with you. Tell me what you need: benefits help, local activities, reminders, memories, documents, music, or a quick grounding check-in."
+@app.post("/auth/login", response_model=LoginResponse)
+def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == str(payload.email).lower()).first()
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    token = create_access_token(user)
+    db.add(AuthToken(user_id=user.id, token=token)); db.add(AdminAuditLog(user_id=user.id, action="user.login", details=user.email)); db.commit()
+    return LoginResponse(token=token, user=profile_out(user))
 
 
-@app.get("/profile/{email}")
-def get_profile(email: str):
-    db = SessionLocal()
-    try:
-        row = db.query(UserProfileDB).filter(UserProfileDB.email == email).first()
-        if not row:
-            return None
-        return {"email": row.email, "name": row.name, "branch": row.branch, "city": row.city, "state": row.state, "interests": row.interests or [], "preferred_tone": row.preferred_tone}
-    finally:
-        db.close()
-
-
-@app.post("/profile")
-def save_profile(profile: ProfileIn):
-    db = SessionLocal()
-    try:
-        row = db.query(UserProfileDB).filter(UserProfileDB.email == profile.email).first()
-        if not row:
-            row = UserProfileDB(email=profile.email)
-            db.add(row)
-        row.name = profile.name
-        row.branch = profile.branch
-        row.city = profile.city
-        row.state = profile.state
-        row.interests = profile.interests
-        row.preferred_tone = profile.preferred_tone
-        row.updated_at = datetime.now(timezone.utc)
-        db.commit()
-        return {"ok": True, "profile": profile.model_dump()}
-    finally:
-        db.close()
-
-
-@app.post("/ai/companion")
-async def ai_companion(req: CompanionRequest):
-    answer = await gemini_answer(req)
-    source = "gemini" if answer else "fallback"
-    reply = answer or fallback_answer(req)
-    db = SessionLocal()
-    try:
-        db.add(ConversationDB(profile_email=req.profile_email or "local", user_message=req.message, ai_reply=reply, mode=req.mode, source=source))
-        db.commit()
-    finally:
-        db.close()
-    return {"reply": reply, "source": source}
-
-
-@app.get("/activities")
-async def activities(city: str = "Dallas", state: str = "TX", interest: str = "veteran events"):
-    query = f"veteran friendly {interest} near {city} {state}"
-    live = False
-    provider = "Curated starter suggestions"
-    items = []
-    if GOOGLE_MAPS_API_KEY:
-        try:
-            url = "https://maps.googleapis.com/maps/api/place/textsearch/json"
-            async with httpx.AsyncClient(timeout=15) as client:
-                r = await client.get(url, params={"query": query, "key": GOOGLE_MAPS_API_KEY})
-                r.raise_for_status()
-                data = r.json().get("results", [])[:8]
-            live = True
-            provider = "Google Places"
-            items = [{"title": x.get("name"), "location": x.get("formatted_address"), "rating": x.get("rating"), "type": "Local activity/resource", "open_now": x.get("opening_hours", {}).get("open_now")} for x in data]
-        except Exception:
-            items = []
-    if not items:
-        items = [
-            {"title": "Veteran Coffee Meetup", "type": "Community", "location": f"{city}, {state}", "date": "This week"},
-            {"title": "VFW / American Legion Post Visit", "type": "Veteran community", "location": f"Near {city}", "date": "Any day"},
-            {"title": "Veteran Job & Resource Fair", "type": "Employment", "location": f"{city} metro", "date": "Next available"},
-            {"title": "Outdoor Walk or Park Check-in", "type": "Wellness", "location": f"Near {city}", "date": "Today"},
-            {"title": "Veteran-Owned Business Visit", "type": "Discounts", "location": f"{city}, {state}", "date": "Daily"},
-        ]
-    db = SessionLocal()
-    try:
-        db.add(ActivityCacheDB(city=city, state=state, interest=interest, provider=provider, live=live, results=items))
-        db.commit()
-    finally:
-        db.close()
-    return {"live": live, "provider": provider, "items": items}
-
-
-@app.get("/music/suggestions")
-def music_suggestions(mood: str = "calm"):
-    mood = mood.lower()
-    if "energy" in mood or "motivat" in mood:
-        theme = "uplifting veteran motivation playlist"
-    elif "sleep" in mood:
-        theme = "calm sleep instrumental playlist"
-    else:
-        theme = "calm instrumental grounding playlist"
-    return {"note": "ValorBuddy can play built-in calming tones. For commercial songs, open a licensed music service.", "suggestions": [{"title": "Calm instrumental grounding", "action": "play_builtin_calm"}, {"title": "Uplifting classics", "url": f"https://open.spotify.com/search/{theme.replace(' ', '%20')}"}, {"title": "YouTube calming playlist search", "url": f"https://www.youtube.com/results?search_query={theme.replace(' ', '+')}"}]}
-
-
-@app.get("/memories")
-def list_memories(profile_email: str = "local"):
-    db = SessionLocal()
-    try:
-        rows = db.query(MemoryDB).filter(MemoryDB.profile_email == profile_email).order_by(MemoryDB.id.desc()).all()
-        return [{"id": r.id, "profile_email": r.profile_email, "title": r.title, "note": r.note or "", "tags": r.tags or [], "image_url": r.image_url, "created_at": r.created_at} for r in rows]
-    finally:
-        db.close()
-
-
-@app.post("/memories")
-def add_memory(memory: MemoryIn):
-    db = SessionLocal()
-    try:
-        row = MemoryDB(**memory.model_dump())
-        db.add(row)
-        db.commit()
-        db.refresh(row)
-        return {"id": row.id, "profile_email": row.profile_email, "title": row.title, "note": row.note or "", "tags": row.tags or [], "image_url": row.image_url, "created_at": row.created_at}
-    finally:
-        db.close()
-
-
-@app.post("/memories/photo")
-async def add_memory_photo(profile_email: str = Form("local"), title: str = Form(...), note: str = Form(""), file: UploadFile = File(...)):
-    safe_name = f"{int(datetime.now().timestamp())}_{file.filename}".replace("/", "_")
-    path = UPLOAD_DIR / safe_name
-    path.write_bytes(await file.read())
-    image_url = f"/uploads/{safe_name}"
-    return add_memory(MemoryIn(profile_email=profile_email, title=title, note=note, image_url=image_url))
-
-
-@app.get("/reminders")
-def list_reminders(profile_email: str = "local"):
-    db = SessionLocal()
-    try:
-        rows = db.query(ReminderDB).filter(ReminderDB.profile_email == profile_email).order_by(ReminderDB.id.desc()).all()
-        return [{"id": r.id, "profile_email": r.profile_email, "title": r.title, "when_text": r.when_text, "note": r.note or "", "status": r.status, "created_at": r.created_at} for r in rows]
-    finally:
-        db.close()
-
-
-@app.post("/reminders")
-def add_reminder(reminder: ReminderIn):
-    db = SessionLocal()
-    try:
-        row = ReminderDB(**reminder.model_dump(), status="active")
-        db.add(row)
-        db.commit()
-        db.refresh(row)
-        return {"id": row.id, "profile_email": row.profile_email, "title": row.title, "when_text": row.when_text, "note": row.note or "", "status": row.status, "created_at": row.created_at}
-    finally:
-        db.close()
+@app.get("/auth/me", response_model=ProfileOut)
+def me(user: User = Depends(get_current_user)):
+    return profile_out(user)
 
 
 @app.get("/api/profile")
-def api_profile(email: str = "local"):
-    db = SessionLocal()
-    try:
-        return profile_payload(db.query(UserProfileDB).filter(UserProfileDB.email == email).first(), email)
-    finally:
-        db.close()
+def get_profile(user: User = Depends(get_current_user)):
+    return profile_out(user).model_dump()
+
+
+@app.post("/api/profile")
+def update_profile(payload: RegisterRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    p = user.profile
+    p.first_name = payload.first_name; p.last_name = payload.last_name; p.branch = payload.branch; p.city = payload.city; p.state = payload.state; p.interests = payload.interests; p.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return profile_out(user).model_dump()
 
 
 @app.get("/api/events/search")
-async def api_events_search(city: str = "Dallas", state: str = "TX", keyword: str = "veteran events"):
-    return await activities(city=city, state=state, interest=keyword)
-
-
-@app.get("/api/benefits/search")
-def api_benefits_search(query: str = "benefits", state: str = "TX", branch: str = "Army"):
-    return benefits_response(query=query, state=state, branch=branch)
-
-
-@app.get("/api/music/suggest")
-def api_music_suggest(mood: str = "calm", branch: str = "Army"):
-    data = music_suggestions(mood=mood)
-    data["branch"] = branch
-    return data
-
-
-@app.get("/api/briefing")
-async def api_briefing(email: str = "local", city: str = "Dallas", state: str = "TX"):
-    db = SessionLocal()
-    try:
-        profile = db.query(UserProfileDB).filter(UserProfileDB.email == email).first()
-        if profile:
-            city, state = profile.city, profile.state
-        reminders = db.query(ReminderDB).filter(ReminderDB.profile_email == email, ReminderDB.status == "active").order_by(ReminderDB.id.desc()).limit(5).all()
-        memories = db.query(MemoryDB).filter(MemoryDB.profile_email == email).order_by(MemoryDB.id.desc()).limit(3).all()
-    finally:
-        db.close()
-    events = await activities(city=city, state=state, interest="veteran activities")
-    return {
-        "greeting": f"Good to see you. Here is your ValorBuddy briefing for {city}, {state}.",
-        "reminders": [{"title": r.title, "when_text": r.when_text, "note": r.note} for r in reminders],
-        "recent_memories": [{"title": m.title, "note": m.note} for m in memories],
-        "local_activities": events.get("items", [])[:3],
-        "suggested_focus": "One practical step, one connection, and one calming routine today."
-    }
+async def events_search(city: str = "Dallas", state: str = "TX", keyword: str = "veteran events", user: Optional[User] = Depends(get_optional_user), db: Session = Depends(get_db)):
+    live, items = await google_places(city, state, keyword)
+    db.add(ActivitySearch(user_id=user.id if user else None, city=city, state=state, query=keyword, live=live, results=items)); db.commit()
+    return {"live": live, "provider": "Google Places" if live else "Fallback", "items": items}
 
 
 @app.post("/api/reminders")
-def api_create_reminder(payload: dict):
-    title = payload.get("title") or payload.get("reminder") or "Reminder"
-    date = payload.get("date", "")
-    time = payload.get("time", "")
-    when_text = payload.get("when_text") or " ".join(x for x in [date, time] if x).strip() or "soon"
-    email = payload.get("profile_email") or payload.get("email") or "local"
-    return add_reminder(ReminderIn(profile_email=email, title=title, when_text=when_text, note=payload.get("note", "")))
+def create_reminder(payload: ReminderIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    row = Reminder(user_id=user.id, title=payload.title, date=payload.date, time=payload.time, when_text=payload.when_text or f"{payload.date} {payload.time}".strip(), note=payload.note)
+    db.add(row); db.add(AdminAuditLog(user_id=user.id, action="reminder.created", details=payload.title)); db.commit(); db.refresh(row)
+    return {"id": row.id, "title": row.title, "date": row.date, "time": row.time, "when_text": row.when_text, "status": row.status, "calendar_enabled": GOOGLE_CALENDAR_ENABLED}
+
+
+@app.get("/api/reminders")
+def list_reminders(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    rows = db.query(Reminder).filter(Reminder.user_id == user.id).order_by(Reminder.id.desc()).all()
+    return [{"id": r.id, "title": r.title, "date": r.date, "time": r.time, "when_text": r.when_text, "status": r.status} for r in rows]
 
 
 @app.post("/api/memories")
-def api_save_memory(payload: dict):
-    title = payload.get("title") or "Saved memory"
-    memory = payload.get("memory") or payload.get("note") or ""
-    email = payload.get("profile_email") or payload.get("email") or "local"
-    return add_memory(MemoryIn(profile_email=email, title=title, note=memory, tags=payload.get("tags", [])))
+def create_memory(payload: MemoryIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    row = Memory(user_id=user.id, title=payload.title, note=payload.note, tags=payload.tags, image_url=payload.image_url)
+    db.add(row); db.add(AdminAuditLog(user_id=user.id, action="memory.created", details=payload.title)); db.commit(); db.refresh(row)
+    return {"id": row.id, "title": row.title, "note": row.note, "tags": row.tags, "image_url": row.image_url}
+
+
+@app.get("/api/memories")
+def list_memories(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    rows = db.query(Memory).filter(Memory.user_id == user.id).order_by(Memory.id.desc()).all()
+    return [{"id": r.id, "title": r.title, "note": r.note, "tags": r.tags, "image_url": r.image_url} for r in rows]
+
+
+@app.get("/api/benefits/search")
+def search_benefits(query: str = "benefits", state: str = "TX", branch: str = "Army"):
+    return benefits_lookup(query, state, branch)
+
+
+@app.get("/api/music/suggest")
+def suggest_music(mood: str = "calm", branch: str = "Army"):
+    return {"items": music_suggestions(mood, branch)}
+
+
+@app.get("/api/briefing")
+async def today_briefing(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    p = user.profile
+    rems = db.query(Reminder).filter(Reminder.user_id == user.id, Reminder.status == "active").order_by(Reminder.id.desc()).limit(3).all()
+    live, events = await google_places(p.city, p.state, "veteran events VA VFW American Legion")
+    return {"greeting": f"Good to see you, {p.first_name}. How is your day going?", "location": f"{p.city}, {p.state}", "reminders": [{"title": r.title, "when_text": r.when_text} for r in rems], "events": events[:3], "wellness_prompt": "Take a steady breath, check your plan for today, and choose one positive action."}
+
+
+@app.post("/api/companion/chat")
+async def companion_chat(payload: CompanionRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    p = user.profile
+    conv = db.get(Conversation, payload.conversation_id) if payload.conversation_id else None
+    if not conv:
+        conv = Conversation(user_id=user.id, source="web", title="ValorBuddy companion")
+        db.add(conv); db.flush()
+    recent_memories = db.query(Memory).filter(Memory.user_id == user.id).order_by(Memory.id.desc()).limit(5).all()
+    recent_reminders = db.query(Reminder).filter(Reminder.user_id == user.id).order_by(Reminder.id.desc()).limit(5).all()
+    prompt = f"""You are ValorBuddy, a calm practical veteran companion. Address the user by first name.
+User: {p.first_name}, Branch: {p.branch}, Location: {p.city}, {p.state}, Interests: {p.interests}
+Recent memories: {[m.title for m in recent_memories]}
+Recent reminders: {[r.title for r in recent_reminders]}
+User message: {payload.message}
+Respond warmly, briefly, practically. If they need local data, suggest asking for events/places. Safety: you are not a clinician; for crisis encourage immediate help/988 press 1."""
+    fallback = f"{p.first_name}, I hear you. I can help with local veteran activities, reminders, memories, benefits, documents, music, or a quick plan for today. What would help most right now?"
+    reply = await gemini_reply(prompt, fallback)
+    db.add(Message(conversation_id=conv.id, user_id=user.id, role="user", content=payload.message))
+    db.add(Message(conversation_id=conv.id, user_id=user.id, role="assistant", content=reply))
+    db.commit()
+    return {"conversation_id": conv.id, "response": reply, "reply": reply}
+
+
+@app.post("/api/documents")
+async def upload_document(doc_type: str = Form("general"), file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    content = await file.read()
+    safe_name = f"{user.id}_{int(datetime.now().timestamp())}_{file.filename}"
+    path = UPLOAD_DIR / safe_name
+    path.write_bytes(content)
+    extracted = ""
+    try:
+        if file.filename.lower().endswith((".txt", ".md", ".csv")):
+            extracted = content.decode("utf-8", errors="ignore")[:6000]
+    except Exception:
+        extracted = ""
+    summary = await gemini_reply(f"Summarize this veteran document in simple helpful terms:\n{extracted[:4000]}", "Document uploaded and stored. AI search is ready for text-based files.")
+    row = Document(user_id=user.id, filename=file.filename, doc_type=doc_type, file_url=f"/uploads/{safe_name}", extracted_text=extracted, ai_summary=summary)
+    db.add(row); db.commit(); db.refresh(row)
+    return {"id": row.id, "filename": row.filename, "doc_type": row.doc_type, "file_url": row.file_url, "ai_summary": row.ai_summary}
+
+
+@app.get("/api/documents")
+def list_documents(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    rows = db.query(Document).filter(Document.user_id == user.id).order_by(Document.id.desc()).all()
+    return [{"id": r.id, "filename": r.filename, "doc_type": r.doc_type, "file_url": r.file_url, "ai_summary": r.ai_summary} for r in rows]
 
 
 @app.post("/api/vapi/action")
-async def api_vapi_action(payload: VapiActionRequest, request: Request):
-    # One orchestration endpoint for Vapi. It routes voice intent to Google Places, Gemini, DB reminders, memories, benefits, music, or briefing.
-    intent = normalize_intent(payload.intent or payload.query or payload.message)
-    msg = payload.message or payload.query or payload.intent
-    db = SessionLocal()
-    try:
-        row = db.query(UserProfileDB).filter(UserProfileDB.email == payload.email).first()
-        if not row:
-            row = UserProfileDB(email=payload.email, name=payload.first_name or "Veteran", branch=payload.branch, city=payload.city, state=payload.state, interests=["veteran events", "benefits", "wellness"])
-            db.add(row); db.commit(); db.refresh(row)
-        prof = Profile(name=row.name or payload.first_name, branch=row.branch or payload.branch, city=row.city or payload.city, state=row.state or payload.state, interests=row.interests or [], preferred_tone=row.preferred_tone)
-    finally:
-        db.close()
+async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db)):
+    text = payload.message or payload.query or payload.title or payload.memory or ""
+    intent = payload.intent if payload.intent and payload.intent != "general" else infer_intent(text)
+    email = (payload.email or "demo@valorbuddy.com").lower()
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        user = db.query(User).filter(User.email == "demo@valorbuddy.com").first()
+    first_name = payload.first_name or (user.profile.first_name if user and user.profile else "there")
+    branch = payload.branch or (user.profile.branch if user and user.profile else "Army")
+    city = payload.city or (user.profile.city if user and user.profile else "Dallas")
+    state = payload.state or (user.profile.state if user and user.profile else "TX")
 
-    result = None
     if intent == "find_local_veteran_activities":
-        result = await activities(city=prof.city, state=prof.state, interest=payload.query or "veteran activities")
-        summary = f"{prof.name}, I found {len(result.get('items', []))} veteran-friendly options near {prof.city}. Top options: " + "; ".join([i.get('title','Option') for i in result.get('items', [])[:3]])
-    elif intent == "create_reminder":
-        title = payload.title or msg or "Reminder"
-        when = " ".join(x for x in [payload.date, payload.time] if x).strip() or "soon"
-        result = api_create_reminder({"email": payload.email, "title": title, "when_text": when})
-        summary = f"Absolutely, {prof.name}. I saved that reminder: {title}, {when}."
-    elif intent == "save_memory":
-        title = payload.title or "Important memory"
-        memory = payload.memory or msg
-        result = api_save_memory({"email": payload.email, "title": title, "memory": memory})
-        summary = f"I saved that memory for you, {prof.name}."
-    elif intent == "get_user_profile":
-        result = profile_payload(row, payload.email)
-        summary = f"{prof.name}, I have your profile as {prof.branch}, based near {prof.city}, {prof.state}."
-    elif intent == "get_today_briefing":
-        result = await api_briefing(email=payload.email, city=prof.city, state=prof.state)
-        summary = f"{prof.name}, here is your briefing: {len(result['reminders'])} reminders, {len(result['local_activities'])} nearby activity options, and a focus on one practical step today."
-    elif intent == "search_benefits":
-        result = benefits_response(query=payload.query or msg, state=prof.state, branch=prof.branch)
-        summary = f"{prof.name}, I found benefits guidance. Top item: {result['items'][0]['title']}. {result['items'][0]['next_step']}"
-    elif intent == "suggest_music":
-        result = music_suggestions(mood=payload.mood)
-        summary = f"{prof.name}, I can suggest calming or uplifting music. I found options for {payload.mood} mood, including a built-in calming tone and licensed playlist links."
-    else:
-        comp = await ai_companion(CompanionRequest(profile=prof, message=msg or "How can you help me today?", profile_email=payload.email))
-        result = comp
-        summary = comp.get("reply")
+        live, items = await google_places(city, state, payload.query or text or "veteran events")
+        response = f"{first_name}, I found {len(items)} veteran-friendly options near {city}. The top options are: " + "; ".join([i.get("title", "Option") for i in items[:3]]) + "."
+        return {"response": response, "intent": intent, "data": {"live": live, "items": items}}
+    if intent == "create_reminder":
+        title = payload.title or text or "Reminder"
+        if user:
+            row = Reminder(user_id=user.id, title=title, date=payload.date, time=payload.time, when_text=f"{payload.date} {payload.time}".strip() or "Soon")
+            db.add(row); db.commit()
+        return {"response": f"Absolutely, {first_name}. I saved that reminder: {title}.", "intent": intent}
+    if intent == "save_memory":
+        title = payload.title or "Memory"
+        note = payload.memory or text
+        if user:
+            db.add(Memory(user_id=user.id, title=title, note=note, tags=["voice"])); db.commit()
+        return {"response": f"I saved that memory for you, {first_name}.", "intent": intent}
+    if intent == "search_benefits":
+        data = benefits_lookup(payload.query or text, state, branch)
+        response = f"{first_name}, here is a good starting point: {data['items'][0]['title']}. {data['items'][0]['summary']}"
+        return {"response": response, "intent": intent, "data": data}
+    if intent == "suggest_music":
+        items = music_suggestions(payload.mood or text or "calm", branch)
+        return {"response": f"{first_name}, I found a calming option: {items[0]['title']}. I can open the playlist link in the app.", "intent": intent, "data": {"items": items}}
+    if intent == "get_today_briefing":
+        return {"response": f"Good to see you, {first_name}. Today, start with one steady breath, check your reminders, and consider one local veteran-friendly activity near {city}. I can search live events now if you want.", "intent": intent}
+    if intent == "get_user_profile":
+        return {"response": f"I have your profile as {first_name}, {branch}, located around {city}, {state}.", "intent": intent}
+    prompt = f"User {first_name}, branch {branch}, city {city}, state {state} said: {text}. Respond as ValorBuddy, practical veteran companion."
+    response = await gemini_reply(prompt, f"{first_name}, I can help with veteran events, reminders, memories, benefits, music, documents, and today’s plan. What would you like me to handle first?")
+    return {"response": response, "intent": intent}
 
-    return {"ok": True, "intent": intent, "response": summary, "data": result}
+
+@app.get("/admin/overview")
+def admin_overview(_: User = Depends(admin_required), db: Session = Depends(get_db)):
+    return {"users": db.query(User).count(), "veterans": db.query(User).filter(User.role == "veteran").count(), "admins": db.query(User).filter(User.role == "admin").count(), "reminders": db.query(Reminder).count(), "memories": db.query(Memory).count(), "conversations": db.query(Conversation).count(), "messages": db.query(Message).count(), "documents": db.query(Document).count(), "activity_searches": db.query(ActivitySearch).count()}
+
+
+@app.get("/admin/users")
+def admin_users(_: User = Depends(admin_required), db: Session = Depends(get_db)):
+    rows = db.query(User).order_by(User.id.desc()).all()
+    return [{"id": u.id, "email": u.email, "role": u.role, "active": u.is_active, "first_name": u.profile.first_name if u.profile else "", "branch": u.profile.branch if u.profile else "", "city": u.profile.city if u.profile else "", "state": u.profile.state if u.profile else ""} for u in rows]
+
+
+@app.get("/admin/activity")
+def admin_activity(_: User = Depends(admin_required), db: Session = Depends(get_db)):
+    logs = db.query(AdminAuditLog).order_by(AdminAuditLog.id.desc()).limit(100).all()
+    return [{"id": l.id, "user_id": l.user_id, "action": l.action, "details": l.details, "created_at": l.created_at.isoformat() if l.created_at else None} for l in logs]
