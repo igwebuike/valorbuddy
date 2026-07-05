@@ -65,3 +65,29 @@ npx cap add ios
 npx cap sync ios
 npx cap open ios
 ```
+
+
+## Database
+
+ValorBuddy now supports PostgreSQL through `DATABASE_URL` and automatically creates these tables on backend startup:
+
+- `user_profiles`
+- `memories`
+- `reminders`
+- `companion_conversations`
+- `activity_searches`
+- `music_favorites`
+
+On Render, create a PostgreSQL database and set `DATABASE_URL` on `valorbuddy-api` to the Internal Database URL. The backend runs `Base.metadata.create_all()` at startup, so no manual SQL is required for the MVP.
+
+Health check:
+
+```text
+/health
+```
+
+DB table check:
+
+```text
+/db/tables
+```
