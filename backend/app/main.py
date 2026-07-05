@@ -16,7 +16,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 APP_NAME = os.getenv("APP_NAME", "ValorBuddy API")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY") or os.getenv("GOOGLE_MAPS_API_KEY")
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./valorbuddy.db")
 DATA_DIR = Path(os.getenv("DATA_DIR", "/tmp/valorbuddy"))
@@ -112,7 +112,7 @@ def get_db():
         db.close()
 
 
-app = FastAPI(title=APP_NAME, version="2.2.0")
+app = FastAPI(title=APP_NAME, version="2.1.0")
 origins = [x.strip() for x in CORS_ORIGINS.split(",") if x.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -178,7 +178,7 @@ def health():
     return {
         "status": "ok",
         "service": APP_NAME,
-        "version": "2.2.0",
+        "version": "2.1.0",
         "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite",
         "tables_auto_create": True,
         "gemini": bool(GEMINI_API_KEY),
@@ -297,7 +297,7 @@ async def ai_companion(req: CompanionRequest):
 async def activities(city: str = "Dallas", state: str = "TX", interest: str = "veteran events"):
     query = f"veteran friendly {interest} near {city} {state}"
     live = False
-    provider = "Curated starter suggestions"
+    provider = "Fallback curated list"
     items = []
     if GOOGLE_MAPS_API_KEY:
         try:
