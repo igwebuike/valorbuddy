@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import List, Optional
 
 import httpx
-from fastapi import FastAPI, UploadFile, File, Form
+from fastapi import FastAPI, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -16,7 +16,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 APP_NAME = os.getenv("APP_NAME", "ValorBuddy API")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
-GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_MAPS_API_KEY")
+GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY") or os.getenv("GOOGLE_MAPS_API_KEY")
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./valorbuddy.db")
 DATA_DIR = Path(os.getenv("DATA_DIR", "/tmp/valorbuddy"))
@@ -112,7 +112,7 @@ def get_db():
         db.close()
 
 
-app = FastAPI(title=APP_NAME, version="2.1.0")
+app = FastAPI(title=APP_NAME, version="2.2.0")
 origins = [x.strip() for x in CORS_ORIGINS.split(",") if x.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -160,6 +160,64 @@ class ReminderIn(BaseModel):
     note: str = ""
 
 
+class VapiActionRequest(BaseModel):
+    intent: str = "general"
+    query: str = ""
+    message: str = ""
+    first_name: str = "Veteran"
+    email: str = "local"
+    branch: str = "Army"
+    city: str = "Dallas"
+    state: str = "TX"
+    title: str = ""
+    date: str = ""
+    time: str = ""
+    memory: str = ""
+    mood: str = "calm"
+
+
+def normalize_intent(text: str) -> str:
+    t = (text or "").lower()
+    if any(x in t for x in ["event", "activity", "vfw", "american legion", "near me", "place", "coffee", "park"]):
+        return "find_local_veteran_activities"
+    if any(x in t for x in ["remind", "reminder", "appointment", "call the va"]):
+        return "create_reminder"
+    if any(x in t for x in ["remember", "memory", "save this", "photo"]):
+        return "save_memory"
+    if any(x in t for x in ["benefit", "benefits", "claim", "gi bill", "disability", "va loan", "dd214"]):
+        return "search_benefits"
+    if any(x in t for x in ["music", "song", "play", "calm", "relax"]):
+        return "suggest_music"
+    if any(x in t for x in ["briefing", "today", "schedule", "what do i have"]):
+        return "get_today_briefing"
+    if any(x in t for x in ["profile", "who am i", "my info"]):
+        return "get_user_profile"
+    return "general"
+
+
+def profile_payload(row, fallback_email="local"):
+    if not row:
+        return {"email": fallback_email, "name": "Veteran", "branch": "Army", "city": "Dallas", "state": "TX", "interests": [], "preferred_tone": "calm and positive"}
+    return {"email": row.email, "name": row.name, "branch": row.branch, "city": row.city, "state": row.state, "interests": row.interests or [], "preferred_tone": row.preferred_tone}
+
+
+def benefits_response(query: str, state: str = "TX", branch: str = "Army"):
+    q = (query or "benefits").lower()
+    items = []
+    if any(x in q for x in ["gi", "education", "school", "tuition"]):
+        items.append({"title": "GI Bill and education benefits", "summary": "Review Post-9/11 GI Bill, Montgomery GI Bill, transferability, school certification, and housing allowance basics.", "next_step": "Check eligibility on VA.gov and gather DD214, school program details, and prior education records."})
+    if any(x in q for x in ["disability", "claim", "rating", "compensation"]):
+        items.append({"title": "VA disability compensation", "summary": "You may be able to file or update a claim for service-connected conditions. ValorBuddy can help organize questions and documents, but cannot guarantee outcomes.", "next_step": "Work with a VSO, VA-accredited representative, or VA.gov to review evidence and file officially."})
+    if any(x in q for x in ["home", "loan", "mortgage", "house"]):
+        items.append({"title": "VA home loan benefit", "summary": "VA-backed home loans can help eligible veterans buy, build, repair, or refinance a home.", "next_step": "Check Certificate of Eligibility and speak with a VA-approved lender."})
+    if not items:
+        items = [
+            {"title": "Benefits starting point", "summary": "Common areas include healthcare, disability compensation, education, VA home loans, employment support, and pension programs.", "next_step": "Tell me which benefit area you want, and I’ll build a plain-English checklist."},
+            {"title": "Find a VSO", "summary": "A Veteran Service Officer can help review claims and paperwork.", "next_step": f"Search for a VSO near your location in {state} or ask ValorBuddy to find nearby veteran organizations."},
+        ]
+    return {"query": query, "branch": branch, "state": state, "disclaimer": "Informational only. For official decisions use VA.gov or a VA-accredited representative.", "items": items}
+
+
 @app.on_event("startup")
 def on_startup():
     create_tables()
@@ -178,7 +236,7 @@ def health():
     return {
         "status": "ok",
         "service": APP_NAME,
-        "version": "2.1.0",
+        "version": "2.2.0",
         "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite",
         "tables_auto_create": True,
         "gemini": bool(GEMINI_API_KEY),
@@ -297,7 +355,7 @@ async def ai_companion(req: CompanionRequest):
 async def activities(city: str = "Dallas", state: str = "TX", interest: str = "veteran events"):
     query = f"veteran friendly {interest} near {city} {state}"
     live = False
-    provider = "Fallback curated list"
+    provider = "Curated starter suggestions"
     items = []
     if GOOGLE_MAPS_API_KEY:
         try:
@@ -393,3 +451,117 @@ def add_reminder(reminder: ReminderIn):
         return {"id": row.id, "profile_email": row.profile_email, "title": row.title, "when_text": row.when_text, "note": row.note or "", "status": row.status, "created_at": row.created_at}
     finally:
         db.close()
+
+
+@app.get("/api/profile")
+def api_profile(email: str = "local"):
+    db = SessionLocal()
+    try:
+        return profile_payload(db.query(UserProfileDB).filter(UserProfileDB.email == email).first(), email)
+    finally:
+        db.close()
+
+
+@app.get("/api/events/search")
+async def api_events_search(city: str = "Dallas", state: str = "TX", keyword: str = "veteran events"):
+    return await activities(city=city, state=state, interest=keyword)
+
+
+@app.get("/api/benefits/search")
+def api_benefits_search(query: str = "benefits", state: str = "TX", branch: str = "Army"):
+    return benefits_response(query=query, state=state, branch=branch)
+
+
+@app.get("/api/music/suggest")
+def api_music_suggest(mood: str = "calm", branch: str = "Army"):
+    data = music_suggestions(mood=mood)
+    data["branch"] = branch
+    return data
+
+
+@app.get("/api/briefing")
+async def api_briefing(email: str = "local", city: str = "Dallas", state: str = "TX"):
+    db = SessionLocal()
+    try:
+        profile = db.query(UserProfileDB).filter(UserProfileDB.email == email).first()
+        if profile:
+            city, state = profile.city, profile.state
+        reminders = db.query(ReminderDB).filter(ReminderDB.profile_email == email, ReminderDB.status == "active").order_by(ReminderDB.id.desc()).limit(5).all()
+        memories = db.query(MemoryDB).filter(MemoryDB.profile_email == email).order_by(MemoryDB.id.desc()).limit(3).all()
+    finally:
+        db.close()
+    events = await activities(city=city, state=state, interest="veteran activities")
+    return {
+        "greeting": f"Good to see you. Here is your ValorBuddy briefing for {city}, {state}.",
+        "reminders": [{"title": r.title, "when_text": r.when_text, "note": r.note} for r in reminders],
+        "recent_memories": [{"title": m.title, "note": m.note} for m in memories],
+        "local_activities": events.get("items", [])[:3],
+        "suggested_focus": "One practical step, one connection, and one calming routine today."
+    }
+
+
+@app.post("/api/reminders")
+def api_create_reminder(payload: dict):
+    title = payload.get("title") or payload.get("reminder") or "Reminder"
+    date = payload.get("date", "")
+    time = payload.get("time", "")
+    when_text = payload.get("when_text") or " ".join(x for x in [date, time] if x).strip() or "soon"
+    email = payload.get("profile_email") or payload.get("email") or "local"
+    return add_reminder(ReminderIn(profile_email=email, title=title, when_text=when_text, note=payload.get("note", "")))
+
+
+@app.post("/api/memories")
+def api_save_memory(payload: dict):
+    title = payload.get("title") or "Saved memory"
+    memory = payload.get("memory") or payload.get("note") or ""
+    email = payload.get("profile_email") or payload.get("email") or "local"
+    return add_memory(MemoryIn(profile_email=email, title=title, note=memory, tags=payload.get("tags", [])))
+
+
+@app.post("/api/vapi/action")
+async def api_vapi_action(payload: VapiActionRequest, request: Request):
+    # One orchestration endpoint for Vapi. It routes voice intent to Google Places, Gemini, DB reminders, memories, benefits, music, or briefing.
+    intent = normalize_intent(payload.intent or payload.query or payload.message)
+    msg = payload.message or payload.query or payload.intent
+    db = SessionLocal()
+    try:
+        row = db.query(UserProfileDB).filter(UserProfileDB.email == payload.email).first()
+        if not row:
+            row = UserProfileDB(email=payload.email, name=payload.first_name or "Veteran", branch=payload.branch, city=payload.city, state=payload.state, interests=["veteran events", "benefits", "wellness"])
+            db.add(row); db.commit(); db.refresh(row)
+        prof = Profile(name=row.name or payload.first_name, branch=row.branch or payload.branch, city=row.city or payload.city, state=row.state or payload.state, interests=row.interests or [], preferred_tone=row.preferred_tone)
+    finally:
+        db.close()
+
+    result = None
+    if intent == "find_local_veteran_activities":
+        result = await activities(city=prof.city, state=prof.state, interest=payload.query or "veteran activities")
+        summary = f"{prof.name}, I found {len(result.get('items', []))} veteran-friendly options near {prof.city}. Top options: " + "; ".join([i.get('title','Option') for i in result.get('items', [])[:3]])
+    elif intent == "create_reminder":
+        title = payload.title or msg or "Reminder"
+        when = " ".join(x for x in [payload.date, payload.time] if x).strip() or "soon"
+        result = api_create_reminder({"email": payload.email, "title": title, "when_text": when})
+        summary = f"Absolutely, {prof.name}. I saved that reminder: {title}, {when}."
+    elif intent == "save_memory":
+        title = payload.title or "Important memory"
+        memory = payload.memory or msg
+        result = api_save_memory({"email": payload.email, "title": title, "memory": memory})
+        summary = f"I saved that memory for you, {prof.name}."
+    elif intent == "get_user_profile":
+        result = profile_payload(row, payload.email)
+        summary = f"{prof.name}, I have your profile as {prof.branch}, based near {prof.city}, {prof.state}."
+    elif intent == "get_today_briefing":
+        result = await api_briefing(email=payload.email, city=prof.city, state=prof.state)
+        summary = f"{prof.name}, here is your briefing: {len(result['reminders'])} reminders, {len(result['local_activities'])} nearby activity options, and a focus on one practical step today."
+    elif intent == "search_benefits":
+        result = benefits_response(query=payload.query or msg, state=prof.state, branch=prof.branch)
+        summary = f"{prof.name}, I found benefits guidance. Top item: {result['items'][0]['title']}. {result['items'][0]['next_step']}"
+    elif intent == "suggest_music":
+        result = music_suggestions(mood=payload.mood)
+        summary = f"{prof.name}, I can suggest calming or uplifting music. I found options for {payload.mood} mood, including a built-in calming tone and licensed playlist links."
+    else:
+        comp = await ai_companion(CompanionRequest(profile=prof, message=msg or "How can you help me today?", profile_email=payload.email))
+        result = comp
+        summary = comp.get("reply")
+
+    return {"ok": True, "intent": intent, "response": summary, "data": result}
