@@ -296,22 +296,6 @@ class BranchUpdate(BaseModel):
     branch: str
 
 
-def format_places_response(first_name: str, city: str, items: list[dict[str, Any]], live: bool) -> str:
-    if not items:
-        return f"{first_name}, I could not find matching local options around {city} yet. Try asking for VFW posts, American Legion, VA clinics, parks, coffee meetups, or veteran resources."
-    source = "live Google Places" if live else "recommended fallback"
-    lines = [f"{first_name}, I found {len(items)} {source} options near {city}. Here are the top choices:"]
-    for idx, item in enumerate(items[:3], 1):
-        name = item.get("title") or item.get("name") or "Local option"
-        loc = item.get("location") or "nearby"
-        rating = item.get("rating")
-        rating_txt = f", rating {rating}" if rating else ""
-        desc = item.get("description") or item.get("type") or "veteran-friendly local resource"
-        lines.append(f"{idx}. {name} — {loc}{rating_txt}. {desc}.")
-    lines.append("Would you like directions, phone details, or more options?")
-    return " ".join(lines)
-
-
 def profile_out(user: User) -> ProfileOut:
     p = user.profile
     return ProfileOut(id=user.id, email=user.email, role=user.role, first_name=p.first_name if p else "Veteran", last_name=p.last_name if p else "", branch=p.branch if p else "Army", city=p.city if p else "Dallas", state=p.state if p else "TX", interests=p.interests if p else [])
@@ -349,7 +333,7 @@ async def google_places(city: str, state: str, query: str) -> tuple[bool, list[d
             data = r.json()
         results = []
         for item in data.get("results", [])[:6]:
-            results.append({"title": item.get("name"), "location": item.get("formatted_address", f"{city}, {state}"), "type": ", ".join(item.get("types", [])[:2]), "rating": item.get("rating"), "description": "Live Google Places result", "place_id": item.get("place_id"), "maps_url": f"https://www.google.com/maps/place/?q=place_id:{item.get('place_id')}"})
+            results.append({"title": item.get("name"), "location": item.get("formatted_address", f"{city}, {state}"), "type": ", ".join(item.get("types", [])[:2]), "rating": item.get("rating"), "description": "Live Google Places result", "place_id": item.get("place_id")})
         return True, results or fallback
     except Exception:
         return False, fallback
@@ -382,8 +366,6 @@ def music_suggestions(mood: str, branch: str) -> list[dict[str, str]]:
 
 def infer_intent(text: str) -> str:
     t = (text or "").lower()
-    if any(x in t for x in ["detail", "details", "tell me more", "more about", "what are they", "those events", "these events", "where are they"]):
-        return "activity_details"
     if any(x in t for x in ["event", "activity", "vfw", "american legion", "near me", "places", "coffee", "park", "va facility", "clinic"]):
         return "find_local_veteran_activities"
     if any(x in t for x in ["remind", "reminder", "appointment", "call the va", "schedule"]):
@@ -465,28 +447,27 @@ def me(user: User = Depends(get_current_user)):
 def get_profile(user: User = Depends(get_current_user)):
     return profile_out(user).model_dump()
 
+@app.post("/api/profile/branch")
+def update_profile_branch(payload: BranchUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    allowed = {"Army", "Navy", "Air Force", "Marines", "Coast Guard", "Space Force"}
+    if payload.branch not in allowed:
+        raise HTTPException(status_code=400, detail="Unsupported service branch")
+    if not user.profile:
+        db.add(UserProfile(user_id=user.id, first_name="Veteran", branch=payload.branch, city="Dallas", state="TX"))
+    else:
+        user.profile.branch = payload.branch
+        user.profile.updated_at = datetime.now(timezone.utc)
+    db.add(AdminAuditLog(user_id=user.id, action="profile.branch_updated", details=payload.branch))
+    db.commit()
+    db.refresh(user)
+    return profile_out(user).model_dump()
+
 
 @app.post("/api/profile")
 def update_profile(payload: RegisterRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     p = user.profile
     p.first_name = payload.first_name; p.last_name = payload.last_name; p.branch = payload.branch; p.city = payload.city; p.state = payload.state; p.interests = payload.interests; p.updated_at = datetime.now(timezone.utc)
     db.commit()
-    return profile_out(user).model_dump()
-
-
-@app.post("/api/profile/branch")
-def update_branch(payload: BranchUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    if payload.branch not in ["Army", "Navy", "Air Force", "Marines", "Coast Guard", "Space Force"]:
-        raise HTTPException(status_code=400, detail="Unsupported branch")
-    p = user.profile
-    if not p:
-        p = UserProfile(user_id=user.id, first_name="Veteran", branch=payload.branch)
-        db.add(p)
-    else:
-        p.branch = payload.branch
-        p.updated_at = datetime.now(timezone.utc)
-    db.commit()
-    db.refresh(user)
     return profile_out(user).model_dump()
 
 
@@ -602,22 +583,9 @@ async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db))
     state = payload.state or (user.profile.state if user and user.profile else "TX")
 
     if intent == "find_local_veteran_activities":
-        live, items = await google_places(city, state, payload.query or text or "veteran events VFW American Legion VA support")
-        if user:
-            db.add(ActivitySearch(user_id=user.id, city=city, state=state, query=payload.query or text or "veteran events", live=live, results=items))
-            db.commit()
-        response = format_places_response(first_name, city, items, live)
-        return {"response": response, "intent": intent, "results": items, "data": {"live": live, "items": items}}
-    if intent == "activity_details":
-        last = None
-        if user:
-            last = db.query(ActivitySearch).filter(ActivitySearch.user_id == user.id).order_by(ActivitySearch.id.desc()).first()
-        if not last:
-            live, items = await google_places(city, state, "veteran events VFW American Legion VA support")
-        else:
-            live, items = last.live, last.results or []
-        response = format_places_response(first_name, city, items, live)
-        return {"response": response, "intent": intent, "results": items, "data": {"live": live, "items": items}}
+        live, items = await google_places(city, state, payload.query or text or "veteran events")
+        response = f"{first_name}, I found {len(items)} veteran-friendly options near {city}. The top options are: " + "; ".join([i.get("title", "Option") for i in items[:3]]) + "."
+        return {"response": response, "intent": intent, "data": {"live": live, "items": items}}
     if intent == "create_reminder":
         title = payload.title or text or "Reminder"
         if user:
