@@ -303,12 +303,16 @@ def profile_out(user: User) -> ProfileOut:
 
 
 async def gemini_reply(prompt: str, fallback: str) -> str:
+    """Gemini wrapper. If the key is missing/fails, use a dynamic non-canned fallback."""
     if not GEMINI_API_KEY:
         return fallback
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
-    payload = {"contents": [{"parts": [{"text": prompt}]}], "generationConfig": {"temperature": 0.55, "maxOutputTokens": 700}}
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.72, "maxOutputTokens": 900},
+    }
     try:
-        async with httpx.AsyncClient(timeout=20) as client:
+        async with httpx.AsyncClient(timeout=22) as client:
             r = await client.post(url, json=payload)
             r.raise_for_status()
             data = r.json()
@@ -317,25 +321,68 @@ async def gemini_reply(prompt: str, fallback: str) -> str:
         return fallback
 
 
+def clean_text(text: str) -> str:
+    return " ".join((text or "").strip().split())
+
+
+def human_list(items: list[dict[str, Any]], limit: int = 3) -> str:
+    parts = []
+    for idx, item in enumerate(items[:limit], 1):
+        name = item.get("title") or item.get("name") or "Option"
+        loc = item.get("location") or item.get("type") or "nearby"
+        rating = f" — rating {item.get('rating')}" if item.get("rating") else ""
+        parts.append(f"{idx}. {name} ({loc}){rating}")
+    return " ".join(parts)
+
+
 async def google_places(city: str, state: str, query: str) -> tuple[bool, list[dict[str, Any]]]:
-    fallback = [
-        {"title": "Veteran Coffee Meetup", "location": f"{city}, {state}", "type": "Community", "description": "Demo suggestion. Add GOOGLE_PLACES_API_KEY on Render for live local results.", "maps_url": f"https://www.google.com/maps/search/veteran+coffee+near+{city}+{state}"},
-        {"title": "VFW or American Legion Post", "location": f"Near {city}", "type": "Veteran community", "description": "Demo suggestion for veteran organizations and social connection.", "maps_url": f"https://www.google.com/maps/search/VFW+American+Legion+near+{city}+{state}"},
-        {"title": "VA Resource Check-in", "location": f"{city} area", "type": "Benefits", "description": "Demo suggestion for VA clinics, benefits offices, or resource centers.", "maps_url": f"https://www.google.com/maps/search/VA+clinic+near+{city}+{state}"},
-        {"title": "Outdoor Walk or Park Check-in", "location": f"Near {city}", "type": "Wellness", "description": "Demo suggestion for a simple positive reset activity.", "maps_url": f"https://www.google.com/maps/search/parks+near+{city}+{state}"},
-    ]
+    """Search live Google Places when configured; otherwise return varied realistic demo cards."""
+    clean_query = clean_text(query) or "veteran friendly places"
+    fallback_map = {
+        "coffee": [
+            {"title": "Veteran-friendly coffee nearby", "location": f"Near {city}, {state}", "type": "Coffee", "description": "Demo card until GOOGLE_PLACES_API_KEY is connected. Use this to show the flow, then enable live Google Places.", "maps_url": f"https://www.google.com/maps/search/veteran+friendly+coffee+near+{quote_plus(city+' '+state)}"},
+            {"title": "American Legion coffee social", "location": f"{city} area", "type": "Veteran community", "description": "Good for a quick meetup, conversation, or networking with other veterans.", "maps_url": f"https://www.google.com/maps/search/American+Legion+near+{quote_plus(city+' '+state)}"},
+        ],
+        "clinic": [
+            {"title": "Nearest VA clinic search", "location": f"Near {city}, {state}", "type": "VA care", "description": "Open map results for VA clinics and resource centers near the veteran.", "maps_url": f"https://www.google.com/maps/search/VA+clinic+near+{quote_plus(city+' '+state)}"},
+            {"title": "Vet Center / counseling resource search", "location": f"{city} area", "type": "Support", "description": "For official support, use VA.gov or call the facility before going.", "maps_url": f"https://www.google.com/maps/search/Vet+Center+near+{quote_plus(city+' '+state)}"},
+        ],
+        "parks": [
+            {"title": "Quiet park or walking trail", "location": f"Near {city}, {state}", "type": "Wellness", "description": "A simple low-pressure reset option nearby.", "maps_url": f"https://www.google.com/maps/search/parks+near+{quote_plus(city+' '+state)}"},
+            {"title": "Lake, trail, or outdoor space", "location": f"{city} area", "type": "Outdoor", "description": "Good for fresh air, family time, or decompression.", "maps_url": f"https://www.google.com/maps/search/trails+near+{quote_plus(city+' '+state)}"},
+        ],
+        "food": [
+            {"title": "Mission BBQ / veteran-friendly restaurant search", "location": f"Near {city}, {state}", "type": "Food", "description": "Look for veteran-friendly restaurants and military discount spots.", "maps_url": f"https://www.google.com/maps/search/veteran+discount+restaurants+near+{quote_plus(city+' '+state)}"},
+            {"title": "Veteran-owned restaurant search", "location": f"{city} area", "type": "Food", "description": "Support veteran-owned businesses nearby.", "maps_url": f"https://www.google.com/maps/search/veteran+owned+restaurant+near+{quote_plus(city+' '+state)}"},
+        ],
+    }
+    q = clean_query.lower()
+    if any(k in q for k in ["coffee", "breakfast", "cafe"]):
+        fallback = fallback_map["coffee"]
+    elif any(k in q for k in ["clinic", "hospital", "doctor", "va"]):
+        fallback = fallback_map["clinic"]
+    elif any(k in q for k in ["park", "walk", "trail", "outdoor"]):
+        fallback = fallback_map["parks"]
+    elif any(k in q for k in ["food", "restaurant", "bbq", "lunch", "dinner"]):
+        fallback = fallback_map["food"]
+    else:
+        fallback = [
+            {"title": "VFW or American Legion post", "location": f"Near {city}, {state}", "type": "Veteran community", "description": "Community, networking, and veteran-friendly events.", "maps_url": f"https://www.google.com/maps/search/VFW+American+Legion+near+{quote_plus(city+' '+state)}"},
+            {"title": "Veteran-friendly coffee or meetup", "location": f"{city} area", "type": "Social", "description": "A simple option for connection without pressure.", "maps_url": f"https://www.google.com/maps/search/veteran+coffee+near+{quote_plus(city+' '+state)}"},
+            {"title": "VA resource or benefits office", "location": f"Near {city}", "type": "Benefits", "description": "Useful for official VA questions or referrals.", "maps_url": f"https://www.google.com/maps/search/VA+benefits+office+near+{quote_plus(city+' '+state)}"},
+            {"title": "Outdoor reset spot", "location": f"Near {city}", "type": "Wellness", "description": "Park, trail, or quiet outdoor option.", "maps_url": f"https://www.google.com/maps/search/parks+near+{quote_plus(city+' '+state)}"},
+        ]
     if not GOOGLE_MAPS_API_KEY:
         return False, fallback
-    clean_query = (query or "veteran events VFW American Legion VA community").strip()
-    text_query = f"{clean_query} near {city}, {state}"
     try:
+        text_query = f"{clean_query} near {city}, {state}"
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.get("https://maps.googleapis.com/maps/api/place/textsearch/json", params={"query": text_query, "key": GOOGLE_MAPS_API_KEY})
             r.raise_for_status()
             data = r.json()
         status = data.get("status")
         if status not in ("OK", "ZERO_RESULTS"):
-            return False, [{**x, "description": f"Google Places returned {status}. Check API key, billing, and Places API access."} for x in fallback]
+            return False, [{**x, "description": f"Google Places returned {status}. Check key, billing, Places API, and restrictions."} for x in fallback]
         results = []
         seen = set()
         for item in data.get("results", [])[:8]:
@@ -362,21 +409,28 @@ async def google_places(city: str, state: str, query: str) -> tuple[bool, list[d
 def benefits_lookup(query: str, state: str, branch: str) -> dict[str, Any]:
     q = (query or "benefits").lower()
     items = []
-    if any(x in q for x in ["education", "school", "gi", "tuition"]):
-        items.append({"title": "GI Bill and education benefits", "summary": "Review Post-9/11 GI Bill, school certification, housing allowance basics, and state education programs.", "next_step": "Gather DD214, school/program details, and check eligibility on VA.gov."})
-    if any(x in q for x in ["disability", "claim", "rating", "compensation"]):
-        items.append({"title": "VA disability compensation", "summary": "You can organize evidence and questions for a service-connected claim. ValorBuddy can help prepare a checklist, not decide eligibility.", "next_step": "Speak with a VSO or VA-accredited representative."})
+    if any(x in q for x in ["spouse", "dependent", "wife", "husband", "child", "children", "survivor", "caregiver", "family"]):
+        items.append({"title": "Spouse, dependent, survivor, and caregiver pathways", "summary": "ValorBuddy can help families understand education, survivor, caregiver, healthcare, and benefit-support pathways in plain English. Eligibility depends on service history and VA rules.", "next_step": "Create a family-access profile, gather DD214/benefit letters, then verify official eligibility on VA.gov or with an accredited VSO."})
+    if any(x in q for x in ["education", "school", "gi", "tuition", "chapter", "dea"]):
+        items.append({"title": "Education benefits / GI Bill / DEA starting point", "summary": "Review Post-9/11 GI Bill, transfer rules, Chapter 35 DEA for eligible dependents, school certification, and housing allowance basics.", "next_step": "Gather service records, school/program details, and check the official VA education portal."})
+    if any(x in q for x in ["disability", "claim", "rating", "compensation", "appeal"]):
+        items.append({"title": "VA disability compensation and claim support", "summary": "ValorBuddy can organize evidence, questions, appointments, and plain-English checklists. It does not decide eligibility or replace an accredited representative.", "next_step": "Collect medical/service evidence and speak with a VSO or VA-accredited representative."})
     if any(x in q for x in ["home", "loan", "mortgage"]):
-        items.append({"title": "VA home loan", "summary": "VA-backed home loans may support buying, refinancing, or repairing a home.", "next_step": "Check Certificate of Eligibility and talk with a VA-approved lender."})
+        items.append({"title": "VA home loan pathway", "summary": "VA-backed home loans may support buying, refinancing, or repairing a home for eligible veterans and some surviving spouses.", "next_step": "Check Certificate of Eligibility and talk with a VA-approved lender."})
+    if any(x in q for x in ["health", "clinic", "medical", "mental", "doctor"]):
+        items.append({"title": "VA healthcare and local care navigation", "summary": "Find VA clinics, Vet Centers, community care questions, and appointment reminders. For urgent or crisis needs, call emergency services or 988 then press 1.", "next_step": "Use VA.gov or local VA facility contacts for official enrollment and appointment details."})
     if not items:
-        items = [{"title": "Benefits starting point", "summary": "Common categories include healthcare, disability compensation, education, home loan, employment, pension, and survivor benefits.", "next_step": "Ask about one category and ValorBuddy will build a plain-English checklist."}]
+        items = [
+            {"title": "Benefits command center", "summary": "Common categories include healthcare, disability compensation, education, home loan, employment, pension, caregiver, survivor, spouse, and dependent benefits.", "next_step": "Ask about one category, and ValorBuddy will build a plain-English checklist."},
+            {"title": "Family access", "summary": "Spouses and dependents can use ValorBuddy to organize documents, reminders, resources, and benefit questions connected to the veteran's journey.", "next_step": "Create a spouse/dependent profile and attach key documents."},
+        ]
     return {"disclaimer": "Informational only. Use VA.gov or a VA-accredited representative for official guidance.", "items": items, "state": state, "branch": branch}
 
 
 def music_suggestions(mood: str, branch: str) -> list[dict[str, str]]:
     mood_l = (mood or "calm").lower()
     if "patriotic" in mood_l or "military" in mood_l:
-        return [{"title": "Patriotic instrumental playlist", "url": "https://www.youtube.com/results?search_query=patriotic+instrumental+music", "mood": mood}, {"title": f"{branch} cadence and heritage music", "url": f"https://www.youtube.com/results?search_query={branch}+military+cadence", "mood": mood}]
+        return [{"title": "Patriotic instrumental playlist", "url": "https://www.youtube.com/results?search_query=patriotic+instrumental+music", "mood": mood}, {"title": f"{branch} cadence and heritage music", "url": f"https://www.youtube.com/results?search_query={quote_plus(branch)}+military+cadence", "mood": mood}]
     if "gospel" in mood_l:
         return [{"title": "Calming gospel playlist", "url": "https://www.youtube.com/results?search_query=calming+gospel+playlist", "mood": mood}]
     if "country" in mood_l:
@@ -386,19 +440,106 @@ def music_suggestions(mood: str, branch: str) -> list[dict[str, str]]:
 
 def infer_intent(text: str) -> str:
     t = (text or "").lower()
-    if any(x in t for x in ["event", "activity", "vfw", "american legion", "near me", "places", "coffee", "park", "va facility", "clinic"]):
-        return "find_local_veteran_activities"
-    if any(x in t for x in ["remind", "reminder", "appointment", "call the va", "schedule"]):
+    if any(x in t for x in ["remind", "reminder", "appointment", "call the va", "schedule", "tomorrow", "next week"]):
         return "create_reminder"
-    if any(x in t for x in ["remember", "memory", "save this"]):
+    if any(x in t for x in ["remember", "memory", "save this", "log this", "journal"]):
         return "save_memory"
-    if any(x in t for x in ["benefit", "claim", "gi bill", "disability", "home loan", "va loan"]):
+    if any(x in t for x in ["benefit", "claim", "gi bill", "disability", "home loan", "va loan", "spouse", "dependent", "survivor", "caregiver", "family access"]):
         return "search_benefits"
+    if any(x in t for x in ["event", "activity", "vfw", "american legion", "near me", "places", "coffee", "park", "restaurant", "bbq", "food", "clinic", "va facility", "gym", "fishing"]):
+        return "find_local_veteran_activities"
     if any(x in t for x in ["music", "song", "playlist", "play something"]):
         return "suggest_music"
-    if any(x in t for x in ["briefing", "today", "how is my day", "schedule"]):
+    if any(x in t for x in ["briefing", "today", "how is my day", "what should i do", "plan my day"]):
         return "get_today_briefing"
+    if any(x in t for x in ["who am i", "my profile", "profile", "branch"]):
+        return "get_user_profile"
     return "general"
+
+
+async def route_valorbuddy_message(
+    *, text: str, first_name: str, branch: str, city: str, state: str,
+    user: Optional[User] = None, db: Optional[Session] = None, explicit_intent: str = "general",
+    title: str = "", date: str = "", time: str = "", memory: str = "", mood: str = "calm"
+) -> dict[str, Any]:
+    """Agentic router: decides which tool to call, gathers data, then composes a human answer."""
+    message = clean_text(text)
+    intent = explicit_intent if explicit_intent and explicit_intent != "general" else infer_intent(message)
+
+    if intent == "find_local_veteran_activities":
+        live, items = await google_places(city, state, message)
+        mode = "live Google Places" if live else "demo search cards"
+        fallback = f"{first_name}, I searched for '{message}' around {city}. Here are the best {mode} options: {human_list(items)}. Pick one and I can help with directions, a reminder, or a follow-up question."
+        prompt = f"""You are ValorBuddy, an AI battle buddy for veterans and families.
+User: {first_name}, {branch}, {city}, {state}
+User asked: {message}
+Tool used: Google Places / local search. Live={live}. Results: {json.dumps(items[:5])}
+Write a natural answer. Do not say 'I found 6 events' unless there are exactly 6. Mention 2-3 specific options, ask a useful follow-up, and avoid canned language."""
+        response = await gemini_reply(prompt, fallback)
+        return {"response": response, "intent": intent, "data": {"live": live, "items": items}}
+
+    if intent == "search_benefits":
+        data = benefits_lookup(message, state, branch)
+        fallback = f"{first_name}, here is the strongest starting point: {data['items'][0]['title']}. {data['items'][0]['summary']} Next step: {data['items'][0]['next_step']}"
+        prompt = f"""You are ValorBuddy, a plain-English veteran benefits guide. You are informational only, not legal/medical advice.
+User: {first_name}, {branch}, {city}, {state}
+Question: {message}
+Benefit data: {json.dumps(data)}
+Answer naturally and specifically. Include spouse/dependent access when relevant. Keep it concise and useful."""
+        response = await gemini_reply(prompt, fallback)
+        return {"response": response, "intent": intent, "data": data}
+
+    if intent == "create_reminder":
+        reminder_title = title or message or "Reminder"
+        when_text = f"{date} {time}".strip() or "Soon"
+        if user and db:
+            row = Reminder(user_id=user.id, title=reminder_title, date=date, time=time, when_text=when_text)
+            db.add(row); db.commit()
+        return {"response": f"Done, {first_name}. I saved this reminder: {reminder_title}. Time: {when_text}.", "intent": intent}
+
+    if intent == "save_memory":
+        mem_title = title or "Saved memory"
+        note = memory or message
+        if user and db:
+            db.add(Memory(user_id=user.id, title=mem_title, note=note, tags=["voice", "assistant"])); db.commit()
+        return {"response": f"I saved that for you, {first_name}. You can find it in your Memory Wall.", "intent": intent}
+
+    if intent == "suggest_music":
+        items = music_suggestions(mood or message or "calm", branch)
+        fallback = f"{first_name}, I would start with {items[0]['title']}. If you want, I can also suggest gospel, country, patriotic, or calm focus music."
+        prompt = f"User {first_name} asked about music: {message}. Branch: {branch}. Suggestions: {json.dumps(items)}. Respond like a helpful companion with one clear recommendation."
+        response = await gemini_reply(prompt, fallback)
+        return {"response": response, "intent": intent, "data": {"items": items}}
+
+    if intent == "get_today_briefing":
+        rems = []
+        if user and db:
+            rems = db.query(Reminder).filter(Reminder.user_id == user.id, Reminder.status == "active").order_by(Reminder.id.desc()).limit(3).all()
+        live, places = await google_places(city, state, "veteran friendly coffee parks VFW")
+        reminder_txt = "; ".join([f"{r.title} ({r.when_text})" for r in rems]) or "no saved reminders yet"
+        fallback = f"Good to see you, {first_name}. Your current reminders: {reminder_txt}. Around {city}, a good next move could be {places[0]['title']}. Want me to search activities, benefits, or save a reminder?"
+        prompt = f"Create a short daily briefing for {first_name}, a {branch} veteran in {city}, {state}. Reminders: {reminder_txt}. Nearby options: {json.dumps(places[:3])}. Make it warm, practical, and not canned."
+        response = await gemini_reply(prompt, fallback)
+        return {"response": response, "intent": intent, "data": {"items": places, "live": live}}
+
+    if intent == "get_user_profile":
+        return {"response": f"I have you as {first_name}, {branch}, around {city}, {state}. ValorBuddy also supports spouse and dependent access, reminders, documents, benefits, local activities, music, and memory notes.", "intent": intent}
+
+    # General companion: make every answer contextual, not canned.
+    recent = []
+    rems = []
+    if user and db:
+        recent = db.query(Memory).filter(Memory.user_id == user.id).order_by(Memory.id.desc()).limit(4).all()
+        rems = db.query(Reminder).filter(Reminder.user_id == user.id).order_by(Reminder.id.desc()).limit(4).all()
+    fallback = f"{first_name}, I hear you. On '{message}', my next useful step would be to turn that into an action: search a local resource, explain a benefit, save a reminder, organize a document, or build a simple plan. Which direction do you want?"
+    prompt = f"""You are ValorBuddy, a real AI battle buddy for veterans, spouses, and dependents. Never sound like a static FAQ.
+User profile: first_name={first_name}, branch={branch}, city={city}, state={state}
+Recent memories: {[m.title for m in recent]}
+Recent reminders: {[r.title for r in rems]}
+User said: {message}
+Respond directly to the user's actual words. Be warm, practical, concise, and action-oriented. If a tool would help, say exactly which next action you can take. Avoid generic canned responses."""
+    response = await gemini_reply(prompt, fallback)
+    return {"response": response, "intent": intent}
 
 
 app = FastAPI(title=APP_NAME, version="3.0.0")
@@ -549,20 +690,20 @@ async def companion_chat(payload: CompanionRequest, user: User = Depends(get_cur
     if not conv:
         conv = Conversation(user_id=user.id, source="web", title="ValorBuddy companion")
         db.add(conv); db.flush()
-    recent_memories = db.query(Memory).filter(Memory.user_id == user.id).order_by(Memory.id.desc()).limit(5).all()
-    recent_reminders = db.query(Reminder).filter(Reminder.user_id == user.id).order_by(Reminder.id.desc()).limit(5).all()
-    prompt = f"""You are ValorBuddy, a calm practical veteran companion. Address the user by first name.
-User: {p.first_name}, Branch: {p.branch}, Location: {p.city}, {p.state}, Interests: {p.interests}
-Recent memories: {[m.title for m in recent_memories]}
-Recent reminders: {[r.title for r in recent_reminders]}
-User message: {payload.message}
-Respond warmly, briefly, practically. If they need local data, suggest asking for events/places. Safety: you are not a clinician; for crisis encourage immediate help/988 press 1."""
-    fallback = f"{p.first_name}, I hear you. I can help with local veteran activities, reminders, memories, benefits, documents, music, or a quick plan for today. What would help most right now?"
-    reply = await gemini_reply(prompt, fallback)
+    result = await route_valorbuddy_message(
+        text=payload.message,
+        first_name=p.first_name,
+        branch=p.branch,
+        city=p.city,
+        state=p.state,
+        user=user,
+        db=db,
+    )
+    reply = result.get("response", "")
     db.add(Message(conversation_id=conv.id, user_id=user.id, role="user", content=payload.message))
-    db.add(Message(conversation_id=conv.id, user_id=user.id, role="assistant", content=reply))
+    db.add(Message(conversation_id=conv.id, user_id=user.id, role="assistant", content=reply, metadata_json={"intent": result.get("intent"), "data": result.get("data", {})}))
     db.commit()
-    return {"conversation_id": conv.id, "response": reply, "reply": reply}
+    return {"conversation_id": conv.id, **result, "reply": reply}
 
 
 @app.post("/api/documents")
@@ -592,52 +733,28 @@ def list_documents(user: User = Depends(get_current_user), db: Session = Depends
 @app.post("/api/vapi/action")
 async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db)):
     text = payload.message or payload.query or payload.title or payload.memory or ""
-    intent = payload.intent if payload.intent and payload.intent != "general" else infer_intent(text)
     email = (payload.email or "demo@valorbuddy.com").lower()
-    user = db.query(User).filter(User.email == email).first()
-    if not user:
-        user = db.query(User).filter(User.email == "demo@valorbuddy.com").first()
+    user = db.query(User).filter(User.email == email).first() or db.query(User).filter(User.email == "demo@valorbuddy.com").first()
     first_name = payload.first_name or (user.profile.first_name if user and user.profile else "there")
     branch = payload.branch or (user.profile.branch if user and user.profile else "Army")
     city = payload.city or (user.profile.city if user and user.profile else "Dallas")
     state = payload.state or (user.profile.state if user and user.profile else "TX")
-
-    if intent == "find_local_veteran_activities":
-        search_text = payload.query or text or "veteran events"
-        live, items = await google_places(city, state, search_text)
-        source = "live Google Places" if live else "demo/local fallback"
-        details = []
-        for i, item in enumerate(items[:3], 1):
-            rating = f", rating {item.get('rating')}" if item.get("rating") else ""
-            details.append(f"{i}) {item.get('title', 'Option')} — {item.get('location', city)}{rating}")
-        response = f"{first_name}, here are {len(items)} {source} options near {city}: " + " | ".join(details) + ". Tap a card for directions or ask me for benefits, reminders, documents, music, or a daily plan."
-        return {"response": response, "intent": intent, "data": {"live": live, "items": items}}
-    if intent == "create_reminder":
-        title = payload.title or text or "Reminder"
-        if user:
-            row = Reminder(user_id=user.id, title=title, date=payload.date, time=payload.time, when_text=f"{payload.date} {payload.time}".strip() or "Soon")
-            db.add(row); db.commit()
-        return {"response": f"Absolutely, {first_name}. I saved that reminder: {title}.", "intent": intent}
-    if intent == "save_memory":
-        title = payload.title or "Memory"
-        note = payload.memory or text
-        if user:
-            db.add(Memory(user_id=user.id, title=title, note=note, tags=["voice"])); db.commit()
-        return {"response": f"I saved that memory for you, {first_name}.", "intent": intent}
-    if intent == "search_benefits":
-        data = benefits_lookup(payload.query or text, state, branch)
-        response = f"{first_name}, here is a good starting point: {data['items'][0]['title']}. {data['items'][0]['summary']}"
-        return {"response": response, "intent": intent, "data": data}
-    if intent == "suggest_music":
-        items = music_suggestions(payload.mood or text or "calm", branch)
-        return {"response": f"{first_name}, I found a calming option: {items[0]['title']}. I can open the playlist link in the app.", "intent": intent, "data": {"items": items}}
-    if intent == "get_today_briefing":
-        return {"response": f"Good to see you, {first_name}. Today, start with one steady breath, check your reminders, and consider one local veteran-friendly activity near {city}. I can search live events now if you want.", "intent": intent}
-    if intent == "get_user_profile":
-        return {"response": f"I have your profile as {first_name}, {branch}, located around {city}, {state}.", "intent": intent}
-    prompt = f"User {first_name}, branch {branch}, city {city}, state {state} said: {text}. Respond as ValorBuddy, practical veteran companion."
-    response = await gemini_reply(prompt, f"{first_name}, I can help with veteran events, reminders, memories, benefits, music, documents, and today’s plan. What would you like me to handle first?")
-    return {"response": response, "intent": intent}
+    result = await route_valorbuddy_message(
+        text=text,
+        first_name=first_name,
+        branch=branch,
+        city=city,
+        state=state,
+        user=user,
+        db=db,
+        explicit_intent=payload.intent,
+        title=payload.title,
+        date=payload.date,
+        time=payload.time,
+        memory=payload.memory,
+        mood=payload.mood,
+    )
+    return result
 
 
 @app.get("/admin/overview")
