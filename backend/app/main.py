@@ -11,7 +11,7 @@ from typing import Any, List, Optional
 
 import httpx
 import jwt
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
@@ -281,16 +281,21 @@ class VapiActionRequest(BaseModel):
     intent: str = "general"
     query: str = ""
     message: str = ""
+    transcript: str = ""
     first_name: str = ""
     email: str = ""
-    branch: str = "Army"
-    city: str = "Dallas"
-    state: str = "TX"
+    branch: str = ""
+    city: str = ""
+    state: str = ""
+    user_type: str = "Veteran"
     title: str = ""
     date: str = ""
     time: str = ""
     memory: str = ""
     mood: str = "calm"
+
+    class Config:
+        extra = "allow"
 
 
 class BranchUpdate(BaseModel):
@@ -730,21 +735,129 @@ def list_documents(user: User = Depends(get_current_user), db: Session = Depends
     return [{"id": r.id, "filename": r.filename, "doc_type": r.doc_type, "file_url": r.file_url, "ai_summary": r.ai_summary} for r in rows]
 
 
+def _deep_find_value(obj: Any, keys: set[str]) -> str:
+    """Find the first non-empty string value for any key in nested Vapi/frontend payloads."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if str(k).lower() in keys and isinstance(v, str) and v.strip():
+                return v.strip()
+        for v in obj.values():
+            found = _deep_find_value(v, keys)
+            if found:
+                return found
+    elif isinstance(obj, list):
+        for item in obj:
+            found = _deep_find_value(item, keys)
+            if found:
+                return found
+    return ""
+
+
+def _deep_find_args(obj: Any) -> dict[str, Any]:
+    """Vapi can send tool arguments in different shapes. This normalizes common ones."""
+    if not isinstance(obj, (dict, list)):
+        return {}
+    if isinstance(obj, dict):
+        # Direct Vapi shapes: {arguments:{...}}, {function:{arguments:{...}}}, {toolCall:{function:{arguments:{...}}}}
+        for key in ("arguments", "args", "parameters"):
+            value = obj.get(key)
+            if isinstance(value, dict):
+                return value
+            if isinstance(value, str) and value.strip():
+                try:
+                    parsed = json.loads(value)
+                    if isinstance(parsed, dict):
+                        return parsed
+                except Exception:
+                    pass
+        for value in obj.values():
+            found = _deep_find_args(value)
+            if found:
+                return found
+    else:
+        for value in obj:
+            found = _deep_find_args(value)
+            if found:
+                return found
+    return {}
+
+
+def _normalize_vapi_payload(raw: dict[str, Any]) -> VapiActionRequest:
+    args = _deep_find_args(raw)
+    merged: dict[str, Any] = {}
+    if isinstance(raw, dict):
+        merged.update(raw)
+    merged.update(args)
+
+    def pick(*names: str, default: str = "") -> str:
+        for name in names:
+            value = merged.get(name)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        found = _deep_find_value(raw, {n.lower() for n in names})
+        return found or default
+
+    return VapiActionRequest(
+        intent=pick("intent", "action", "tool", default="general"),
+        query=pick("query", "question", "search"),
+        message=pick("message", "transcript", "user_message", "userMessage", "input", "text", "content"),
+        transcript=pick("transcript"),
+        first_name=pick("first_name", "firstName", "name", default="there"),
+        email=pick("email", "user_email", "userEmail"),
+        branch=pick("branch", "service_branch", "serviceBranch"),
+        city=pick("city", "location_city", "locationCity"),
+        state=pick("state", "location_state", "locationState"),
+        user_type=pick("user_type", "userType", default="Veteran"),
+        title=pick("title", "reminder_title", "reminderTitle"),
+        date=pick("date", "reminder_date", "reminderDate"),
+        time=pick("time", "reminder_time", "reminderTime"),
+        memory=pick("memory", "note"),
+        mood=pick("mood", default="calm"),
+    )
+
+
 @app.post("/api/vapi/action")
-async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db)):
-    text = payload.message or payload.query or payload.title or payload.memory or ""
-    email = (payload.email or "demo@valorbuddy.com").lower()
-    user = db.query(User).filter(User.email == email).first() or db.query(User).filter(User.email == "demo@valorbuddy.com").first()
+async def vapi_action(request: Request, db: Session = Depends(get_db)):
+    """Agentic Vapi endpoint.
+
+    Important: this endpoint does not hard-code Dallas. If Vapi does not pass a city/state
+    and no authenticated user email is supplied, local searches ask for the user's location
+    instead of returning fake Dallas recommendations.
+    """
+    try:
+        raw = await request.json()
+        if not isinstance(raw, dict):
+            raw = {"message": str(raw)}
+    except Exception:
+        raw = {}
+
+    payload = _normalize_vapi_payload(raw)
+    text = payload.message or payload.query or payload.transcript or payload.title or payload.memory or ""
+
+    # Only look up demo/user profile when Vapi passes an email. This prevents every public
+    # voice call from silently falling back to demo@valorbuddy.com / Dallas.
+    user = None
+    if payload.email:
+        email = payload.email.lower()
+        user = db.query(User).filter(User.email == email).first()
+
     first_name = payload.first_name or (user.profile.first_name if user and user.profile else "there")
-    branch = payload.branch or (user.profile.branch if user and user.profile else "Army")
-    city = payload.city or (user.profile.city if user and user.profile else "Dallas")
-    state = payload.state or (user.profile.state if user and user.profile else "TX")
+    branch = payload.branch or (user.profile.branch if user and user.profile else "Veteran")
+    city = payload.city or (user.profile.city if user and user.profile else "")
+    state = payload.state or (user.profile.state if user and user.profile else "")
+
+    # Detect local intent early. If location is missing, ask instead of defaulting to Dallas.
+    detected_intent = payload.intent if payload.intent and payload.intent != "general" else infer_intent(text)
+    if detected_intent == "find_local_veteran_activities" and (not city or not state):
+        answer = f"Of course, {first_name}. What city and state should I search around? Once I have that, I’ll look for veteran-friendly places, VA resources, VFW or American Legion posts, and nearby activities."
+        return {"response": answer, "answer": answer, "reply": answer, "intent": detected_intent, "data": {"needs_location": True}}
+
     result = await route_valorbuddy_message(
         text=text,
         first_name=first_name,
         branch=branch,
-        city=city,
-        state=state,
+        city=city or "your area",
+        state=state or "",
         user=user,
         db=db,
         explicit_intent=payload.intent,
@@ -754,7 +867,9 @@ async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db))
         memory=payload.memory,
         mood=payload.mood,
     )
-    return result
+    response = result.get("response", "")
+    # Return multiple common keys so Vapi/frontends can read the answer reliably.
+    return {**result, "answer": response, "reply": response, "message": response}
 
 
 @app.get("/admin/overview")
