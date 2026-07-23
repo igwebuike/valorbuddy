@@ -11,6 +11,13 @@ from typing import Any, List, Optional
 
 import httpx
 import jwt
+
+try:
+    from google import genai
+    from google.genai import types as genai_types
+except ImportError:  # Keeps local fallback mode available before dependencies are installed.
+    genai = None
+    genai_types = None
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -26,7 +33,13 @@ ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+GEMINI_LITE_MODEL = os.getenv("GEMINI_LITE_MODEL", "gemini-3.5-flash-lite")
+GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "")
+GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "global")
+GOOGLE_GENAI_USE_VERTEXAI = os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "false").lower() == "true"
+AI_TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "30"))
+ENABLE_GOOGLE_SEARCH_GROUNDING = os.getenv("ENABLE_GOOGLE_SEARCH_GROUNDING", "true").lower() == "true"
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY") or os.getenv("GOOGLE_MAPS_API_KEY")
 GOOGLE_CALENDAR_ENABLED = os.getenv("GOOGLE_CALENDAR_ENABLED", "false").lower() == "true"
 DATA_DIR = Path(os.getenv("DATA_DIR", "/tmp/valorbuddy"))
@@ -305,23 +318,69 @@ def profile_out(user: User) -> ProfileOut:
     return ProfileOut(id=user.id, email=user.email, role=user.role, first_name=p.first_name if p else "Veteran", last_name=p.last_name if p else "", branch=p.branch if p else "Army", city=p.city if p else "Dallas", state=p.state if p else "TX", interests=p.interests if p else [])
 
 
-async def gemini_reply(prompt: str, fallback: str) -> str:
-    """Gemini wrapper. If the key is missing/fails, use a dynamic non-canned fallback."""
-    if not GEMINI_API_KEY:
-        return fallback
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={GEMINI_API_KEY}"
-    payload = {
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.72, "maxOutputTokens": 900},
-    }
-    try:
-        async with httpx.AsyncClient(timeout=22) as client:
-            r = await client.post(url, json=payload)
-            r.raise_for_status()
-            data = r.json()
-        return data["candidates"][0]["content"]["parts"][0]["text"].strip()
-    except Exception:
-        return fallback
+async def gemini_reply(prompt: str, fallback: str, task: str = "reasoning", grounded: bool = False) -> str:
+    """Production Gemini wrapper with Vertex AI support and cost-aware model routing."""
+    model = GEMINI_LITE_MODEL if task in {"classification", "extraction", "summary", "routing"} else GEMINI_MODEL
+    system_instruction = (
+        "You are ValorBuddy, a practical and respectful assistant for U.S. veterans, spouses, "
+        "dependents, survivors, and caregivers. Give concise next steps. Never claim to be the VA, "
+        "a clinician, an attorney, or an emergency service. For benefits, medical, legal, crisis, or "
+        "financial issues, clearly distinguish general information from official advice and direct "
+        "the person to an appropriate official or accredited resource. Do not expose secrets or infer "
+        "sensitive facts that the user did not provide."
+    )
+
+    if genai is not None and (GOOGLE_GENAI_USE_VERTEXAI or GEMINI_API_KEY):
+        try:
+            client_kwargs: dict[str, Any] = {}
+            if GOOGLE_GENAI_USE_VERTEXAI:
+                if not GOOGLE_CLOUD_PROJECT:
+                    raise RuntimeError("GOOGLE_CLOUD_PROJECT is required when Vertex AI is enabled")
+                client_kwargs.update(vertexai=True, project=GOOGLE_CLOUD_PROJECT, location=GOOGLE_CLOUD_LOCATION)
+            else:
+                client_kwargs["api_key"] = GEMINI_API_KEY
+
+            client = genai.Client(**client_kwargs)
+            try:
+                response = await client.aio.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config=genai_types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        temperature=0.25 if grounded else (0.35 if task in {"classification", "extraction", "summary", "routing"} else 0.65),
+                        max_output_tokens=900 if grounded else (700 if task in {"classification", "extraction", "summary", "routing"} else 1100),
+                        tools=[genai_types.Tool(google_search=genai_types.GoogleSearch())] if grounded and ENABLE_GOOGLE_SEARCH_GROUNDING else None,
+                    ),
+                )
+                text = (getattr(response, "text", None) or "").strip()
+                return text or fallback
+            finally:
+                await client.aio.aclose()
+        except Exception:
+            pass
+
+    # Backward-compatible Developer API REST fallback.
+    if GEMINI_API_KEY:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        payload = {
+            "systemInstruction": {"parts": [{"text": system_instruction}]},
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.25 if grounded else (0.35 if task in {"classification", "extraction", "summary", "routing"} else 0.65),
+                "maxOutputTokens": 900 if grounded else (700 if task in {"classification", "extraction", "summary", "routing"} else 1100),
+            },
+        }
+        if grounded and ENABLE_GOOGLE_SEARCH_GROUNDING:
+            payload["tools"] = [{"google_search": {}}]
+        try:
+            async with httpx.AsyncClient(timeout=AI_TIMEOUT_SECONDS) as client:
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+                data = response.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+        except Exception:
+            pass
+    return fallback
 
 
 def clean_text(text: str) -> str:
@@ -519,6 +578,22 @@ def infer_intent(text: str) -> str:
         return "get_today_briefing"
     if any(x in t for x in ["who am i", "my profile", "profile", "branch"]):
         return "get_user_profile"
+    if any(x in t for x in ["travel", "trip", "route", "road condition", "weather", "storm", "flight", "hotel", "safety alert", "traffic"]):
+        return "live_travel"
+    if any(x in t for x in ["housing", "apartment", "rent", "landlord", "low credit", "bad credit", "credit score", "transitional housing", "homeless"]):
+        return "live_housing"
+    if any(x in t for x in ["job", "hiring", "employer", "career", "skillbridge", "clearance job", "remote work", "companies hiring veterans"]):
+        return "live_jobs"
+    if any(x in t for x in ["discount", "military discount", "veteran discount", "coupon", "save money"]):
+        return "live_discounts"
+    if any(x in t for x in ["veteran owned", "veteran-owned", "small business", "entrepreneur", "business grant", "government contract"]):
+        return "live_veteran_business"
+    if any(x in t for x in ["buy a car", "auto purchase", "vehicle", "car loan", "dealer", "truck purchase"]):
+        return "live_auto"
+    if any(x in t for x in ["invest", "investment", "stock", "retirement", "tsp", "ira", "401k", "financial plan"]):
+        return "live_finance"
+    if any(x in t for x in ["latest", "current", "today's", "right now", "news", "real time", "realtime"]):
+        return "live_research"
     return "general"
 
 
@@ -605,6 +680,28 @@ Answer naturally and specifically. Include spouse, child, dependent, caregiver, 
     if intent == "get_user_profile":
         return {"response": f"I have you as {first_name}, {branch}, around {city}, {state}. ValorBuddy also supports spouse and dependent access, reminders, documents, benefits, local activities, music, and memory notes.", "intent": intent}
 
+    if intent in {"live_travel", "live_housing", "live_jobs", "live_discounts", "live_veteran_business", "live_auto", "live_finance", "live_research"}:
+        now_utc = datetime.now(timezone.utc).isoformat()
+        topic_rules = {
+            "live_travel": "Check current travel conditions, official alerts, weather, road/flight safety, and nearby veteran resources. Separate verified facts from suggestions.",
+            "live_housing": "Find current official housing resources and practical options. Never promise approval or claim a property works with bad credit unless a source says so.",
+            "live_jobs": "Use current employer or job information. Prefer official company career pages, USAJobs, SkillBridge, and reputable veteran-employment resources.",
+            "live_discounts": "Verify that discounts are current and explain that terms can change; advise confirming with the business before purchase.",
+            "live_veteran_business": "Find current veteran-owned businesses or official entrepreneurship programs. Clearly label directory claims that need business verification.",
+            "live_auto": "Provide current auto-buying education, recall/safety considerations, financing questions, and dealer research without promising credit approval.",
+            "live_finance": "Give education, comparisons, and risk-aware next steps only—not personalized investment instructions or guaranteed returns. Prefer SEC, FINRA, IRS, VA, and TSP sources.",
+            "live_research": "Answer using current web information and identify uncertainty or rapidly changing details.",
+        }
+        location = f"{city}, {state}".strip(", ") or "the user's current area"
+        fallback = f"{first_name}, I can research that using live sources, but live grounding is not available right now. Please try again shortly or ask me to search a nearby place using Google Maps."
+        prompt = f"""You are ValorBuddy's real-time research assistant. Current UTC timestamp: {now_utc}.
+User: {first_name}; branch: {branch}; user type: {user_type}; location: {location}; coordinates: {lat}, {lng}.
+Request: {message}
+Task rules: {topic_rules[intent]}
+Use Google Search grounding. Give a direct answer with a short 'What I found', 'Best next steps', and 'Verify before acting' structure when appropriate. Mention dates for time-sensitive information. Do not invent availability, discounts, credit acceptance, employer openings, prices, safety conditions, or eligibility. For emergencies or immediate danger, direct the user to 911; for veteran crisis support, 988 then Press 1."""
+        response = await gemini_reply(prompt, fallback, grounded=True)
+        return {"response": response, "intent": intent, "grounded": True, "data": {"grounded": True, "as_of": now_utc, "location": location}}
+
     # General companion: make every answer contextual, not canned.
     recent = []
     rems = []
@@ -622,7 +719,7 @@ Respond directly to the user's actual words. Be warm, practical, concise, and ac
     return {"response": response, "intent": intent}
 
 
-app = FastAPI(title=APP_NAME, version="3.0.0")
+app = FastAPI(title=APP_NAME, version="3.2.0")
 origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
@@ -648,7 +745,7 @@ def startup():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": APP_NAME, "version": "3.0.0", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
+    return {"status": "ok", "app": APP_NAME, "version": "3.2.0", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "ai_provider": "vertex_ai" if GOOGLE_GENAI_USE_VERTEXAI else "gemini_api", "gemini": bool(GEMINI_API_KEY or (GOOGLE_GENAI_USE_VERTEXAI and GOOGLE_CLOUD_PROJECT)), "reasoning_model": GEMINI_MODEL, "lite_model": GEMINI_LITE_MODEL, "google_places": bool(GOOGLE_MAPS_API_KEY), "google_search_grounding": ENABLE_GOOGLE_SEARCH_GROUNDING}
 
 
 @app.get("/db/tables")
@@ -801,7 +898,7 @@ async def upload_document(doc_type: str = Form("general"), file: UploadFile = Fi
             extracted = content.decode("utf-8", errors="ignore")[:6000]
     except Exception:
         extracted = ""
-    summary = await gemini_reply(f"Summarize this veteran document in simple helpful terms:\n{extracted[:4000]}", "Document uploaded and stored. AI search is ready for text-based files.")
+    summary = await gemini_reply(f"Summarize this veteran document in simple helpful terms:\n{extracted[:4000]}", "Document uploaded and stored. AI search is ready for text-based files.", task="summary")
     row = Document(user_id=user.id, filename=file.filename, doc_type=doc_type, file_url=f"/uploads/{safe_name}", extracted_text=extracted, ai_summary=summary)
     db.add(row); db.commit(); db.refresh(row)
     return {"id": row.id, "filename": row.filename, "doc_type": row.doc_type, "file_url": row.file_url, "ai_summary": row.ai_summary}
@@ -814,12 +911,19 @@ def list_documents(user: User = Depends(get_current_user), db: Session = Depends
 
 
 @app.post("/api/vapi/action")
-async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db)):
+async def vapi_action(payload: VapiActionRequest, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
     text = payload.message or payload.query or payload.title or payload.memory or ""
     email = (payload.email or "").lower().strip()
     user = db.query(User).filter(User.email == email).first() if email else None
+    if not user and authorization and authorization.lower().startswith("bearer "):
+        try:
+            token = authorization.split(" ", 1)[1].strip()
+            payload_token = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            user = db.get(User, int(payload_token.get("sub")))
+        except Exception:
+            user = None
     if not user:
-        user = db.query(User).filter(User.email == "demo@valorbuddy.com").first()
+        raise HTTPException(status_code=401, detail="Authentication required for voice commands")
 
     profile = user.profile if user and user.profile else None
     first_name = payload.first_name or (profile.first_name if profile else "there")
