@@ -629,6 +629,36 @@ def music_suggestions(mood: str, branch: str) -> list[dict[str, str]]:
     return [{"title": "Calm instrumental focus", "url": "https://www.youtube.com/results?search_query=calm+instrumental+music", "mood": mood}, {"title": "Relaxing old school classics", "url": "https://www.youtube.com/results?search_query=relaxing+old+school+classics", "mood": mood}]
 
 
+
+def event_choice_payload(first_name: str) -> dict[str, Any]:
+    choices = [
+        {"label": "Veteran social events", "query": "veteran social events near me"},
+        {"label": "VFW or American Legion", "query": "VFW American Legion events near me"},
+        {"label": "Family-friendly activities", "query": "family friendly veteran activities near me"},
+        {"label": "Outdoor activities", "query": "veteran outdoor activities parks trails fishing near me"},
+        {"label": "Live music and entertainment", "query": "veteran friendly live music entertainment near me"},
+        {"label": "Coffee and breakfast meetups", "query": "veteran coffee breakfast meetup near me"},
+        {"label": "Volunteer opportunities", "query": "veteran volunteer opportunities near me"},
+        {"label": "Fitness and recreation", "query": "veteran fitness recreation activities near me"},
+        {"label": "Museums and military history", "query": "military museums veteran history attractions near me"},
+        {"label": "Career and networking", "query": "veteran career networking events near me"},
+        {"label": "Support and wellness groups", "query": "veteran peer support wellness groups near me"},
+        {"label": "Free events today", "query": "free veteran events today near me"},
+    ]
+    labels = "; ".join(f"{i+1}. {x['label']}" for i, x in enumerate(choices))
+    response = (
+        f"Absolutely, {first_name}. Here are some easy choices: {labels}. "
+        "Say the number or the type you want. If you are not sure, say ‘pick for me’ and I’ll start with the best-rated options happening closest to you."
+    )
+    return {"response": response, "intent": "event_choices", "data": {"choices": choices, "awaiting_choice": True}}
+
+
+def is_event_choice_request(message: str) -> bool:
+    t = (message or "").lower()
+    event_words = any(x in t for x in ("event", "events", "activity", "activities", "things to do"))
+    choice_words = any(x in t for x in ("example", "examples", "choose", "choices", "options", "types", "what kind", "list"))
+    return event_words and choice_words
+
 def infer_intent(text: str) -> str:
     t = (text or "").lower()
     if any(x in t for x in ["remind", "reminder", "appointment", "call the va", "schedule", "tomorrow", "next week"]):
@@ -656,6 +686,8 @@ async def route_valorbuddy_message(
 ) -> dict[str, Any]:
     """Agentic router: decides which tool to call, gathers data, then composes a human answer."""
     message = clean_text(text)
+    if is_event_choice_request(message):
+        return event_choice_payload(first_name)
     # GPS is authoritative. Reverse-geocode once so every planner and response uses the current area.
     if lat is not None and lng is not None:
         current = await reverse_geocode_location(lat, lng)
@@ -679,7 +711,9 @@ async def route_valorbuddy_message(
     intent = plan.get("intent", "general")
 
     if plan.get("needs_clarification"):
-        question = clean_text(plan.get("clarification_question")) or f"{first_name}, what type of option should I focus on?"
+        if any(x in message.lower() for x in ("event", "events", "activity", "activities", "near me")):
+            return event_choice_payload(first_name)
+        question = clean_text(plan.get("clarification_question")) or f"{first_name}, what should I focus on?"
         default_query = clean_text(plan.get("default_query")) or message
         return {
             "response": question,
@@ -715,7 +749,15 @@ Answer ONLY the exact local intent. If the request is for veteran activities or 
 Give up to three specific options. For each, briefly state what it is, where it is, and any verified rating or useful live detail available in the results. Do not invent dates, times, hours, admission, or event details that are absent.
 Use natural battle-buddy language without calling yourself an AI assistant. End with ONE specific, interactive question such as whether to check directions, distance, hours, registration details, or filter for today/free/family-friendly. Do not ask a generic “Which direction do you want?” question."""
         response = await gemini_reply(prompt, fallback, grounded=False)
-        return {"response": response, "intent": intent, "data": {"live": live, "items": items, "location": location_meta, "plan": plan}}
+        quick_choices = [
+            {"label": "Today", "query": "veteran events today near me"},
+            {"label": "Free", "query": "free veteran events near me"},
+            {"label": "Family-friendly", "query": "family friendly veteran activities near me"},
+            {"label": "VFW / Legion", "query": "VFW American Legion events near me"},
+            {"label": "Outdoor", "query": "veteran outdoor activities near me"},
+            {"label": "Pick for me", "query": "best rated veteran activities closest to me"},
+        ]
+        return {"response": response, "intent": intent, "data": {"live": live, "items": items, "choices": quick_choices, "location": location_meta, "plan": plan}}
 
     if intent == "search_benefits":
         data = benefits_lookup(message, state, branch)
@@ -770,7 +812,7 @@ Answer naturally and specifically. Include spouse, child, dependent, caregiver, 
     if user and db:
         recent = db.query(Memory).filter(Memory.user_id == user.id).order_by(Memory.id.desc()).limit(4).all()
         rems = db.query(Reminder).filter(Reminder.user_id == user.id).order_by(Reminder.id.desc()).limit(4).all()
-    fallback = f"{first_name}, I heard you: {message}. Tell me the one detail that matters most, and I’ll give you a direct answer."
+    fallback = f"{first_name}, here is the best starting point based on what you asked: {message}. I’ll make a practical recommendation now, and you can tell me what to adjust."
     prompt = f"""User profile: first_name={first_name}, branch={branch}, current_city={city}, current_state={state}
 Recent memories: {[m.title for m in recent]}
 Recent reminders: {[r.title for r in rems]}
@@ -785,7 +827,7 @@ Answer the user's actual request directly and stay on that single topic. Do not 
     return {"response": response, "intent": intent, "data": {"plan": plan, "grounded": use_grounding}}
 
 
-app = FastAPI(title=APP_NAME, version="4.0.0")
+app = FastAPI(title=APP_NAME, version="4.4.0")
 origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
@@ -811,7 +853,7 @@ def startup():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": APP_NAME, "version": "4.1.0", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
+    return {"status": "ok", "app": APP_NAME, "version": "4.4.0", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
 
 
 @app.get("/db/tables")

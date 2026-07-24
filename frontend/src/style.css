@@ -124,3 +124,25 @@ html[data-branch="navy"],body[data-branch="navy"],.app.navy,.loginPage.navy{
 .app.navy .mic.listening{animation:navyPulse 1.2s infinite!important}
 @keyframes navyPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 8px rgba(197,162,79,.12),0 0 30px rgba(197,162,79,.35)}50%{transform:scale(1.04);box-shadow:0 0 0 18px rgba(197,162,79,.06),0 0 48px rgba(197,162,79,.58)}}
 .voiceHeading{display:flex;align-items:center;justify-content:space-between;gap:12px}.voiceHeading h3{display:flex;align-items:center;gap:8px;margin:0}.liveBadge{font-size:11px;font-weight:900;letter-spacing:.16em;padding:5px 8px;border-radius:999px;background:#20c97a;color:#042b1c}.voiceIntro{line-height:1.55}.suggestionChip{width:100%;border:1px solid rgba(255,255,255,.42)!important;border-radius:999px!important;background:rgba(255,255,255,.1)!important;color:#fff!important;padding:10px 14px!important;font-weight:800!important;cursor:pointer}.suggestionChip:hover{background:rgba(197,162,79,.2)!important;border-color:#c5a24f!important}.heard{display:block;margin-top:10px}.reply{margin-top:12px;padding:13px 14px;border-radius:12px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);line-height:1.45}.heroStatus{display:flex;gap:16px;align-items:center;margin-top:24px}.heroStatus span{font-weight:900;color:#16824b!important}.heroStatus small{color:#6d5a25!important;font-weight:800}
+
+/* ValorBuddy v4.4 Navy readability and interactive voice overrides */
+.app.navy{background:#eaf0f7!important;color:#071a33!important}
+.app.navy main{background:linear-gradient(135deg,#eef4fa,#dfe9f4)!important}
+.app.navy .hero{background:linear-gradient(130deg,#ffffff,#edf4fb)!important;border:2px solid #9fb5ca!important;border-top:6px solid #c7a548!important}
+.app.navy .hero h1{color:#002b5c!important;text-shadow:none!important;letter-spacing:.045em!important;font-weight:950!important}
+.app.navy .hero p{color:#263d59!important;font-size:17px!important;font-weight:650!important;line-height:1.55!important;max-width:720px!important}
+.app.navy .hero b{color:#9b7212!important;font-weight:950!important}
+.app.navy .voiceBox{background:linear-gradient(155deg,#00224d,#003e78)!important;border:2px solid #d1b35f!important;color:#fff!important}
+.app.navy .voiceBox h3,.app.navy .voiceBox p,.app.navy .voiceBox small,.app.navy .voiceBox .reply{color:#fff!important;opacity:1!important;text-shadow:none!important}
+.app.navy .voiceIntro{font-size:16px!important;font-weight:650!important;line-height:1.55!important}
+.app.navy .reply{background:rgba(255,255,255,.14)!important;border-color:rgba(255,255,255,.42)!important;font-size:16px!important;font-weight:650!important;line-height:1.55!important}
+.app.navy .heard{color:#eaf4ff!important;font-weight:700!important}
+.welcomeButton{width:100%;margin:8px 0 14px;padding:10px 14px;border-radius:10px;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.12);color:#fff;font-weight:850;cursor:pointer}
+.welcomeButton:hover{background:rgba(255,255,255,.22)}
+.choiceGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px}
+.choiceGrid button{display:flex;align-items:center;gap:9px;text-align:left;padding:11px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.1);color:#fff;font-weight:800;cursor:pointer}
+.choiceGrid button:hover{background:rgba(209,179,95,.24);border-color:#d1b35f}
+.choiceGrid button span{display:grid;place-items:center;min-width:24px;height:24px;border-radius:50%;background:#d1b35f;color:#00224d;font-size:12px;font-weight:950}
+.app.navy .chat .assistant,.app.navy .chat .user{color:#10213d!important;font-size:16px!important;font-weight:620!important;line-height:1.55!important}
+.app.navy .chat .assistant{background:#fff!important}.app.navy .chat .user{background:#e8f0f8!important}
+@media(max-width:900px){.choiceGrid{grid-template-columns:1fr}}
