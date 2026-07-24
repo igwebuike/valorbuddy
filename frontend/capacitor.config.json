@@ -2,13 +2,5 @@
   "appId": "com.tagustechnologies.valorbuddy",
   "appName": "ValorBuddy",
   "webDir": "dist",
-  "server": {
-    "androidScheme": "https"
-  },
-  "plugins": {
-    "LocalNotifications": {
-      "smallIcon": "ic_stat_icon_config_sample",
-      "iconColor": "#0B3D2E"
-    }
-  }
+  "server": { "androidScheme": "https" }
 }

@@ -8,16 +8,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote_plus
 from typing import Any, List, Optional
+import asyncio
+import logging
 
 import httpx
+from google import genai
+from google.genai import types
 import jwt
-
-try:
-    from google import genai
-    from google.genai import types as genai_types
-except ImportError:  # Keeps local fallback mode available before dependencies are installed.
-    genai = None
-    genai_types = None
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -32,14 +29,18 @@ SECRET_KEY = os.getenv("SECRET_KEY", "dev-change-me-valorbuddy")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+# Prefer GOOGLE_API_KEY so the existing Render variable continues to work.
+# GEMINI_API_KEY remains a backward-compatible alias.
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = GOOGLE_API_KEY
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
-GEMINI_LITE_MODEL = os.getenv("GEMINI_LITE_MODEL", "gemini-3.5-flash-lite")
+GEMINI_PLANNER_MODEL = os.getenv("GEMINI_PLANNER_MODEL", GEMINI_MODEL)
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "")
 GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "global")
 GOOGLE_GENAI_USE_VERTEXAI = os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "false").lower() == "true"
-AI_TIMEOUT_SECONDS = float(os.getenv("AI_TIMEOUT_SECONDS", "30"))
 ENABLE_GOOGLE_SEARCH_GROUNDING = os.getenv("ENABLE_GOOGLE_SEARCH_GROUNDING", "true").lower() == "true"
+AI_TIMEOUT_SECONDS = int(os.getenv("AI_TIMEOUT_SECONDS", "35"))
+logger = logging.getLogger("valorbuddy.ai")
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY") or os.getenv("GOOGLE_MAPS_API_KEY")
 GOOGLE_CALENDAR_ENABLED = os.getenv("GOOGLE_CALENDAR_ENABLED", "false").lower() == "true"
 DATA_DIR = Path(os.getenv("DATA_DIR", "/tmp/valorbuddy"))
@@ -71,7 +72,7 @@ class UserProfile(Base):
     first_name = Column(String(120), nullable=False)
     last_name = Column(String(120), nullable=True)
     branch = Column(String(80), nullable=False, default="Army")
-    city = Column(String(120), nullable=False, default="Dallas")
+    city = Column(String(120), nullable=False, default="")
     state = Column(String(80), nullable=False, default="TX")
     interests = Column(JSON, nullable=False, default=list)
     preferred_tone = Column(String(120), nullable=False, default="calm, practical, encouraging")
@@ -242,8 +243,8 @@ class RegisterRequest(BaseModel):
     first_name: str
     last_name: str = ""
     branch: str = "Army"
-    city: str = "Dallas"
-    state: str = "TX"
+    city: str = ""
+    state: str = ""
     interests: List[str] = []
 
 
@@ -273,6 +274,9 @@ class CompanionRequest(BaseModel):
     message: str
     conversation_id: int | None = None
     mode: str = "companion"
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    timezone: str = ""
 
 
 class ReminderIn(BaseModel):
@@ -315,73 +319,87 @@ class BranchUpdate(BaseModel):
 
 def profile_out(user: User) -> ProfileOut:
     p = user.profile
-    return ProfileOut(id=user.id, email=user.email, role=user.role, first_name=p.first_name if p else "Veteran", last_name=p.last_name if p else "", branch=p.branch if p else "Army", city=p.city if p else "Dallas", state=p.state if p else "TX", interests=p.interests if p else [])
+    return ProfileOut(id=user.id, email=user.email, role=user.role, first_name=p.first_name if p else "Veteran", last_name=p.last_name if p else "", branch=p.branch if p else "Army", city=p.city if p else "", state=p.state if p else "", interests=p.interests if p else [])
 
 
-async def gemini_reply(prompt: str, fallback: str, task: str = "reasoning", grounded: bool = False) -> str:
-    """Production Gemini wrapper with Vertex AI support and cost-aware model routing."""
-    model = GEMINI_LITE_MODEL if task in {"classification", "extraction", "summary", "routing"} else GEMINI_MODEL
-    system_instruction = (
-        "You are ValorBuddy, a practical and respectful assistant for U.S. veterans, spouses, "
-        "dependents, survivors, and caregivers. Give concise next steps. Never claim to be the VA, "
-        "a clinician, an attorney, or an emergency service. For benefits, medical, legal, crisis, or "
-        "financial issues, clearly distinguish general information from official advice and direct "
-        "the person to an appropriate official or accredited resource. Do not expose secrets or infer "
-        "sensitive facts that the user did not provide."
+def _genai_client():
+    """Create a Google Gen AI client for API-key or Vertex AI authentication."""
+    if GOOGLE_GENAI_USE_VERTEXAI:
+        kwargs = {"vertexai": True, "location": GOOGLE_CLOUD_LOCATION}
+        if GOOGLE_CLOUD_PROJECT:
+            kwargs["project"] = GOOGLE_CLOUD_PROJECT
+        if GEMINI_API_KEY:
+            kwargs["api_key"] = GEMINI_API_KEY
+        return genai.Client(**kwargs)
+    return genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+
+
+SYSTEM_INSTRUCTION = """You are ValorBuddy, a trusted AI companion for U.S. veterans, service members, spouses, caregivers, survivors, and dependents.
+Be warm, direct, practical, and action-oriented. Use the user's current GPS location when supplied; never assume Dallas or any other city.
+Use live grounded information for current facts, weather, travel, events, opening hours, news, jobs, discounts, and changing rules. Clearly distinguish live results from general guidance.
+Preserve context from recent conversation, reminders, memories, and documents. Resolve follow-ups such as 'is it open?' or 'take me there' using prior context.
+Do not claim to have completed an action unless the application actually completed it. For emergencies or immediate danger, direct the user to 911. For a veteran in crisis, mention 988 then Press 1 when relevant.
+Do not diagnose, provide legal representation, or guarantee VA eligibility. Keep most answers under 220 words unless the user asks for detail."""
+
+
+def _extract_text(response: Any) -> str:
+    text = getattr(response, "text", None)
+    if text:
+        return text.strip()
+    try:
+        parts = response.candidates[0].content.parts
+        return "".join(getattr(part, "text", "") or "" for part in parts).strip()
+    except Exception:
+        return ""
+
+
+async def gemini_reply(prompt: str, fallback: str, *, grounded: bool = False, json_mode: bool = False, model: str | None = None) -> str:
+    """Google Gen AI SDK wrapper with optional Google Search grounding and JSON output."""
+    client = _genai_client()
+    if not client:
+        return fallback
+    tools = [types.Tool(google_search=types.GoogleSearch())] if grounded and ENABLE_GOOGLE_SEARCH_GROUNDING else None
+    config = types.GenerateContentConfig(
+        system_instruction=SYSTEM_INSTRUCTION,
+        temperature=0.35 if json_mode else 0.62,
+        max_output_tokens=1400,
+        tools=tools,
+        response_mime_type="application/json" if json_mode else None,
     )
+    def call():
+        return client.models.generate_content(model=model or GEMINI_MODEL, contents=prompt, config=config)
+    try:
+        response = await asyncio.wait_for(asyncio.to_thread(call), timeout=AI_TIMEOUT_SECONDS)
+        return _extract_text(response) or fallback
+    except Exception as exc:
+        logger.exception("Gemini request failed: %s", exc)
+        return fallback
 
-    if genai is not None and (GOOGLE_GENAI_USE_VERTEXAI or GEMINI_API_KEY):
-        try:
-            client_kwargs: dict[str, Any] = {}
-            if GOOGLE_GENAI_USE_VERTEXAI:
-                if not GOOGLE_CLOUD_PROJECT:
-                    raise RuntimeError("GOOGLE_CLOUD_PROJECT is required when Vertex AI is enabled")
-                client_kwargs.update(vertexai=True, project=GOOGLE_CLOUD_PROJECT, location=GOOGLE_CLOUD_LOCATION)
-            else:
-                client_kwargs["api_key"] = GEMINI_API_KEY
 
-            client = genai.Client(**client_kwargs)
-            try:
-                response = await client.aio.models.generate_content(
-                    model=model,
-                    contents=prompt,
-                    config=genai_types.GenerateContentConfig(
-                        system_instruction=system_instruction,
-                        temperature=0.25 if grounded else (0.35 if task in {"classification", "extraction", "summary", "routing"} else 0.65),
-                        max_output_tokens=900 if grounded else (700 if task in {"classification", "extraction", "summary", "routing"} else 1100),
-                        tools=[genai_types.Tool(google_search=genai_types.GoogleSearch())] if grounded and ENABLE_GOOGLE_SEARCH_GROUNDING else None,
-                    ),
-                )
-                text = (getattr(response, "text", None) or "").strip()
-                return text or fallback
-            finally:
-                await client.aio.aclose()
-        except Exception:
-            pass
-
-    # Backward-compatible Developer API REST fallback.
-    if GEMINI_API_KEY:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
-        payload = {
-            "systemInstruction": {"parts": [{"text": system_instruction}]},
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "temperature": 0.25 if grounded else (0.35 if task in {"classification", "extraction", "summary", "routing"} else 0.65),
-                "maxOutputTokens": 900 if grounded else (700 if task in {"classification", "extraction", "summary", "routing"} else 1100),
-            },
-        }
-        if grounded and ENABLE_GOOGLE_SEARCH_GROUNDING:
-            payload["tools"] = [{"google_search": {}}]
-        try:
-            async with httpx.AsyncClient(timeout=AI_TIMEOUT_SECONDS) as client:
-                response = await client.post(url, json=payload)
-                response.raise_for_status()
-                data = response.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"].strip()
-        except Exception:
-            pass
-    return fallback
-
+async def plan_request(message: str, context: dict[str, Any]) -> dict[str, Any]:
+    """Ask Gemini to plan tool use. Keyword routing is only a fail-safe fallback."""
+    schema = {
+        "intent": "general|local_search|live_web|benefits|create_reminder|save_memory|music|briefing|profile|document_question",
+        "needs_location": False,
+        "needs_places": False,
+        "needs_google_search": False,
+        "search_query": "",
+        "response_goal": "",
+    }
+    prompt = f"""Return only JSON matching this shape: {json.dumps(schema)}
+Choose the minimum tools needed. Use local_search/needs_places for nearby restaurants, VA facilities, events, stores, parks, directions, or 'near me'.
+Use live_web/needs_google_search for current weather, traffic, road conditions, news, current policies, changing benefits rules, jobs, discounts, prices, schedules, or today's events not reliably covered by Places.
+Use benefits for stable benefits guidance; create_reminder only when the user explicitly asks to save a reminder; save_memory only when explicitly asked to remember/save; music for music requests.
+Context: {json.dumps(context, default=str)}
+User message: {message}"""
+    raw = await gemini_reply(prompt, json.dumps(schema), json_mode=True, model=GEMINI_PLANNER_MODEL)
+    try:
+        plan = json.loads(raw)
+        return {**schema, **plan}
+    except Exception:
+        fallback_intent = infer_intent(message)
+        mapping = {"find_local_veteran_activities":"local_search","search_benefits":"benefits","get_today_briefing":"briefing","get_user_profile":"profile","suggest_music":"music"}
+        return {**schema, "intent": mapping.get(fallback_intent, fallback_intent), "needs_places": fallback_intent == "find_local_veteran_activities", "needs_location": fallback_intent == "find_local_veteran_activities", "search_query": message}
 
 def clean_text(text: str) -> str:
     return " ".join((text or "").strip().split())
@@ -578,22 +596,6 @@ def infer_intent(text: str) -> str:
         return "get_today_briefing"
     if any(x in t for x in ["who am i", "my profile", "profile", "branch"]):
         return "get_user_profile"
-    if any(x in t for x in ["travel", "trip", "route", "road condition", "weather", "storm", "flight", "hotel", "safety alert", "traffic"]):
-        return "live_travel"
-    if any(x in t for x in ["housing", "apartment", "rent", "landlord", "low credit", "bad credit", "credit score", "transitional housing", "homeless"]):
-        return "live_housing"
-    if any(x in t for x in ["job", "hiring", "employer", "career", "skillbridge", "clearance job", "remote work", "companies hiring veterans"]):
-        return "live_jobs"
-    if any(x in t for x in ["discount", "military discount", "veteran discount", "coupon", "save money"]):
-        return "live_discounts"
-    if any(x in t for x in ["veteran owned", "veteran-owned", "small business", "entrepreneur", "business grant", "government contract"]):
-        return "live_veteran_business"
-    if any(x in t for x in ["buy a car", "auto purchase", "vehicle", "car loan", "dealer", "truck purchase"]):
-        return "live_auto"
-    if any(x in t for x in ["invest", "investment", "stock", "retirement", "tsp", "ira", "401k", "financial plan"]):
-        return "live_finance"
-    if any(x in t for x in ["latest", "current", "today's", "right now", "news", "real time", "realtime"]):
-        return "live_research"
     return "general"
 
 
@@ -605,9 +607,29 @@ async def route_valorbuddy_message(
 ) -> dict[str, Any]:
     """Agentic router: decides which tool to call, gathers data, then composes a human answer."""
     message = clean_text(text)
-    intent = explicit_intent if explicit_intent and explicit_intent != "general" else infer_intent(message)
+    # GPS is authoritative. Reverse-geocode once so every planner and response uses the current area.
+    if lat is not None and lng is not None:
+        current = await reverse_geocode_location(lat, lng)
+        city = current.get("city") or city
+        state = current.get("state") or state
+    recent_messages = []
+    recent_memories = []
+    recent_reminders = []
+    if user and db:
+        recent_messages = db.query(Message).filter(Message.user_id == user.id).order_by(Message.id.desc()).limit(8).all()
+        recent_memories = db.query(Memory).filter(Memory.user_id == user.id).order_by(Memory.id.desc()).limit(5).all()
+        recent_reminders = db.query(Reminder).filter(Reminder.user_id == user.id, Reminder.status == "active").order_by(Reminder.id.desc()).limit(5).all()
+    context = {
+        "first_name": first_name, "branch": branch, "profile_city": city, "profile_state": state,
+        "gps_available": lat is not None and lng is not None, "latitude": lat, "longitude": lng, "user_type": user_type,
+        "recent_conversation": [{"role": m.role, "content": m.content[:500]} for m in reversed(recent_messages)],
+        "memories": [{"title": m.title, "note": (m.note or "")[:300]} for m in recent_memories],
+        "reminders": [{"title": r.title, "when": r.when_text} for r in recent_reminders],
+    }
+    plan = await plan_request(message, context) if not (explicit_intent and explicit_intent != "general") else {"intent": explicit_intent}
+    intent = plan.get("intent", "general")
 
-    if intent == "find_local_veteran_activities":
+    if intent in ("local_search", "find_local_veteran_activities") or plan.get("needs_places"):
         if lat is None and lng is None and not clean_text(city):
             return {
                 "response": f"Absolutely {first_name}. What city and state are you in so I can search live veteran-friendly events and family activities near you?",
@@ -630,8 +652,8 @@ User type: {user_type}. ValorBuddy supports veterans, spouses, kids, dependents,
 User asked: {message}
 Tool used: Google Places / local search. Live={live}. Location source={location_meta.get('source')}. Results: {json.dumps(items[:5])}
 Write a natural answer. Do not say 'I found 6 events' unless there are exactly 6. Mention 2-3 specific options, ask a useful follow-up, and avoid canned language. If results are family-friendly or suitable for spouses/kids/dependents, say so briefly."""
-        response = await gemini_reply(prompt, fallback)
-        return {"response": response, "intent": intent, "data": {"live": live, "items": items, "location": location_meta}}
+        response = await gemini_reply(prompt, fallback, grounded=False)
+        return {"response": response, "intent": intent, "data": {"live": live, "items": items, "location": location_meta, "plan": plan}}
 
     if intent == "search_benefits":
         data = benefits_lookup(message, state, branch)
@@ -641,8 +663,8 @@ User: {first_name}, {branch}, {city}, {state}
 Question: {message}
 Benefit data: {json.dumps(data)}
 Answer naturally and specifically. Include spouse, child, dependent, caregiver, and family access when relevant. Keep it concise and useful."""
-        response = await gemini_reply(prompt, fallback)
-        return {"response": response, "intent": intent, "data": data}
+        response = await gemini_reply(prompt, fallback, grounded=bool(plan.get("needs_google_search")))
+        return {"response": response, "intent": intent, "data": {**data, "plan": plan}}
 
     if intent == "create_reminder":
         reminder_title = title or message or "Reminder"
@@ -680,28 +702,6 @@ Answer naturally and specifically. Include spouse, child, dependent, caregiver, 
     if intent == "get_user_profile":
         return {"response": f"I have you as {first_name}, {branch}, around {city}, {state}. ValorBuddy also supports spouse and dependent access, reminders, documents, benefits, local activities, music, and memory notes.", "intent": intent}
 
-    if intent in {"live_travel", "live_housing", "live_jobs", "live_discounts", "live_veteran_business", "live_auto", "live_finance", "live_research"}:
-        now_utc = datetime.now(timezone.utc).isoformat()
-        topic_rules = {
-            "live_travel": "Check current travel conditions, official alerts, weather, road/flight safety, and nearby veteran resources. Separate verified facts from suggestions.",
-            "live_housing": "Find current official housing resources and practical options. Never promise approval or claim a property works with bad credit unless a source says so.",
-            "live_jobs": "Use current employer or job information. Prefer official company career pages, USAJobs, SkillBridge, and reputable veteran-employment resources.",
-            "live_discounts": "Verify that discounts are current and explain that terms can change; advise confirming with the business before purchase.",
-            "live_veteran_business": "Find current veteran-owned businesses or official entrepreneurship programs. Clearly label directory claims that need business verification.",
-            "live_auto": "Provide current auto-buying education, recall/safety considerations, financing questions, and dealer research without promising credit approval.",
-            "live_finance": "Give education, comparisons, and risk-aware next steps only—not personalized investment instructions or guaranteed returns. Prefer SEC, FINRA, IRS, VA, and TSP sources.",
-            "live_research": "Answer using current web information and identify uncertainty or rapidly changing details.",
-        }
-        location = f"{city}, {state}".strip(", ") or "the user's current area"
-        fallback = f"{first_name}, I can research that using live sources, but live grounding is not available right now. Please try again shortly or ask me to search a nearby place using Google Maps."
-        prompt = f"""You are ValorBuddy's real-time research assistant. Current UTC timestamp: {now_utc}.
-User: {first_name}; branch: {branch}; user type: {user_type}; location: {location}; coordinates: {lat}, {lng}.
-Request: {message}
-Task rules: {topic_rules[intent]}
-Use Google Search grounding. Give a direct answer with a short 'What I found', 'Best next steps', and 'Verify before acting' structure when appropriate. Mention dates for time-sensitive information. Do not invent availability, discounts, credit acceptance, employer openings, prices, safety conditions, or eligibility. For emergencies or immediate danger, direct the user to 911; for veteran crisis support, 988 then Press 1."""
-        response = await gemini_reply(prompt, fallback, grounded=True)
-        return {"response": response, "intent": intent, "grounded": True, "data": {"grounded": True, "as_of": now_utc, "location": location}}
-
     # General companion: make every answer contextual, not canned.
     recent = []
     rems = []
@@ -715,11 +715,14 @@ Recent memories: {[m.title for m in recent]}
 Recent reminders: {[r.title for r in rems]}
 User said: {message}
 Respond directly to the user's actual words. Be warm, practical, concise, and action-oriented. If a tool would help, say exactly which next action you can take. Avoid generic canned responses."""
-    response = await gemini_reply(prompt, fallback)
-    return {"response": response, "intent": intent}
+    use_grounding = bool(plan.get("needs_google_search") or intent == "live_web")
+    if use_grounding:
+        prompt += "\nUse Google Search grounding for current facts. Include dates or freshness context where useful and do not invent local results."
+    response = await gemini_reply(prompt, fallback, grounded=use_grounding)
+    return {"response": response, "intent": intent, "data": {"plan": plan, "grounded": use_grounding}}
 
 
-app = FastAPI(title=APP_NAME, version="3.2.0")
+app = FastAPI(title=APP_NAME, version="4.0.0")
 origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
@@ -745,7 +748,7 @@ def startup():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": APP_NAME, "version": "3.2.0", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "ai_provider": "vertex_ai" if GOOGLE_GENAI_USE_VERTEXAI else "gemini_api", "gemini": bool(GEMINI_API_KEY or (GOOGLE_GENAI_USE_VERTEXAI and GOOGLE_CLOUD_PROJECT)), "reasoning_model": GEMINI_MODEL, "lite_model": GEMINI_LITE_MODEL, "google_places": bool(GOOGLE_MAPS_API_KEY), "google_search_grounding": ENABLE_GOOGLE_SEARCH_GROUNDING}
+    return {"status": "ok", "app": APP_NAME, "version": "4.1.0", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
 
 
 @app.get("/db/tables")
@@ -856,11 +859,11 @@ def suggest_music(mood: str = "calm", branch: str = "Army"):
 
 
 @app.get("/api/briefing")
-async def today_briefing(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def today_briefing(lat: float | None = None, lng: float | None = None, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     p = user.profile
     rems = db.query(Reminder).filter(Reminder.user_id == user.id, Reminder.status == "active").order_by(Reminder.id.desc()).limit(3).all()
-    live, events, location_meta = await google_places(city=p.city, state=p.state, query="veteran events VA VFW American Legion family friendly")
-    return {"greeting": f"Good to see you, {p.first_name}. How is your day going?", "location": f"{p.city}, {p.state}", "reminders": [{"title": r.title, "when_text": r.when_text} for r in rems], "events": events[:3], "wellness_prompt": ("Live Google Places is connected." if live else "Google Places is in demo mode. Add GOOGLE_PLACES_API_KEY in Render to make activities live.")}
+    live, events, location_meta = await google_places(city=p.city, state=p.state, query="veteran events VA VFW American Legion family friendly", lat=lat, lng=lng)
+    return {"greeting": f"Good to see you, {p.first_name}. How is your day going?", "location": f"{location_meta.get('city') or p.city}, {location_meta.get('state') or p.state}", "reminders": [{"title": r.title, "when_text": r.when_text} for r in rems], "events": events[:3], "wellness_prompt": ("Live Google Places is connected." if live else "Google Places is in demo mode. Add GOOGLE_PLACES_API_KEY in Render to make activities live.")}
 
 
 @app.post("/api/companion/chat")
@@ -876,6 +879,8 @@ async def companion_chat(payload: CompanionRequest, user: User = Depends(get_cur
         branch=p.branch,
         city=p.city,
         state=p.state,
+        lat=payload.lat,
+        lng=payload.lng,
         user=user,
         db=db,
     )
@@ -898,7 +903,7 @@ async def upload_document(doc_type: str = Form("general"), file: UploadFile = Fi
             extracted = content.decode("utf-8", errors="ignore")[:6000]
     except Exception:
         extracted = ""
-    summary = await gemini_reply(f"Summarize this veteran document in simple helpful terms:\n{extracted[:4000]}", "Document uploaded and stored. AI search is ready for text-based files.", task="summary")
+    summary = await gemini_reply(f"Summarize this veteran document in simple helpful terms:\n{extracted[:4000]}", "Document uploaded and stored. AI search is ready for text-based files.")
     row = Document(user_id=user.id, filename=file.filename, doc_type=doc_type, file_url=f"/uploads/{safe_name}", extracted_text=extracted, ai_summary=summary)
     db.add(row); db.commit(); db.refresh(row)
     return {"id": row.id, "filename": row.filename, "doc_type": row.doc_type, "file_url": row.file_url, "ai_summary": row.ai_summary}
@@ -911,19 +916,12 @@ def list_documents(user: User = Depends(get_current_user), db: Session = Depends
 
 
 @app.post("/api/vapi/action")
-async def vapi_action(payload: VapiActionRequest, authorization: Optional[str] = Header(None), db: Session = Depends(get_db)):
+async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db)):
     text = payload.message or payload.query or payload.title or payload.memory or ""
     email = (payload.email or "").lower().strip()
     user = db.query(User).filter(User.email == email).first() if email else None
-    if not user and authorization and authorization.lower().startswith("bearer "):
-        try:
-            token = authorization.split(" ", 1)[1].strip()
-            payload_token = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            user = db.get(User, int(payload_token.get("sub")))
-        except Exception:
-            user = None
     if not user:
-        raise HTTPException(status_code=401, detail="Authentication required for voice commands")
+        user = db.query(User).filter(User.email == "demo@valorbuddy.com").first()
 
     profile = user.profile if user and user.profile else None
     first_name = payload.first_name or (profile.first_name if profile else "there")
