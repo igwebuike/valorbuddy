@@ -334,12 +334,49 @@ def _genai_client():
     return genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 
-SYSTEM_INSTRUCTION = """You are ValorBuddy, a trusted AI companion for U.S. veterans, service members, spouses, caregivers, survivors, and dependents.
-Be warm, direct, practical, and action-oriented. Use the user's current GPS location when supplied; never assume Dallas or any other city.
-Use live grounded information for current facts, weather, travel, events, opening hours, news, jobs, discounts, and changing rules. Clearly distinguish live results from general guidance.
-Preserve context from recent conversation, reminders, memories, and documents. Resolve follow-ups such as 'is it open?' or 'take me there' using prior context.
-Do not claim to have completed an action unless the application actually completed it. For emergencies or immediate danger, direct the user to 911. For a veteran in crisis, mention 988 then Press 1 when relevant.
-Do not diagnose, provide legal representation, or guarantee VA eligibility. Keep most answers under 220 words unless the user asks for detail."""
+SYSTEM_INSTRUCTION = """You are ValorBuddy, a trusted digital battle buddy for the entire military community.
+
+You support veterans, active-duty service members, retired service members, National Guard, Reserve members, transitioning service members, military spouses, children, dependents, caregivers, Gold Star families, surviving spouses, wounded warriors, and military families from every race, ethnicity, nationality, gender, religion, disability status, background, and branch of service.
+
+Treat every person with dignity, respect, empathy, and professionalism. Never make assumptions about combat history, disability status, VA eligibility, finances, beliefs, health conditions, or personal experiences.
+
+MISSION
+Help the user accomplish real tasks, save time, reduce stress, understand options, and take the next useful action. Do not merely describe what you could do.
+
+PERSONALITY
+Be warm, calm, capable, practical, encouraging, concise, confident, humble, conversational, and military-aware. Never sound like ChatGPT, a search engine, documentation, or a scripted call center. Do not call yourself an AI assistant unless directly asked. Use the user's name naturally when appropriate.
+
+INTENT FIRST
+Identify the user's primary intent and stay focused on it. If the user asks about activities or events, discuss only activities or events. Do not mention documents, reminders, benefits, or unrelated features. If the user asks about restaurants, discuss restaurants only. If the user asks about benefits, discuss benefits only.
+
+Ask at most one focused clarification question when it is truly necessary. If sufficient information exists, act immediately. Never end with a generic question such as “What would you like to do?” Make a useful recommendation or ask a specific next-step question.
+
+LIVE LOCATION
+For “near me” requests, current GPS coordinates are authoritative. Never default to Dallas or any other city. Never use a saved city when live GPS exists. If GPS is unavailable for a “near me” request, ask: “What city and state are you in so I can search near you?”
+
+LIVE INFORMATION
+Never invent events, places, addresses, business hours, weather, traffic, news, prices, jobs, discounts, schedules, or VA office hours. Use live tools when available. Clearly distinguish live results from general guidance.
+
+TOOL BEHAVIOR
+Use only the tools needed for the user's exact request. Combine tool results into one natural answer. Never expose internal reasoning, planner output, tool names, backend systems, or implementation details.
+
+CONVERSATION MEMORY
+Use recent conversation naturally. Resolve references such as “it,” “that place,” “the first one,” or “is it open?” from prior context. Do not repeat information the user already provided.
+
+LOCAL RESULTS
+Give no more than three strong options unless the user asks for more. Summarize why each option fits. End with one specific next step such as directions, distance, hours, registration details, or filtering by today/free/family-friendly.
+
+MENTAL WELLNESS AND SAFETY
+You are not a therapist, doctor, psychiatrist, psychologist, crisis counselor, lawyer, or financial advisor. Never diagnose PTSD, depression, anxiety, or another condition. Never provide clinical treatment or promise eligibility or legal outcomes.
+
+If someone appears stressed or overwhelmed, respond calmly, validate without exaggeration, offer one simple grounding step, offer one practical next action, and ask one gentle follow-up question.
+
+If the user expresses intent to harm themselves or someone else, or says they may not be safe, respond immediately: “In the U.S., please call or text 988 and press 1 for the Veterans Crisis Line now. If there is immediate danger, call 911 or go to the nearest emergency department.” Encourage immediate human support and stay calm.
+
+RESPONSE STYLE
+Keep most responses under 220 words unless the user asks for detail. Be direct, natural, specific, and action-oriented. Never say “My next useful step would be,” “I can help by,” or list unrelated capabilities. Actually help.
+
+Every response should leave the user better informed, more confident, or one step closer to completing the goal."""
 
 
 def _extract_text(response: Any) -> str:
@@ -383,13 +420,25 @@ async def plan_request(message: str, context: dict[str, Any]) -> dict[str, Any]:
         "needs_location": False,
         "needs_places": False,
         "needs_google_search": False,
+        "needs_clarification": False,
+        "clarification_question": "",
+        "default_query": "",
         "search_query": "",
         "response_goal": "",
     }
-    prompt = f"""Return only JSON matching this shape: {json.dumps(schema)}
-Choose the minimum tools needed. Use local_search/needs_places for nearby restaurants, VA facilities, events, stores, parks, directions, or 'near me'.
-Use live_web/needs_google_search for current weather, traffic, road conditions, news, current policies, changing benefits rules, jobs, discounts, prices, schedules, or today's events not reliably covered by Places.
-Use benefits for stable benefits guidance; create_reminder only when the user explicitly asks to save a reminder; save_memory only when explicitly asked to remember/save; music for music requests.
+    prompt = f"""Return only valid JSON matching this shape: {json.dumps(schema)}
+
+Identify ONE primary intent and select the minimum tools required.
+- Use local_search with needs_places=true for nearby activities, veteran events, VFW, American Legion, restaurants, VA facilities, stores, parks, directions, or any 'near me' request.
+- Use live_web with needs_google_search=true for current weather, traffic, road conditions, news, current policies, changing benefits rules, jobs, discounts, prices, public event schedules, or other time-sensitive facts not reliably covered by Places.
+- Use benefits for benefits guidance.
+- Use create_reminder only when the user explicitly asks to create/save a reminder.
+- Use save_memory only when the user explicitly asks to remember/save something.
+- Use music for music requests.
+
+Stay strictly focused on the user's request. An activities request must not expand into documents, reminders, benefits, or unrelated features.
+Ask one clarification question only when the request cannot be acted on accurately without it. When clarification is needed, set needs_clarification=true, write one natural clarification_question, and provide a useful default_query that can be executed if the user does not respond. Do not request clarification when the user already asked clearly for nearby veteran activities or events.
+
 Context: {json.dumps(context, default=str)}
 User message: {message}"""
     raw = await gemini_reply(prompt, json.dumps(schema), json_mode=True, model=GEMINI_PLANNER_MODEL)
@@ -629,8 +678,18 @@ async def route_valorbuddy_message(
     plan = await plan_request(message, context) if not (explicit_intent and explicit_intent != "general") else {"intent": explicit_intent}
     intent = plan.get("intent", "general")
 
+    if plan.get("needs_clarification"):
+        question = clean_text(plan.get("clarification_question")) or f"{first_name}, what type of option should I focus on?"
+        default_query = clean_text(plan.get("default_query")) or message
+        return {
+            "response": question,
+            "intent": "clarification",
+            "data": {"awaiting_clarification": True, "default_query": default_query, "plan": plan},
+        }
+
     if intent in ("local_search", "find_local_veteran_activities") or plan.get("needs_places"):
-        if lat is None and lng is None and not clean_text(city):
+        near_me = any(phrase in message.lower() for phrase in ("near me", "nearby", "around me", "close to me"))
+        if lat is None and lng is None and (near_me or not clean_text(city)):
             return {
                 "response": f"Absolutely {first_name}. What city and state are you in so I can search live veteran-friendly events and family activities near you?",
                 "intent": "ask_location",
@@ -645,13 +704,16 @@ async def route_valorbuddy_message(
             }
         mode = "live Google Places" if live else "fallback map suggestions"
         place_label = f"near {location_meta.get('city')}, {location_meta.get('state')}" if location_meta.get('city') else "near your current location"
-        fallback = f"{first_name}, I searched {place_label}. Here are the best {mode}: {human_list(items)}. Pick one and I can help with directions, a reminder, or a follow-up question."
-        prompt = f"""You are ValorBuddy, an AI battle buddy for veterans and families.
-User: {first_name}, {branch}, {location_meta.get('city') or city}, {location_meta.get('state') or state}
-User type: {user_type}. ValorBuddy supports veterans, spouses, kids, dependents, caregivers, and family members.
-User asked: {message}
-Tool used: Google Places / local search. Live={live}. Location source={location_meta.get('source')}. Results: {json.dumps(items[:5])}
-Write a natural answer. Do not say 'I found 6 events' unless there are exactly 6. Mention 2-3 specific options, ask a useful follow-up, and avoid canned language. If results are family-friendly or suitable for spouses/kids/dependents, say so briefly."""
+        fallback = f"{first_name}, I found these options {place_label}: {human_list(items)}. Which one should I check for hours, distance, or directions?"
+        prompt = f"""User: {first_name}, branch={branch}, current_area={location_meta.get('city') or city}, {location_meta.get('state') or state}
+User type: {user_type}
+Exact request: {message}
+Primary intent: {intent}
+Live local results: live={live}, source={location_meta.get('source')}, results={json.dumps(items[:5])}
+
+Answer ONLY the exact local intent. If the request is for veteran activities or events, discuss only those activities or events. Do not mention documents, reminders, benefits, memories, or other ValorBuddy features.
+Give up to three specific options. For each, briefly state what it is, where it is, and any verified rating or useful live detail available in the results. Do not invent dates, times, hours, admission, or event details that are absent.
+Use natural battle-buddy language without calling yourself an AI assistant. End with ONE specific, interactive question such as whether to check directions, distance, hours, registration details, or filter for today/free/family-friendly. Do not ask a generic “Which direction do you want?” question."""
         response = await gemini_reply(prompt, fallback, grounded=False)
         return {"response": response, "intent": intent, "data": {"live": live, "items": items, "location": location_meta, "plan": plan}}
 
@@ -694,13 +756,13 @@ Answer naturally and specifically. Include spouse, child, dependent, caregiver, 
             rems = db.query(Reminder).filter(Reminder.user_id == user.id, Reminder.status == "active").order_by(Reminder.id.desc()).limit(3).all()
         live, places, location_meta = await google_places(city=city, state=state, query="veteran friendly coffee parks VFW", lat=lat, lng=lng)
         reminder_txt = "; ".join([f"{r.title} ({r.when_text})" for r in rems]) or "no saved reminders yet"
-        fallback = f"Good to see you, {first_name}. Your current reminders: {reminder_txt}. Around {city}, a good next move could be {places[0]['title']}. Want me to search activities, benefits, or save a reminder?"
+        fallback = f"Good to see you, {first_name}. You have {reminder_txt}. One nearby option is {places[0]['title']}. Should I check its hours or directions?"
         prompt = f"Create a short daily briefing for {first_name}, a {branch} veteran in {city}, {state}. Reminders: {reminder_txt}. Nearby options: {json.dumps(places[:3])}. Make it warm, practical, and not canned."
         response = await gemini_reply(prompt, fallback)
         return {"response": response, "intent": intent, "data": {"items": places, "live": live}}
 
     if intent == "get_user_profile":
-        return {"response": f"I have you as {first_name}, {branch}, around {city}, {state}. ValorBuddy also supports spouse and dependent access, reminders, documents, benefits, local activities, music, and memory notes.", "intent": intent}
+        return {"response": f"I have your name as {first_name} and your branch as {branch}. Your saved area is {city}, {state}. Tell me what you want corrected, and I’ll focus on that update.", "intent": intent}
 
     # General companion: make every answer contextual, not canned.
     recent = []
@@ -708,13 +770,14 @@ Answer naturally and specifically. Include spouse, child, dependent, caregiver, 
     if user and db:
         recent = db.query(Memory).filter(Memory.user_id == user.id).order_by(Memory.id.desc()).limit(4).all()
         rems = db.query(Reminder).filter(Reminder.user_id == user.id).order_by(Reminder.id.desc()).limit(4).all()
-    fallback = f"{first_name}, I hear you. On '{message}', my next useful step would be to turn that into an action: search a local resource, explain a benefit, save a reminder, organize a document, or build a simple plan. Which direction do you want?"
-    prompt = f"""You are ValorBuddy, a real AI battle buddy for veterans, spouses, and dependents. Never sound like a static FAQ.
-User profile: first_name={first_name}, branch={branch}, city={city}, state={state}
+    fallback = f"{first_name}, I heard you: {message}. Tell me the one detail that matters most, and I’ll give you a direct answer."
+    prompt = f"""User profile: first_name={first_name}, branch={branch}, current_city={city}, current_state={state}
 Recent memories: {[m.title for m in recent]}
 Recent reminders: {[r.title for r in rems]}
+Primary intent: {intent}
 User said: {message}
-Respond directly to the user's actual words. Be warm, practical, concise, and action-oriented. If a tool would help, say exactly which next action you can take. Avoid generic canned responses."""
+
+Answer the user's actual request directly and stay on that single topic. Do not list ValorBuddy capabilities or unrelated features. Do not say “my next useful step,” “I can help by,” or “which direction do you want?” If one essential detail is missing, ask one precise follow-up question. Otherwise provide the useful answer or recommendation now. Keep it natural, concise, warm, and action-oriented."""
     use_grounding = bool(plan.get("needs_google_search") or intent == "live_web")
     if use_grounding:
         prompt += "\nUse Google Search grounding for current facts. Include dates or freshness context where useful and do not invent local results."
@@ -794,7 +857,7 @@ def update_profile_branch(payload: BranchUpdate, user: User = Depends(get_curren
     if payload.branch not in allowed:
         raise HTTPException(status_code=400, detail="Unsupported service branch")
     if not user.profile:
-        db.add(UserProfile(user_id=user.id, first_name="Veteran", branch=payload.branch, city="Dallas", state="TX"))
+        db.add(UserProfile(user_id=user.id, first_name="Veteran", branch=payload.branch, city="", state=""))
     else:
         user.profile.branch = payload.branch
         user.profile.updated_at = datetime.now(timezone.utc)

@@ -79,3 +79,23 @@ html[data-branch="spaceforce"],body[data-branch="spaceforce"],.app.spaceforce,.l
 .app.airforce aside,.app.airforce header,.app.airforce .hero,.app.airforce .card,.app.airforce .voiceBox,.app.airforce .glance,.app.airforce .page,.app.airforce .globalSearch{background:linear-gradient(135deg,#0d2d52,#071a2f)!important;border-color:#8b95a3!important;color:#e6e8ec!important}.app.airforce h1,.app.airforce h2,.app.airforce h3,.app.airforce b,.app.airforce button{color:#d6d9df!important}
 .app.marines aside,.app.marines header,.app.marines .hero,.app.marines .card,.app.marines .voiceBox,.app.marines .glance,.app.marines .page,.app.marines .globalSearch{background:linear-gradient(135deg,#332014,#1f120b)!important;border-color:#c92b2b!important;color:#ffd9d0!important}.app.marines h1,.app.marines h2,.app.marines h3,.app.marines b,.app.marines button{color:#ff3131!important}
 @media(max-width:720px){.globalSearch{margin:12px;flex-wrap:wrap}.globalSearch button{width:100%;justify-content:center}.logo img{width:44px;height:44px}}
+
+/* ===== Navy clarity and identity patch ===== */
+html[data-branch="navy"],body[data-branch="navy"],.app.navy,.loginPage.navy{
+  --bg:#031426!important;--panel:#062743!important;--panel2:#0a3a5d!important;
+  --accent:#d4af37!important;--accent2:#f7e7a9!important;--text:#f7fbff!important;
+  --muted:#b9d2e8!important;--border:#2f6f99!important;
+  color:#f7fbff!important;
+  background:radial-gradient(circle at 75% 8%,#0d4f75 0,#062743 25%,#031426 62%,#010a13 100%)!important;
+}
+.app.navy:before{content:""!important;position:fixed!important;inset:0!important;pointer-events:none!important;z-index:0!important;opacity:.2!important;background-image:radial-gradient(circle at 72% 25%,transparent 0 70px,rgba(212,175,55,.65) 72px 74px,transparent 76px),radial-gradient(circle at 72% 25%,transparent 0 140px,rgba(47,111,153,.7) 142px 144px,transparent 146px),linear-gradient(rgba(47,111,153,.4) 1px,transparent 1px),linear-gradient(90deg,rgba(47,111,153,.4) 1px,transparent 1px)!important;background-size:auto,auto,48px 48px,48px 48px!important}
+.app.navy aside,.app.navy header{background:linear-gradient(180deg,rgba(2,15,29,.96),rgba(3,20,38,.94))!important;border-color:#2f6f99!important;color:#f7fbff!important}
+.app.navy .hero,.app.navy .voiceBox,.app.navy .glance,.app.navy .page,.app.navy .card,.app.navy .globalSearch,.app.navy .profileCard,.app.navy .chat .assistant,.app.navy .chat .user,.app.navy .miniProfile,.app.navy .pledge{background:linear-gradient(145deg,rgba(6,39,67,.96),rgba(3,20,38,.96))!important;border-color:#2f6f99!important;color:#f7fbff!important;box-shadow:0 18px 44px rgba(0,5,12,.38)!important}
+.app.navy .hero{background:radial-gradient(circle at 88% 28%,rgba(212,175,55,.12),transparent 28%),linear-gradient(120deg,#062743,#031426)!important}
+.app.navy h1,.app.navy h2,.app.navy h3,.app.navy .logo b,.app.navy header>div:first-child b,.app.navy .card h3,.app.navy .voiceBox h3,.app.navy .pledge{color:#f7e7a9!important}
+.app.navy p,.app.navy small,.app.navy .muted,.app.navy .card p,.app.navy .card small,.app.navy .voiceBox p,.app.navy .voiceBox small,.app.navy .logo span,.app.navy header>div:first-child span{color:#b9d2e8!important}
+.app.navy .status,.app.navy .miniProfile span,.app.navy .hero b,.app.navy .badge,.app.navy .card a,.app.navy .stats b{color:#d4af37!important}
+.app.navy aside button,.app.navy header button,.app.navy .primary,.app.navy .card button,.app.navy .composer button,.app.navy .tabs button{background:#062743!important;border-color:#2f6f99!important;color:#f7fbff!important}
+.app.navy aside button:hover,.app.navy aside button.active,.app.navy header button:hover,.app.navy header button.active,.app.navy .primary:hover,.app.navy .card:hover{background:#0a3a5d!important;border-color:#d4af37!important;box-shadow:inset 5px 0 #d4af37!important}
+.app.navy .mic{border-color:#d4af37!important;background:radial-gradient(circle,rgba(212,175,55,.24),#062743 55%,#031426)!important;box-shadow:0 0 36px rgba(212,175,55,.32)!important;color:#f7fbff!important}
+.app.navy input{background:#02101f!important;border-color:#2f6f99!important;color:#f7fbff!important}

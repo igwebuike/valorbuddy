@@ -48,3 +48,13 @@ npx cap add android
 npx cap add ios
 npx cap sync
 ```
+
+## v4.2 focused-intelligence update
+
+- Replaced generic capability-list responses with intent-focused AI behavior.
+- Added one-question clarification flow with a 12-second sensible-default continuation in web voice/chat.
+- Enforced GPS-first handling for “near me” requests; no silent Dallas fallback.
+- Added an inclusive production system prompt for the full military community.
+- Added `docs/VAPI_PRODUCTION_PROMPT.txt` for the Vapi assistant configuration.
+- Redesigned the Navy theme with a distinct deep-navy, sonar-grid, and gold-accent identity.
+- Updated the first greeting to use “digital battle buddy” language without announcing loaded personal data.
