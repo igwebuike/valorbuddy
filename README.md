@@ -58,3 +58,23 @@ npx cap sync
 - Added `docs/VAPI_PRODUCTION_PROMPT.txt` for the Vapi assistant configuration.
 - Redesigned the Navy theme with a distinct deep-navy, sonar-grid, and gold-accent identity.
 - Updated the first greeting to use “digital battle buddy” language without announcing loaded personal data.
+
+
+## v4.6 conversation completion update
+
+- Clear event and nearby-place requests now bypass vague planner fallbacks and route directly to live location search.
+- ValorBuddy no longer repeats the user's question.
+- Removed “I heard you,” “best starting point,” and “tell me one detail” responses.
+- Responses continue through a useful answer, recommendation, numbered choices, and a concrete next action.
+- Event responses recommend a first option and let the user continue by saying a number.
+
+
+## ValorBuddy v4.6 additions
+
+- Beautiful responsive recommendation popup with wrapped clickable action buttons.
+- GPS-first local discovery with city/state fallback and date-oriented search choices.
+- Live Google Places details for top results, including opening status, phone, website, ratings, and available Google review excerpts.
+- ValorBuddy explanation for why each event or place may fit.
+- Benefits popup with plain-English explanation, best next step, and clearly labeled common veteran-community guidance.
+- Voice and Activities pages now surface quick choices for today, this weekend, free events, family-friendly options, VFW/Legion, and “pick for me.”
+- No invented reviews: place comments are shown only when returned by Google; benefits community notes are labeled as common practical guidance rather than individual testimonials.

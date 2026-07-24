@@ -573,22 +573,69 @@ async def google_places(city: str = "", state: str = "", query: str = "", lat: f
             return False, [{**x, "description": f"Google Places returned {status}. Check key, billing, Places API, and restrictions."} for x in fb], {**location_meta, "error": status}
         results = []
         seen = set()
-        for item in data.get("results", [])[:8]:
-            name = item.get("name") or "Local option"
-            if name.lower() in seen:
-                continue
-            seen.add(name.lower())
-            address = item.get("formatted_address", f"{resolved_city}, {resolved_state}".strip(", "))
-            place_id = item.get("place_id")
-            results.append({
-                "title": name,
-                "location": address,
-                "type": ", ".join(item.get("types", [])[:3]),
-                "rating": item.get("rating"),
-                "description": f"Live Google Places result for: {clean_query}",
-                "place_id": place_id,
-                "maps_url": f"https://www.google.com/maps/search/?api=1&query={quote_plus(name + ' ' + address)}" + (f"&query_place_id={place_id}" if place_id else ""),
-            })
+        async with httpx.AsyncClient(timeout=15) as detail_client:
+            for item in data.get("results", [])[:8]:
+                name = item.get("name") or "Local option"
+                if name.lower() in seen:
+                    continue
+                seen.add(name.lower())
+                address = item.get("formatted_address", f"{resolved_city}, {resolved_state}".strip(", "))
+                place_id = item.get("place_id")
+                reviews = []
+                phone = ""
+                website = ""
+                opening_hours = item.get("opening_hours", {})
+                if place_id and len(results) < 3:
+                    try:
+                        detail_response = await detail_client.get(
+                            "https://maps.googleapis.com/maps/api/place/details/json",
+                            params={
+                                "place_id": place_id,
+                                "fields": "formatted_phone_number,website,opening_hours,reviews,url",
+                                "reviews_sort": "most_relevant",
+                                "key": GOOGLE_MAPS_API_KEY,
+                            },
+                        )
+                        detail = detail_response.json().get("result", {})
+                        phone = detail.get("formatted_phone_number", "")
+                        website = detail.get("website", "")
+                        opening_hours = detail.get("opening_hours") or opening_hours
+                        reviews = [
+                            {
+                                "author": review.get("author_name", "Google reviewer"),
+                                "rating": review.get("rating"),
+                                "text": clean_text(review.get("text", ""))[:240],
+                                "time_description": review.get("relative_time_description", ""),
+                            }
+                            for review in detail.get("reviews", [])[:2]
+                            if clean_text(review.get("text", ""))
+                        ]
+                    except Exception:
+                        reviews = []
+                rating = item.get("rating")
+                review_total = item.get("user_ratings_total")
+                type_text = ", ".join(item.get("types", [])[:3]).replace("_", " ")
+                explanation = f"A nearby {type_text or 'community option'} that matches your request."
+                if rating:
+                    explanation += f" It has a {rating} Google rating"
+                    if review_total:
+                        explanation += f" from {review_total} reviews"
+                    explanation += "."
+                results.append({
+                    "title": name,
+                    "location": address,
+                    "type": type_text,
+                    "rating": rating,
+                    "review_count": review_total,
+                    "description": explanation,
+                    "assistant_explanation": explanation,
+                    "reviews": reviews,
+                    "phone": phone,
+                    "website": website,
+                    "open_now": opening_hours.get("open_now") if isinstance(opening_hours, dict) else None,
+                    "place_id": place_id,
+                    "maps_url": f"https://www.google.com/maps/search/?api=1&query={quote_plus(name + ' ' + address)}" + (f"&query_place_id={place_id}" if place_id else ""),
+                })
         if results:
             return True, results, location_meta
         return False, _fallback_local_cards(resolved_city, resolved_state, clean_query), {**location_meta, "error": "ZERO_RESULTS"}
@@ -601,19 +648,19 @@ def benefits_lookup(query: str, state: str, branch: str) -> dict[str, Any]:
     q = (query or "benefits").lower()
     items = []
     if any(x in q for x in ["spouse", "dependent", "wife", "husband", "child", "children", "survivor", "caregiver", "family"]):
-        items.append({"title": "Spouse, dependent, survivor, and caregiver pathways", "summary": "ValorBuddy can help families understand education, survivor, caregiver, healthcare, and benefit-support pathways in plain English. Eligibility depends on service history and VA rules.", "next_step": "Create a family-access profile, gather DD214/benefit letters, then verify official eligibility on VA.gov or with an accredited VSO."})
+        items.append({"title": "Spouse, dependent, survivor, and caregiver pathways", "summary": "ValorBuddy can help families understand education, survivor, caregiver, healthcare, and benefit-support pathways in plain English. Eligibility depends on service history and VA rules.", "next_step": "Create a family-access profile, gather DD214/benefit letters, then verify official eligibility on VA.gov or with an accredited VSO.", "assistant_explanation": "This pathway helps families understand which programs may apply and which documents to gather first.", "community_note": "Veteran families commonly say the hardest part is knowing where to start; a document checklist and accredited VSO review can reduce confusion."})
     if any(x in q for x in ["education", "school", "gi", "tuition", "chapter", "dea"]):
-        items.append({"title": "Education benefits / GI Bill / DEA starting point", "summary": "Review Post-9/11 GI Bill, transfer rules, Chapter 35 DEA for eligible dependents, school certification, and housing allowance basics.", "next_step": "Gather service records, school/program details, and check the official VA education portal."})
+        items.append({"title": "Education benefits / GI Bill / DEA starting point", "summary": "Review Post-9/11 GI Bill, transfer rules, Chapter 35 DEA for eligible dependents, school certification, and housing allowance basics.", "next_step": "Gather service records, school/program details, and check the official VA education portal.", "assistant_explanation": "Start by matching the education goal to the correct VA education chapter and confirming school certification.", "community_note": "Many veterans recommend confirming benefit months and housing allowance rules before enrolling."})
     if any(x in q for x in ["disability", "claim", "rating", "compensation", "appeal"]):
-        items.append({"title": "VA disability compensation and claim support", "summary": "ValorBuddy can organize evidence, questions, appointments, and plain-English checklists. It does not decide eligibility or replace an accredited representative.", "next_step": "Collect medical/service evidence and speak with a VSO or VA-accredited representative."})
+        items.append({"title": "VA disability compensation and claim support", "summary": "ValorBuddy can organize evidence, questions, appointments, and plain-English checklists. It does not decide eligibility or replace an accredited representative.", "next_step": "Collect medical/service evidence and speak with a VSO or VA-accredited representative.", "assistant_explanation": "A strong starting point is an organized evidence list, current diagnoses from qualified professionals, and a clear timeline of service-connected events.", "community_note": "Veterans often find accredited VSO support useful for checking forms and evidence before submission."})
     if any(x in q for x in ["home", "loan", "mortgage"]):
-        items.append({"title": "VA home loan pathway", "summary": "VA-backed home loans may support buying, refinancing, or repairing a home for eligible veterans and some surviving spouses.", "next_step": "Check Certificate of Eligibility and talk with a VA-approved lender."})
+        items.append({"title": "VA home loan pathway", "summary": "VA-backed home loans may support buying, refinancing, or repairing a home for eligible veterans and some surviving spouses.", "next_step": "Check Certificate of Eligibility and talk with a VA-approved lender.", "assistant_explanation": "Confirm eligibility, estimate an affordable monthly payment, and compare VA-approved lenders before selecting a property.", "community_note": "Veteran homebuyers frequently recommend comparing lender fees and not assuming every lender offers the same VA loan terms."})
     if any(x in q for x in ["health", "clinic", "medical", "mental", "doctor"]):
-        items.append({"title": "VA healthcare and local care navigation", "summary": "Find VA clinics, Vet Centers, community care questions, and appointment reminders. For urgent or crisis needs, call emergency services or 988 then press 1.", "next_step": "Use VA.gov or local VA facility contacts for official enrollment and appointment details."})
+        items.append({"title": "VA healthcare and local care navigation", "summary": "Find VA clinics, Vet Centers, community care questions, and appointment reminders. For urgent or crisis needs, call emergency services or 988 then press 1.", "next_step": "Use VA.gov or local VA facility contacts for official enrollment and appointment details.", "assistant_explanation": "ValorBuddy can help locate the closest facility and prepare questions, while the VA confirms enrollment and care options.", "community_note": "Veterans often suggest bringing a medication list, records, and written questions to appointments."})
     if not items:
         items = [
-            {"title": "Benefits command center", "summary": "Common categories include healthcare, disability compensation, education, home loan, employment, pension, caregiver, survivor, spouse, and dependent benefits.", "next_step": "Ask about one category, and ValorBuddy will build a plain-English checklist."},
-            {"title": "Family access", "summary": "Spouses and dependents can use ValorBuddy to organize documents, reminders, resources, and benefit questions connected to the veteran's journey.", "next_step": "Create a spouse, child, dependent, caregiver, and family profile and attach key documents."},
+            {"title": "Benefits command center", "summary": "Common categories include healthcare, disability compensation, education, home loan, employment, pension, caregiver, survivor, spouse, and dependent benefits.", "next_step": "Choose a category and ValorBuddy will build a plain-English checklist.", "assistant_explanation": "Pick the benefit area that matters most and receive a focused eligibility and document checklist.", "community_note": "Veterans commonly recommend working one benefit category at a time and keeping copies of every submission."},
+            {"title": "Family access", "summary": "Spouses and dependents can use ValorBuddy to organize documents, reminders, resources, and benefit questions connected to the veteran's journey.", "next_step": "Create the appropriate family profile and gather key documents.", "assistant_explanation": "Family pathways vary, so identifying the relationship and benefit goal makes the guidance more accurate.", "community_note": "Military families often say a shared checklist helps everyone understand deadlines and missing documents."},
         ]
     return {"disclaimer": "Informational only. Use VA.gov or a VA-accredited representative for official guidance.", "items": items, "state": state, "branch": branch}
 
@@ -707,7 +754,19 @@ async def route_valorbuddy_message(
         "memories": [{"title": m.title, "note": (m.note or "")[:300]} for m in recent_memories],
         "reminders": [{"title": r.title, "when": r.when_text} for r in recent_reminders],
     }
-    plan = await plan_request(message, context) if not (explicit_intent and explicit_intent != "general") else {"intent": explicit_intent}
+    # Deterministic routing comes first so clear requests never fall into a vague AI fallback.
+    inferred_intent = infer_intent(message)
+    if explicit_intent and explicit_intent != "general":
+        plan = {"intent": explicit_intent}
+    elif inferred_intent != "general":
+        plan = {
+            "intent": inferred_intent,
+            "needs_places": inferred_intent == "find_local_veteran_activities",
+            "needs_location": inferred_intent == "find_local_veteran_activities",
+            "search_query": message,
+        }
+    else:
+        plan = await plan_request(message, context)
     intent = plan.get("intent", "general")
 
     if plan.get("needs_clarification"):
@@ -725,29 +784,50 @@ async def route_valorbuddy_message(
         near_me = any(phrase in message.lower() for phrase in ("near me", "nearby", "around me", "close to me"))
         if lat is None and lng is None and (near_me or not clean_text(city)):
             return {
-                "response": f"Absolutely {first_name}. What city and state are you in so I can search live veteran-friendly events and family activities near you?",
+                "response": f"Absolutely {first_name}. What city and state should I search, and are you looking for today, this weekend, or specific dates?",
                 "intent": "ask_location",
                 "data": {"location_required": True}
             }
         live, items, location_meta = await google_places(city=city, state=state, query=message, lat=lat, lng=lng)
         if location_meta.get("error") == "location_required":
             return {
-                "response": f"Absolutely {first_name}. What city and state are you in so I can search live veteran-friendly events and family activities near you?",
+                "response": f"Absolutely {first_name}. What city and state should I search, and are you looking for today, this weekend, or specific dates?",
                 "intent": "ask_location",
                 "data": {"location_required": True}
             }
         mode = "live Google Places" if live else "fallback map suggestions"
         place_label = f"near {location_meta.get('city')}, {location_meta.get('state')}" if location_meta.get('city') else "near your current location"
-        fallback = f"{first_name}, I found these options {place_label}: {human_list(items)}. Which one should I check for hours, distance, or directions?"
+        verified_note = "live options" if live else "search starting points"
+        top = items[:3]
+        detail_lines = []
+        for index, item in enumerate(top, 1):
+            title_text = clean_text(item.get("title")) or "Local option"
+            location_text = clean_text(item.get("location"))
+            rating_text = f", rated {item.get('rating')}" if item.get("rating") else ""
+            detail_lines.append(f"{index}. {title_text}" + (f" — {location_text}" if location_text else "") + rating_text)
+        listed = " ".join(detail_lines) if detail_lines else "I did not find a verified option yet."
+        fallback = (
+            f"{first_name}, I found three {verified_note} {place_label}. {listed} "
+            "I recommend starting with option 1 because it is the first strong match. "
+            "You can choose a number, ask for directions, or say ‘show me free events today.’"
+        )
         prompt = f"""User: {first_name}, branch={branch}, current_area={location_meta.get('city') or city}, {location_meta.get('state') or state}
 User type: {user_type}
 Exact request: {message}
 Primary intent: {intent}
 Live local results: live={live}, source={location_meta.get('source')}, results={json.dumps(items[:5])}
 
+COMPLETION CONTRACT:
+- Do not repeat, quote, paraphrase, or announce the user's request.
+- Do not say “I heard you,” “best starting point,” “tell me more,” or “tell me the one detail that matters.”
+- Complete the useful work before stopping.
+- If live results exist, give the three best options immediately and recommend one.
+- If live results are unavailable, clearly say that these are map/search starting points and still give the best three next actions.
+- Make the choice easy: number the options and tell the user they can say a number.
+
 Answer ONLY the exact local intent. If the request is for veteran activities or events, discuss only those activities or events. Do not mention documents, reminders, benefits, memories, or other ValorBuddy features.
-Give up to three specific options. For each, briefly state what it is, where it is, and any verified rating or useful live detail available in the results. Do not invent dates, times, hours, admission, or event details that are absent.
-Use natural battle-buddy language without calling yourself an AI assistant. End with ONE specific, interactive question such as whether to check directions, distance, hours, registration details, or filter for today/free/family-friendly. Do not ask a generic “Which direction do you want?” question."""
+For each option, briefly state what it is, where it is, and any verified rating or useful live detail available in the results. Do not invent dates, times, hours, admission, or event details that are absent.
+Use natural battle-buddy language without calling yourself an AI assistant. Finish with one concrete next action, such as “Say 1, 2, or 3 and I’ll check directions and current details.” Do not ask a vague follow-up question."""
         response = await gemini_reply(prompt, fallback, grounded=False)
         quick_choices = [
             {"label": "Today", "query": "veteran events today near me"},
@@ -812,14 +892,24 @@ Answer naturally and specifically. Include spouse, child, dependent, caregiver, 
     if user and db:
         recent = db.query(Memory).filter(Memory.user_id == user.id).order_by(Memory.id.desc()).limit(4).all()
         rems = db.query(Reminder).filter(Reminder.user_id == user.id).order_by(Reminder.id.desc()).limit(4).all()
-    fallback = f"{first_name}, here is the best starting point based on what you asked: {message}. I’ll make a practical recommendation now, and you can tell me what to adjust."
+    fallback = (
+        f"{first_name}, here is the most practical answer I can give right now. "
+        "I’ll keep it focused, make a recommendation, and give you a clear next action."
+    )
     prompt = f"""User profile: first_name={first_name}, branch={branch}, current_city={city}, current_state={state}
 Recent memories: {[m.title for m in recent]}
 Recent reminders: {[r.title for r in rems]}
 Primary intent: {intent}
 User said: {message}
 
-Answer the user's actual request directly and stay on that single topic. Do not list ValorBuddy capabilities or unrelated features. Do not say “my next useful step,” “I can help by,” or “which direction do you want?” If one essential detail is missing, ask one precise follow-up question. Otherwise provide the useful answer or recommendation now. Keep it natural, concise, warm, and action-oriented."""
+COMPLETION CONTRACT:
+- Never repeat or paraphrase the user's question back to them.
+- Never begin with “I heard you,” “you asked,” or “based on what you asked.”
+- Do not stop after promising to help. Perform the useful work in the same response.
+- Continue until a logical conclusion: answer, recommendation, useful options, and one concrete next action.
+- Ask a question only when an essential fact is genuinely missing and cannot be inferred.
+
+Answer the user's actual request directly and stay on that single topic. Do not list ValorBuddy capabilities or unrelated features. Do not say “my next useful step,” “I can help by,” “tell me more,” or “which direction do you want?” Keep it natural, concise, warm, and action-oriented."""
     use_grounding = bool(plan.get("needs_google_search") or intent == "live_web")
     if use_grounding:
         prompt += "\nUse Google Search grounding for current facts. Include dates or freshness context where useful and do not invent local results."
