@@ -311,6 +311,7 @@ class VapiActionRequest(BaseModel):
     memory: str = ""
     mood: str = "calm"
     user_type: str = "Veteran"
+    context_items: List[dict[str, Any]] = []
 
 
 class BranchUpdate(BaseModel):
@@ -729,10 +730,40 @@ async def route_valorbuddy_message(
     *, text: str, first_name: str, branch: str, city: str = "", state: str = "",
     lat: float | None = None, lng: float | None = None, user_type: str = "Veteran",
     user: Optional[User] = None, db: Optional[Session] = None, explicit_intent: str = "general",
-    title: str = "", date: str = "", time: str = "", memory: str = "", mood: str = "calm"
+    title: str = "", date: str = "", time: str = "", memory: str = "", mood: str = "calm",
+    context_items: Optional[list[dict[str, Any]]] = None
 ) -> dict[str, Any]:
     """Agentic router: decides which tool to call, gathers data, then composes a human answer."""
     message = clean_text(text)
+    context_items = context_items or []
+    lower_message = message.lower()
+    ownership_followup = any(phrase in lower_message for phrase in [
+        "veteran owned", "veteran-owned", "are they owned", "why did you choose",
+        "why were they chosen", "how are these events", "are these events",
+        "what makes them veteran", "how did you match"
+    ])
+    if ownership_followup and context_items:
+        names = [clean_text(x.get("title")) for x in context_items[:3] if clean_text(x.get("title"))]
+        named = ", ".join(names)
+        return {
+            "response": (
+                f"I cannot verify that {named or 'those locations'} are veteran-owned from the available Google listing data. "
+                "I selected them because their names, categories, or descriptions indicate that they serve veterans or connect people with veteran resources. "
+                "They are locations or organizations—not automatically confirmed scheduled events. For an actual event, I should verify a date, organizer, venue, and event page before recommending it. "
+                "Choose Today, This weekend, or a specific date and I’ll narrow the search to confirmed event-style results."
+            ),
+            "intent": "explain_previous_results",
+            "data": {
+                "items": context_items[:6],
+                "choices": [
+                    {"label": "Today", "query": "confirmed veteran events today near me"},
+                    {"label": "This weekend", "query": "confirmed veteran events this weekend near me"},
+                    {"label": "Veteran-owned only", "query": "verified veteran-owned businesses near me"},
+                    {"label": "VFW / Legion events", "query": "scheduled VFW American Legion events near me"}
+                ],
+                "preserve_results": True
+            }
+        }
     if is_event_choice_request(message):
         return event_choice_payload(first_name)
     # GPS is authoritative. Reverse-geocode once so every planner and response uses the current area.
@@ -917,7 +948,7 @@ Answer the user's actual request directly and stay on that single topic. Do not 
     return {"response": response, "intent": intent, "data": {"plan": plan, "grounded": use_grounding}}
 
 
-app = FastAPI(title=APP_NAME, version="4.4.0")
+app = FastAPI(title=APP_NAME, version="4.7.0")
 origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
@@ -943,7 +974,7 @@ def startup():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": APP_NAME, "version": "4.4.0", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
+    return {"status": "ok", "app": APP_NAME, "version": "4.7.0", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
 
 
 @app.get("/db/tables")
@@ -1145,6 +1176,7 @@ async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db))
         time=payload.time,
         memory=payload.memory,
         mood=payload.mood,
+        context_items=payload.context_items,
     )
     return result
 

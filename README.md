@@ -78,3 +78,12 @@ npx cap sync
 - Benefits popup with plain-English explanation, best next step, and clearly labeled common veteran-community guidance.
 - Voice and Activities pages now surface quick choices for today, this weekend, free events, family-friendly options, VFW/Legion, and “pick for me.”
 - No invented reviews: place comments are shown only when returned by Google; benefits community notes are labeled as common practical guidance rather than individual testimonials.
+
+## ValorBuddy v4.7 additions
+
+- Restored service-branch emblems in the sidebar and command header.
+- Added interruptible voice playback: say “wait,” “stop,” “hold on,” or use the Stop Speaking button.
+- Voice results are spoken one recommendation at a time with pauses between options.
+- Follow-up questions now include the previously displayed result context, so questions such as “Are these veteran-owned?” and “Why did you choose them?” are answered against the actual options already shown.
+- Previous results remain visible during explanation follow-ups.
+- Added clearer distinction between veteran-serving locations, verified veteran-owned businesses, and confirmed scheduled events.
