@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, create_engine, func, inspect, text
 from sqlalchemy.orm import Session, declarative_base, relationship, sessionmaker
+from app.agentic import AGENT_CATALOG as VOS_AGENT_CATALOG, TOOL_CATALOG as VOS_TOOL_CATALOG, CORE_PRINCIPLE as VOS_CORE_PRINCIPLE, route_goal, build_fallback_plan, build_agent_prompt, agent_opening
 
 APP_NAME = os.getenv("APP_NAME", "ValorBuddy Enterprise API")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
@@ -991,10 +992,9 @@ Answer naturally and specifically. Include spouse, child, dependent, caregiver, 
     if user and db:
         recent = db.query(Memory).filter(Memory.user_id == user.id).order_by(Memory.id.desc()).limit(4).all()
         rems = db.query(Reminder).filter(Reminder.user_id == user.id).order_by(Reminder.id.desc()).limit(4).all()
-    fallback = (
-        f"{first_name}, here is the most practical answer I can give right now. "
-        "I’ll keep it focused, make a recommendation, and give you a clear next action."
-    )
+    routed_agents = route_goal(message)
+    active_agent = routed_agents[0] if routed_agents else "companion"
+    fallback = f"{agent_opening(active_agent, first_name)} I identified one useful next action and kept the response within this agent's mission."
     profile = user.profile if user and user.profile else None
     profile_context = {
         "first_name": first_name, "last_name": getattr(profile, "last_name", ""), "rank": getattr(profile, "rank", ""),
@@ -1004,11 +1004,7 @@ Answer naturally and specifically. Include spouse, child, dependent, caregiver, 
         "current_city": city, "current_state": state, "interests": getattr(profile, "interests", []),
         "accessibility_needs": getattr(profile, "accessibility_needs", [])
     }
-    prompt = f"""Member profile: {profile_context}
-Recent memories: {[m.title for m in recent]}
-Recent reminders: {[r.title for r in rems]}
-Primary intent: {intent}
-User said: {message}
+    prompt = build_agent_prompt(active_agent, member=profile_context, request=message, context={"recent_memories": [m.title for m in recent], "recent_reminders": [r.title for r in rems], "primary_intent": intent, "handoff_candidates": routed_agents[1:]}) + """
 
 COMPLETION CONTRACT:
 - Never repeat or paraphrase the user's question back to them.
@@ -1025,7 +1021,7 @@ Answer the user's actual request directly and stay on that single topic. Do not 
     return {"response": response, "intent": intent, "data": {"plan": plan, "grounded": use_grounding}}
 
 
-app = FastAPI(title=APP_NAME, version="4.9.1")
+app = FastAPI(title=APP_NAME, version="5.0.0")
 origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
@@ -1477,38 +1473,9 @@ def admin_analytics(user: User = Depends(platform_admin_required), db: Session =
 # Goal -> Plan -> Execute -> Verify -> Remember -> Follow up
 # ============================================================================
 
-AGENTIC_CORE_PRINCIPLE = (
-    "Every agent must either save the veteran time, reduce stress, improve access "
-    "to trusted resources, or strengthen day-to-day quality of life."
-)
-
-AGENT_CATALOG = {
-    "supervisor": {"name": "Supervisor Agent", "mission": "Understand the member's goal and coordinate the smallest safe team of agents."},
-    "travel": {"name": "Travel & Safety Agent", "mission": "Help members travel safely and confidently."},
-    "benefits": {"name": "Benefits Agent", "mission": "Simplify access to trusted benefits information and next steps."},
-    "forms": {"name": "VA Forms Agent", "mission": "Find, explain, and prepare official VA forms without false submission claims."},
-    "housing": {"name": "Housing Agent", "mission": "Help members evaluate stable, accessible, veteran-friendly housing."},
-    "career": {"name": "Career Agent", "mission": "Support meaningful employment and career development."},
-    "documents": {"name": "Documents Agent", "mission": "Organize and retrieve important records securely."},
-    "calendar": {"name": "Life Operations Agent", "mission": "Coordinate reminders, appointments, tasks, and follow-through."},
-    "companion": {"name": "Personal Companion Agent", "mission": "Provide respectful everyday support, encouragement, organization, and connection."},
-    "entertainment": {"name": "Entertainment & Media Agent", "mission": "Help members relax, learn, and enjoy personalized media and activities."},
-    "family": {"name": "Family Support Agent", "mission": "Strengthen family connections and remember meaningful commitments."},
-    "wellness": {"name": "Wellness Agent", "mission": "Encourage healthy routines and non-clinical well-being support."},
-    "safety": {"name": "Emergency & Safety Agent", "mission": "Prioritize immediate safety and connect members to appropriate human support."},
-}
-
-TOOL_CATALOG = {
-    "profile.read": {"agent": "supervisor", "risk": "low", "approval": False, "description": "Read the authenticated member profile."},
-    "memory.read": {"agent": "supervisor", "risk": "low", "approval": False, "description": "Read confirmed member memory facts."},
-    "resources.search": {"agent": "travel", "risk": "low", "approval": False, "description": "Search live local resources through configured providers."},
-    "benefits.guide": {"agent": "benefits", "risk": "low", "approval": False, "description": "Provide plain-English educational benefits guidance."},
-    "va_forms.search": {"agent": "forms", "risk": "low", "approval": False, "description": "Find official VA form guidance."},
-    "entertainment.suggest": {"agent": "entertainment", "risk": "low", "approval": False, "description": "Suggest music and entertainment based on preferences."},
-    "companion.support": {"agent": "companion", "risk": "low", "approval": False, "description": "Provide non-clinical emotional and everyday support."},
-    "reminder.create": {"agent": "calendar", "risk": "medium", "approval": True, "description": "Create a member reminder after explicit approval."},
-    "memory.save": {"agent": "supervisor", "risk": "medium", "approval": True, "description": "Save a durable memory fact after explicit approval."},
-}
+AGENTIC_CORE_PRINCIPLE = VOS_CORE_PRINCIPLE
+AGENT_CATALOG = VOS_AGENT_CATALOG
+TOOL_CATALOG = VOS_TOOL_CATALOG
 
 
 class AgentMission(Base):
@@ -1618,49 +1585,7 @@ def _mission_dict(mission: AgentMission, db: Session, include_events: bool = Fal
 
 
 def _fallback_mission_plan(goal: str) -> dict[str, Any]:
-    text_goal = goal.lower()
-    agents = ["supervisor"]
-    steps = [
-        {"agent": "supervisor", "tool": "profile.read", "title": "Load relevant member context", "input": {}},
-        {"agent": "supervisor", "tool": "memory.read", "title": "Review confirmed preferences and open context", "input": {}},
-    ]
-    category = None
-    if any(k in text_goal for k in ["trip", "travel", "route", "hotel", "driving", "vacation"]): category, agents = "travel", agents + ["travel"]
-    elif any(k in text_goal for k in ["benefit", "rating", "gi bill", "disability", "vre", "vr&e"]): category, agents = "benefits", agents + ["benefits"]
-    elif any(k in text_goal for k in ["form", "claim", "application"]): category, agents = "forms", agents + ["forms"]
-    elif any(k in text_goal for k in ["house", "housing", "apartment", "move", "relocat"]): category, agents = "housing", agents + ["housing"]
-    elif any(k in text_goal for k in ["job", "career", "resume", "employer", "interview"]): category, agents = "employment", agents + ["career"]
-    elif any(k in text_goal for k in ["music", "movie", "podcast", "entertainment", "playlist", "netflix"]): category, agents = "entertainment", agents + ["entertainment"]
-    elif any(k in text_goal for k in ["lonely", "stressed", "overwhelmed", "talk", "bad day", "support"]): category, agents = "companion", agents + ["companion"]
-
-    if category in {"travel", "housing", "employment"}:
-        steps.append({"agent": agents[-1], "tool": "resources.search", "title": f"Search trusted {category} resources", "input": {"category": category, "query": goal}})
-    elif category == "benefits":
-        steps.append({"agent": "benefits", "tool": "benefits.guide", "title": "Build a plain-English benefits pathway", "input": {"query": goal}})
-    elif category == "forms":
-        steps.append({"agent": "forms", "tool": "va_forms.search", "title": "Find the likely official VA form and checklist", "input": {"query": goal}})
-    elif category == "entertainment":
-        steps.append({"agent": "entertainment", "tool": "entertainment.suggest", "title": "Create personalized entertainment recommendations", "input": {"query": goal}})
-    elif category == "companion":
-        steps.append({"agent": "companion", "tool": "companion.support", "title": "Provide calm, practical personal support", "input": {"query": goal}})
-    else:
-        steps.append({"agent": "companion", "tool": "companion.support", "title": "Turn the request into a practical next-step plan", "input": {"query": goal}})
-        agents.append("companion")
-
-    if any(k in text_goal for k in ["remind", "calendar", "appointment", "follow up", "deadline"]):
-        agents.append("calendar")
-        steps.append({"agent": "calendar", "tool": "reminder.create", "title": "Prepare a follow-up reminder", "input": {"title": goal[:180], "when_text": "Confirm timing"}})
-    if any(k in text_goal for k in ["remember", "save my preference", "from now on"]):
-        steps.append({"agent": "supervisor", "tool": "memory.save", "title": "Prepare a memory update", "input": {"category": "mission", "key": "mission_preference", "value": goal}})
-
-    return {
-        "title": goal[:70].rstrip(" .") or "New mission",
-        "primary_agent": agents[-1] if len(agents) > 1 else "supervisor",
-        "participating_agents": list(dict.fromkeys(agents)),
-        "risk_level": "medium" if any(TOOL_CATALOG.get(s["tool"], {}).get("approval") for s in steps) else "low",
-        "success_definition": "The member receives a verified, practical result and a clear next action.",
-        "steps": steps,
-    }
+    return build_fallback_plan(goal)
 
 
 async def _plan_agent_mission(goal: str, user: User) -> dict[str, Any]:
@@ -1689,7 +1614,7 @@ Goal: {goal}
         if not isinstance(plan.get("steps"), list) or not plan["steps"]:
             return fallback
         valid_steps = []
-        for step in plan["steps"][:10]:
+        for step in plan["steps"][:18]:
             tool = step.get("tool")
             agent = step.get("agent")
             if tool in TOOL_CATALOG and agent in AGENT_CATALOG:
@@ -1722,15 +1647,35 @@ async def _execute_agent_tool(tool_name: str, payload: dict[str, Any], mission: 
         q = (payload.get("query") or mission.goal).lower()
         all_forms = va_forms(q)
         return {"verified": True, **all_forms, "source": "official_va_links"}
+    if tool_name in {"travel.search", "housing.search", "employment.search", "discounts.search", "vehicle.research"}:
+        category = tool_name.split(".")[0]
+        query = payload.get("query") or mission.goal
+        search_query = {"travel": f"{query} VA hospitals veteran friendly hotels rest stops fuel safety", "housing": f"{query} veteran friendly housing accessible apartments VA loan resources", "employment": f"{query} veteran hiring jobs apprenticeships federal remote", "discounts": f"{query} verified veteran military discounts", "vehicle": f"{query} veteran vehicle incentives financing insurance EV incentives"}.get(category, query)
+        live, items, location = await google_places(city=getattr(p, "city", ""), state=getattr(p, "state", ""), query=search_query, lat=mission.context_snapshot.get("lat"), lng=mission.context_snapshot.get("lng"))
+        return {"verified": bool(items), "category": category, "live": live, "items": items[:8], "location": location, "source": "google_places" if live else "search_starting_points"}
+    if tool_name == "documents.review":
+        rows = db.query(Document).filter(Document.user_id == user.id).order_by(Document.id.desc()).limit(20).all()
+        return {"verified": True, "items": [{"id": r.id, "title": r.filename, "status": r.status, "doc_type": r.doc_type} for r in rows], "source": "secure_document_metadata"}
+    if tool_name == "finance.educate":
+        q=(payload.get("query") or mission.goal).lower()
+        topic="budgeting" if "budget" in q else "credit" if "credit" in q else "retirement" if "retire" in q else "investing basics" if "invest" in q else "financial readiness"
+        return {"verified": True, "topic": topic, "guidance": ["Clarify the goal and time horizon", "Review cash flow, obligations, and emergency reserves", "Compare options, fees, risks, and official resources", "Choose one small next action"], "notice": "General education only; not individualized financial, tax, legal, or investment advice.", "source": "valorbuddy_financial_education"}
+    if tool_name == "family.plan":
+        return {"verified": True, "plan": ["Identify the person or commitment that matters", "Choose a specific connection action", "Set a reminder only with member approval"], "source": "valorbuddy_family_support"}
+    if tool_name == "wellness.support":
+        prompt = build_agent_prompt("wellness", member=profile_out(user).model_dump(), request=payload.get("query") or mission.goal, context={"mode":"non-clinical wellness"})
+        response = await gemini_reply(prompt, "Pause, take one slow breath, reduce the next task to one manageable step, and contact a trusted person or professional when more support is needed.")
+        return {"verified": True, "response": response, "source": "valorbuddy_wellness"}
     if tool_name == "entertainment.suggest":
         items = music_suggestions(payload.get("query") or mission.goal, getattr(p, "branch", "Army"))
         return {"verified": True, "items": items, "source": "personalized_suggestions"}
     if tool_name == "companion.support":
-        prompt = f"""Member goal: {mission.goal}
-Profile: first_name={getattr(p,'first_name','Veteran')}, branch={getattr(p,'branch','')}, interests={getattr(p,'interests',[])}, preferred_tone={getattr(p,'preferred_tone','calm, practical, encouraging')}.
-Provide respectful, non-clinical personal support. Save time, reduce stress, improve trusted access, or strengthen quality of life. Give one grounding or organizing step and one concrete next action. Do not imply you replace a human friend, clinician, family member, or crisis service."""
-        response = await gemini_reply(prompt, "Take one slow breath, choose the single most important thing for the next 20 minutes, and make that the only mission. You do not have to solve everything at once.")
-        return {"verified": True, "response": response, "source": "valorbuddy_companion"}
+        mode = payload.get("mode", "companion")
+        agent = "supervisor" if mode == "synthesis" else ("safety" if mode == "safety" else "companion")
+        completed = [row.output_json for row in db.query(AgentMissionStep).filter(AgentMissionStep.mission_id == mission.id, AgentMissionStep.status == "completed").all()]
+        prompt = build_agent_prompt(agent, member=profile_out(user).model_dump(), request=payload.get("query") or mission.goal, context={"mode": mode, "completed_steps": completed})
+        response = await gemini_reply(prompt, "Choose the single next action that reduces the most stress or saves the most time, and complete that before expanding the mission.")
+        return {"verified": True, "response": response, "agent": agent, "source": f"valorbuddy_{agent}"}
     if tool_name == "reminder.create":
         row = Reminder(user_id=user.id, title=payload.get("title") or mission.title, when_text=payload.get("when_text") or "To be confirmed", note=f"Created from mission {mission.mission_uid}")
         db.add(row); db.flush()
@@ -1804,7 +1749,7 @@ async def _run_mission(mission: AgentMission, user: User, db: Session) -> AgentM
 @app.get("/api/agentic/core")
 def agentic_core_info(user: User = Depends(get_current_user)):
     return {
-        "version": "4.9.1", "name": "ValorBuddy Agentic Core", "core_principle": AGENTIC_CORE_PRINCIPLE,
+        "version": "5.0.0", "name": "ValorBuddy Veteran Operating System", "core_principle": AGENTIC_CORE_PRINCIPLE,
         "operating_model": "Goal → Plan → Execute → Verify → Remember → Follow up",
         "agents": AGENT_CATALOG, "tools": TOOL_CATALOG,
         "guardrails": ["Authenticated member context", "Approval before consequential actions", "Verified tool results", "No false VA submissions", "User-controlled memory", "Audit trail"],
