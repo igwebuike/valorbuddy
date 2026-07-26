@@ -1021,7 +1021,7 @@ Answer the user's actual request directly and stay on that single topic. Do not 
     return {"response": response, "intent": intent, "data": {"plan": plan, "grounded": use_grounding}}
 
 
-app = FastAPI(title=APP_NAME, version="5.0.0")
+app = FastAPI(title=APP_NAME, version="4.9.2")
 origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
@@ -1655,7 +1655,7 @@ async def _execute_agent_tool(tool_name: str, payload: dict[str, Any], mission: 
         return {"verified": bool(items), "category": category, "live": live, "items": items[:8], "location": location, "source": "google_places" if live else "search_starting_points"}
     if tool_name == "documents.review":
         rows = db.query(Document).filter(Document.user_id == user.id).order_by(Document.id.desc()).limit(20).all()
-        return {"verified": True, "items": [{"id": r.id, "title": r.filename, "status": r.status, "doc_type": r.doc_type} for r in rows], "source": "secure_document_metadata"}
+        return {"verified": True, "items": [{"id": r.id, "title": r.filename, "status": "ready" if (r.extracted_text or r.ai_summary) else "uploaded", "doc_type": r.doc_type} for r in rows], "source": "secure_document_metadata"}
     if tool_name == "finance.educate":
         q=(payload.get("query") or mission.goal).lower()
         topic="budgeting" if "budget" in q else "credit" if "credit" in q else "retirement" if "retire" in q else "investing basics" if "invest" in q else "financial readiness"
@@ -1749,7 +1749,7 @@ async def _run_mission(mission: AgentMission, user: User, db: Session) -> AgentM
 @app.get("/api/agentic/core")
 def agentic_core_info(user: User = Depends(get_current_user)):
     return {
-        "version": "5.0.0", "name": "ValorBuddy Veteran Operating System", "core_principle": AGENTIC_CORE_PRINCIPLE,
+        "version": "4.9.2", "name": "ValorBuddy Stabilized Agentic Core", "core_principle": AGENTIC_CORE_PRINCIPLE,
         "operating_model": "Goal → Plan → Execute → Verify → Remember → Follow up",
         "agents": AGENT_CATALOG, "tools": TOOL_CATALOG,
         "guardrails": ["Authenticated member context", "Approval before consequential actions", "Verified tool results", "No false VA submissions", "User-controlled memory", "Audit trail"],

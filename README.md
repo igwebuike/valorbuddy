@@ -1,3 +1,15 @@
+# ValorBuddy v4.9.2 Stabilized Agentic Core
+
+This release intentionally preserves the last working v4.9.1 frontend and PostgreSQL schema while adding the specialist-agent runtime from the v5 experiment in a controlled, additive way.
+
+Key changes:
+- Dedicated agent catalog, router, planner, prompts and tool registry under `backend/app/agentic/`.
+- Specialist routing for travel, benefits, forms, housing, employment, career, events, discounts, vehicles, finance, documents, family, wellness, companion, entertainment, life operations, health navigation and safety.
+- Agent-specific prompt voice instead of the repeated generic fallback.
+- Existing mission tables and approval flow retained.
+- High-contrast semantic UI fixes and mobile containment improvements.
+- Visible specialist agent directory in Mission Control.
+
 # ValorBuddy Production AI Upgrade v4.1
 
 The existing UI is preserved. This release upgrades the intelligence layer.
