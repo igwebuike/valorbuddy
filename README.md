@@ -103,3 +103,36 @@ npx cap sync
 `ADMIN_PASSWORD=<strong unique password>`
 
 For real-time interruptible speech, the recommended next integration is Gemini Live API or Google ADK Live. The current browser speech layer remains as a compatibility fallback.
+
+# ValorBuddy v4.9 Platform Edition
+
+## Implemented in this upgrade
+- Professional responsive member platform and military-style personalized greeting.
+- In-session Member View / Admin Command toggle for authorized roles.
+- Expanded service and lifestyle profile through structured `profile_data` storage.
+- AI companion mission interface using the existing planner, tools, GPS and Gemini layer.
+- Explicit, user-controlled AI memory facts with add, update and forget operations.
+- GPS-first resource intelligence for travel, events, housing, employment, veteran-owned businesses, discounts, vehicles and organizations.
+- VA Forms navigator with official links, document checklists and an explicit no-false-submission safeguard.
+- Benefits pathways, financial education guardrails, entertainment favorites, documents and reminders.
+- Admin analytics, editable prompt/platform settings and knowledge-base APIs.
+- New v4.9 database tables: `memory_facts`, `platform_settings`, and `knowledge_items`.
+- Integration capability endpoint and health indicators.
+
+## Production integration boundaries
+The Google, Microsoft and Apple sign-in controls are presentation-ready but require OAuth client credentials and callback configuration. MFA, email verification, password reset, refresh-token rotation, device management, OCR providers, cloud object encryption, calendar write access, Gemini Live, VAPI, Firebase, and authorized VA submission APIs require provider credentials and deployment configuration; the source does not falsely represent those services as active.
+
+## Local validation
+```bash
+cd backend
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+
+cd ../frontend
+npm install
+npm run build
+npm run dev
+```
+
+## Upgrade notes
+Existing deployments use additive startup migrations for the new `profile_data` column. Back up production PostgreSQL before deployment. For a regulated or enterprise launch, replace the lightweight startup migration with Alembic, use a secrets manager, configure strict CORS, rotate `SECRET_KEY`, and complete an independent security review.

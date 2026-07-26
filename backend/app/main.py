@@ -87,6 +87,7 @@ class UserProfile(Base):
     interests = Column(JSON, nullable=False, default=list)
     preferred_tone = Column(String(120), nullable=False, default="calm, practical, encouraging")
     companion_mode = Column(Boolean, nullable=False, default=True)
+    profile_data = Column(JSON, nullable=False, default=dict)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     user = relationship("User", back_populates="profile")
@@ -282,6 +283,7 @@ class ProfileUpdate(BaseModel):
     interests: List[str] = []
     accessibility_needs: List[str] = []
     preferred_music_genres: List[str] = []
+    profile_data: dict[str, Any] = {}
 
 
 class LoginRequest(BaseModel):
@@ -307,6 +309,7 @@ class ProfileOut(BaseModel):
     interests: List[str] = []
     accessibility_needs: List[str] = []
     preferred_music_genres: List[str] = []
+    profile_data: dict[str, Any] = {}
 
 
 class LoginResponse(BaseModel):
@@ -372,7 +375,8 @@ def profile_out(user: User) -> ProfileOut:
         service_start_year=p.service_start_year if p else "", service_end_year=p.service_end_year if p else "",
         deployment_history=p.deployment_history if p else "", va_rating=p.va_rating if p else "",
         city=p.city if p else "", state=p.state if p else "", interests=p.interests if p else [],
-        accessibility_needs=p.accessibility_needs if p else [], preferred_music_genres=p.preferred_music_genres if p else []
+        accessibility_needs=p.accessibility_needs if p else [], preferred_music_genres=p.preferred_music_genres if p else [],
+        profile_data=p.profile_data if p and p.profile_data else {}
     )
 
 
@@ -1021,7 +1025,7 @@ Answer the user's actual request directly and stay on that single topic. Do not 
     return {"response": response, "intent": intent, "data": {"plan": plan, "grounded": use_grounding}}
 
 
-app = FastAPI(title=APP_NAME, version="4.8.0")
+app = FastAPI(title=APP_NAME, version="4.9.0")
 origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
@@ -1035,7 +1039,7 @@ def startup():
         "rank": "VARCHAR(120) DEFAULT ''", "service_status": "VARCHAR(80) DEFAULT 'Veteran'",
         "service_start_year": "VARCHAR(10) DEFAULT ''", "service_end_year": "VARCHAR(10) DEFAULT ''",
         "deployment_history": "TEXT DEFAULT ''", "va_rating": "VARCHAR(30) DEFAULT ''",
-        "accessibility_needs": "JSON", "preferred_music_genres": "JSON"
+        "accessibility_needs": "JSON", "preferred_music_genres": "JSON", "profile_data": "JSON"
     }
     with engine.begin() as conn:
         existing = {c["name"] for c in inspect(engine).get_columns("user_profiles")}
@@ -1061,7 +1065,7 @@ def startup():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": APP_NAME, "version": "4.8.0", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
+    return {"status": "ok", "app": APP_NAME, "version": "4.9.0", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
 
 
 @app.get("/db/tables")
@@ -1075,7 +1079,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Email already exists")
     user = User(email=str(payload.email).lower(), password_hash=hash_password(payload.password), role="veteran")
     db.add(user); db.flush()
-    db.add(UserProfile(user_id=user.id, first_name=payload.first_name, last_name=payload.last_name, rank=payload.rank, branch=payload.branch, service_status=payload.service_status, service_start_year=payload.service_start_year, service_end_year=payload.service_end_year, deployment_history=payload.deployment_history, va_rating=payload.va_rating, city=payload.city, state=payload.state, interests=payload.interests, accessibility_needs=payload.accessibility_needs, preferred_music_genres=payload.preferred_music_genres))
+    db.add(UserProfile(user_id=user.id, first_name=payload.first_name, last_name=payload.last_name, rank=payload.rank, branch=payload.branch, service_status=payload.service_status, service_start_year=payload.service_start_year, service_end_year=payload.service_end_year, deployment_history=payload.deployment_history, va_rating=payload.va_rating, city=payload.city, state=payload.state, interests=payload.interests, accessibility_needs=payload.accessibility_needs, preferred_music_genres=payload.preferred_music_genres, profile_data=payload.profile_data))
     db.add(AdminAuditLog(user_id=user.id, action="user.registered", details=user.email))
     db.commit(); db.refresh(user)
     token = create_access_token(user)
@@ -1120,7 +1124,7 @@ def update_profile_branch(payload: BranchUpdate, user: User = Depends(get_curren
 @app.post("/api/profile")
 def update_profile(payload: ProfileUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     p = user.profile or UserProfile(user_id=user.id, first_name=payload.first_name)
-    for field in ("first_name", "last_name", "rank", "branch", "service_status", "service_start_year", "service_end_year", "deployment_history", "va_rating", "city", "state", "interests", "accessibility_needs", "preferred_music_genres"):
+    for field in ("first_name", "last_name", "rank", "branch", "service_status", "service_start_year", "service_end_year", "deployment_history", "va_rating", "city", "state", "interests", "accessibility_needs", "preferred_music_genres", "profile_data"):
         setattr(p, field, getattr(payload, field))
     p.updated_at = datetime.now(timezone.utc)
     db.add(p); db.add(AdminAuditLog(user_id=user.id, action="profile.updated", details=f"{payload.first_name} {payload.last_name}".strip()))
@@ -1314,3 +1318,156 @@ def admin_users(_: User = Depends(admin_required), db: Session = Depends(get_db)
 def admin_activity(_: User = Depends(admin_required), db: Session = Depends(get_db)):
     logs = db.query(AdminAuditLog).order_by(AdminAuditLog.id.desc()).limit(100).all()
     return [{"id": l.id, "user_id": l.user_id, "action": l.action, "details": l.details, "created_at": l.created_at.isoformat() if l.created_at else None} for l in logs]
+
+
+# ===== ValorBuddy v4.9 Platform Edition =====
+class MemoryFact(Base):
+    __tablename__ = "memory_facts"
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    category = Column(String(80), nullable=False, default="preference")
+    key = Column(String(120), nullable=False)
+    value = Column(Text, nullable=False)
+    confidence = Column(String(20), nullable=False, default="confirmed")
+    source = Column(String(80), nullable=False, default="member")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+class PlatformSetting(Base):
+    __tablename__ = "platform_settings"
+    id = Column(Integer, primary_key=True)
+    setting_key = Column(String(120), unique=True, nullable=False, index=True)
+    setting_value = Column(Text, nullable=False, default="")
+    category = Column(String(80), nullable=False, default="prompt")
+    updated_by = Column(Integer, ForeignKey("users.id"), nullable=True)
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+class KnowledgeItem(Base):
+    __tablename__ = "knowledge_items"
+    id = Column(Integer, primary_key=True)
+    category = Column(String(80), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    summary = Column(Text, nullable=False, default="")
+    url = Column(String(500), nullable=True)
+    tags = Column(JSON, nullable=False, default=list)
+    status = Column(String(40), nullable=False, default="published")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+class MemoryFactIn(BaseModel):
+    category: str = "preference"
+    key: str
+    value: str
+    confidence: str = "confirmed"
+
+class PlatformSettingIn(BaseModel):
+    setting_key: str
+    setting_value: str
+    category: str = "prompt"
+
+class KnowledgeItemIn(BaseModel):
+    category: str
+    title: str
+    summary: str = ""
+    url: str = ""
+    tags: List[str] = []
+
+ADMIN_ROLES = {"admin", "super_admin", "administrator", "super administrator", "content_manager"}
+
+def platform_admin_required(user: User = Depends(get_current_user)) -> User:
+    if user.role.lower() not in ADMIN_ROLES:
+        raise HTTPException(status_code=403, detail="Platform administration access required")
+    return user
+
+@app.get("/api/platform/capabilities")
+def platform_capabilities(user: User = Depends(get_current_user)):
+    return {
+        "version": "4.9.0",
+        "edition": "Platform Edition",
+        "role": user.role,
+        "can_switch_admin": user.role.lower() in ADMIN_ROLES,
+        "modules": ["companion", "travel", "events", "benefits", "va_forms", "housing", "employment", "businesses", "discounts", "financial_education", "vehicles", "music", "memories", "documents", "reminders", "organizations"],
+        "integrations": {"gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY), "calendar": GOOGLE_CALENDAR_ENABLED, "vapi": bool(os.getenv("VAPI_PUBLIC_KEY")), "firebase": bool(os.getenv("FIREBASE_PROJECT_ID"))}
+    }
+
+@app.get("/api/memory/facts")
+def list_memory_facts(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    rows = db.query(MemoryFact).filter(MemoryFact.user_id == user.id).order_by(MemoryFact.updated_at.desc()).all()
+    return [{"id": r.id, "category": r.category, "key": r.key, "value": r.value, "confidence": r.confidence, "source": r.source} for r in rows]
+
+@app.post("/api/memory/facts")
+def save_memory_fact(payload: MemoryFactIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    row = db.query(MemoryFact).filter(MemoryFact.user_id == user.id, MemoryFact.key == payload.key).first()
+    if not row:
+        row = MemoryFact(user_id=user.id, key=payload.key)
+    row.category, row.value, row.confidence, row.updated_at = payload.category, payload.value, payload.confidence, datetime.now(timezone.utc)
+    db.add(row); db.add(AdminAuditLog(user_id=user.id, action="memory.fact_saved", details=payload.key)); db.commit(); db.refresh(row)
+    return {"id": row.id, "category": row.category, "key": row.key, "value": row.value, "confidence": row.confidence}
+
+@app.delete("/api/memory/facts/{fact_id}")
+def delete_memory_fact(fact_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    row = db.query(MemoryFact).filter(MemoryFact.id == fact_id, MemoryFact.user_id == user.id).first()
+    if not row: raise HTTPException(status_code=404, detail="Memory not found")
+    db.delete(row); db.commit(); return {"deleted": True}
+
+@app.get("/api/resources/search")
+async def resource_search(category: str, query: str = "", city: str = "", state: str = "", lat: float | None = None, lng: float | None = None, user: User = Depends(get_current_user)):
+    profile = user.profile
+    city = city or (profile.city if profile else "")
+    state = state or (profile.state if profile else "")
+    map_queries = {
+        "travel": "VA hospital Vet Center veteran friendly hotel fuel rest stop",
+        "housing": "veteran housing apartments low credit VA loan housing",
+        "employment": "veteran employment center workforce jobs",
+        "businesses": "veteran owned business",
+        "discounts": "veteran discount",
+        "vehicles": "veteran auto dealer military discount",
+        "organizations": "VFW American Legion DAV veteran organization",
+        "events": "veteran events"
+    }
+    live, items, location = await google_places(city=city, state=state, query=query or map_queries.get(category, category), lat=lat, lng=lng)
+    return {"category": category, "query": query, "live": live, "items": items, "location": location, "disclaimer": "Verify eligibility, availability, pricing, and current terms directly with the provider."}
+
+@app.get("/api/va/forms")
+def va_forms(query: str = ""):
+    forms = [
+        {"form":"VA Form 21-526EZ","title":"Disability Compensation","purpose":"Apply for disability compensation or related benefits.","url":"https://www.va.gov/find-forms/about-form-21-526ez/","documents":["DD214 or separation records","Medical evidence","Dependency records when applicable"]},
+        {"form":"VA Form 22-1990","title":"Education Benefits","purpose":"Apply for VA education benefits.","url":"https://www.va.gov/find-forms/about-form-22-1990/","documents":["Service history","School or training program information","Direct deposit information"]},
+        {"form":"VA Form 10-10EZ","title":"Health Care Application","purpose":"Apply for VA health care.","url":"https://www.va.gov/find-forms/about-form-10-10ez/","documents":["Military service information","Insurance information","Household financial information when requested"]},
+        {"form":"VA Form 26-1880","title":"Certificate of Eligibility","purpose":"Request a VA home loan Certificate of Eligibility.","url":"https://www.va.gov/find-forms/about-form-26-1880/","documents":["Proof of service","Current duty statement when applicable","Discharge documentation"]}
+    ]
+    q=query.lower().strip()
+    if q: forms=[f for f in forms if q in json.dumps(f).lower()] or forms
+    return {"items": forms, "submission_status": "not_integrated", "notice": "ValorBuddy can explain and prepare information, but does not claim submission unless an authorized VA integration confirms it."}
+
+@app.get("/api/admin/settings")
+def admin_settings(user: User = Depends(platform_admin_required), db: Session = Depends(get_db)):
+    rows=db.query(PlatformSetting).order_by(PlatformSetting.category, PlatformSetting.setting_key).all()
+    return [{"id":r.id,"setting_key":r.setting_key,"setting_value":r.setting_value,"category":r.category,"updated_at":r.updated_at} for r in rows]
+
+@app.post("/api/admin/settings")
+def upsert_admin_setting(payload: PlatformSettingIn, user: User = Depends(platform_admin_required), db: Session = Depends(get_db)):
+    row=db.query(PlatformSetting).filter(PlatformSetting.setting_key==payload.setting_key).first() or PlatformSetting(setting_key=payload.setting_key)
+    row.setting_value, row.category, row.updated_by, row.updated_at = payload.setting_value, payload.category, user.id, datetime.now(timezone.utc)
+    db.add(row); db.add(AdminAuditLog(user_id=user.id, action="platform.setting_updated", details=payload.setting_key)); db.commit(); db.refresh(row)
+    return {"id":row.id,"setting_key":row.setting_key,"setting_value":row.setting_value,"category":row.category}
+
+@app.get("/api/admin/knowledge")
+def admin_knowledge(user: User = Depends(platform_admin_required), db: Session = Depends(get_db)):
+    rows=db.query(KnowledgeItem).order_by(KnowledgeItem.id.desc()).all()
+    return [{"id":r.id,"category":r.category,"title":r.title,"summary":r.summary,"url":r.url,"tags":r.tags,"status":r.status} for r in rows]
+
+@app.post("/api/admin/knowledge")
+def add_knowledge(payload: KnowledgeItemIn, user: User = Depends(platform_admin_required), db: Session = Depends(get_db)):
+    row=KnowledgeItem(category=payload.category,title=payload.title,summary=payload.summary,url=payload.url,tags=payload.tags)
+    db.add(row); db.add(AdminAuditLog(user_id=user.id, action="knowledge.created", details=payload.title)); db.commit(); db.refresh(row)
+    return {"id":row.id,"category":row.category,"title":row.title,"summary":row.summary,"url":row.url,"tags":row.tags,"status":row.status}
+
+@app.get("/api/admin/analytics")
+def admin_analytics(user: User = Depends(platform_admin_required), db: Session = Depends(get_db)):
+    intents = db.query(Message.metadata_json, func.count(Message.id)).filter(Message.role == "assistant").group_by(Message.metadata_json).limit(10).all()
+    return {
+        "members": db.query(User).count(), "conversations": db.query(Conversation).count(), "messages": db.query(Message).count(),
+        "voice_sessions": db.query(Conversation).filter(Conversation.source == "voice").count(), "documents": db.query(Document).count(),
+        "reminders": db.query(Reminder).count(), "saved_memories": db.query(Memory).count(), "searches": db.query(ActivitySearch).count(),
+        "integration_health": {"gemini": bool(GEMINI_API_KEY), "places": bool(GOOGLE_MAPS_API_KEY), "calendar": GOOGLE_CALENDAR_ENABLED}
+    }
