@@ -1025,7 +1025,7 @@ Answer the user's actual request directly and stay on that single topic. Do not 
     return {"response": response, "intent": intent, "data": {"plan": plan, "grounded": use_grounding}}
 
 
-app = FastAPI(title=APP_NAME, version="4.9.0")
+app = FastAPI(title=APP_NAME, version="4.9.1")
 origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
@@ -1065,7 +1065,7 @@ def startup():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": APP_NAME, "version": "4.9.0", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
+    return {"status": "ok", "app": APP_NAME, "version": "4.9.1", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
 
 
 @app.get("/db/tables")
@@ -1381,8 +1381,8 @@ def platform_admin_required(user: User = Depends(get_current_user)) -> User:
 @app.get("/api/platform/capabilities")
 def platform_capabilities(user: User = Depends(get_current_user)):
     return {
-        "version": "4.9.0",
-        "edition": "Platform Edition",
+        "version": "4.9.1",
+        "edition": "Agentic Core",
         "role": user.role,
         "can_switch_admin": user.role.lower() in ADMIN_ROLES,
         "modules": ["companion", "travel", "events", "benefits", "va_forms", "housing", "employment", "businesses", "discounts", "financial_education", "vehicles", "music", "memories", "documents", "reminders", "organizations"],
@@ -1471,3 +1471,415 @@ def admin_analytics(user: User = Depends(platform_admin_required), db: Session =
         "reminders": db.query(Reminder).count(), "saved_memories": db.query(Memory).count(), "searches": db.query(ActivitySearch).count(),
         "integration_health": {"gemini": bool(GEMINI_API_KEY), "places": bool(GOOGLE_MAPS_API_KEY), "calendar": GOOGLE_CALENDAR_ENABLED}
     }
+
+# ============================================================================
+# ValorBuddy v4.9.1 Agentic Core
+# Goal -> Plan -> Execute -> Verify -> Remember -> Follow up
+# ============================================================================
+
+AGENTIC_CORE_PRINCIPLE = (
+    "Every agent must either save the veteran time, reduce stress, improve access "
+    "to trusted resources, or strengthen day-to-day quality of life."
+)
+
+AGENT_CATALOG = {
+    "supervisor": {"name": "Supervisor Agent", "mission": "Understand the member's goal and coordinate the smallest safe team of agents."},
+    "travel": {"name": "Travel & Safety Agent", "mission": "Help members travel safely and confidently."},
+    "benefits": {"name": "Benefits Agent", "mission": "Simplify access to trusted benefits information and next steps."},
+    "forms": {"name": "VA Forms Agent", "mission": "Find, explain, and prepare official VA forms without false submission claims."},
+    "housing": {"name": "Housing Agent", "mission": "Help members evaluate stable, accessible, veteran-friendly housing."},
+    "career": {"name": "Career Agent", "mission": "Support meaningful employment and career development."},
+    "documents": {"name": "Documents Agent", "mission": "Organize and retrieve important records securely."},
+    "calendar": {"name": "Life Operations Agent", "mission": "Coordinate reminders, appointments, tasks, and follow-through."},
+    "companion": {"name": "Personal Companion Agent", "mission": "Provide respectful everyday support, encouragement, organization, and connection."},
+    "entertainment": {"name": "Entertainment & Media Agent", "mission": "Help members relax, learn, and enjoy personalized media and activities."},
+    "family": {"name": "Family Support Agent", "mission": "Strengthen family connections and remember meaningful commitments."},
+    "wellness": {"name": "Wellness Agent", "mission": "Encourage healthy routines and non-clinical well-being support."},
+    "safety": {"name": "Emergency & Safety Agent", "mission": "Prioritize immediate safety and connect members to appropriate human support."},
+}
+
+TOOL_CATALOG = {
+    "profile.read": {"agent": "supervisor", "risk": "low", "approval": False, "description": "Read the authenticated member profile."},
+    "memory.read": {"agent": "supervisor", "risk": "low", "approval": False, "description": "Read confirmed member memory facts."},
+    "resources.search": {"agent": "travel", "risk": "low", "approval": False, "description": "Search live local resources through configured providers."},
+    "benefits.guide": {"agent": "benefits", "risk": "low", "approval": False, "description": "Provide plain-English educational benefits guidance."},
+    "va_forms.search": {"agent": "forms", "risk": "low", "approval": False, "description": "Find official VA form guidance."},
+    "entertainment.suggest": {"agent": "entertainment", "risk": "low", "approval": False, "description": "Suggest music and entertainment based on preferences."},
+    "companion.support": {"agent": "companion", "risk": "low", "approval": False, "description": "Provide non-clinical emotional and everyday support."},
+    "reminder.create": {"agent": "calendar", "risk": "medium", "approval": True, "description": "Create a member reminder after explicit approval."},
+    "memory.save": {"agent": "supervisor", "risk": "medium", "approval": True, "description": "Save a durable memory fact after explicit approval."},
+}
+
+
+class AgentMission(Base):
+    __tablename__ = "agent_missions"
+    id = Column(Integer, primary_key=True)
+    mission_uid = Column(String(80), unique=True, nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    goal = Column(Text, nullable=False)
+    status = Column(String(40), nullable=False, default="planning", index=True)
+    primary_agent = Column(String(80), nullable=False, default="supervisor")
+    participating_agents = Column(JSON, nullable=False, default=list)
+    plan_json = Column(JSON, nullable=False, default=dict)
+    summary = Column(Text, nullable=True)
+    next_action = Column(Text, nullable=True)
+    progress = Column(Integer, nullable=False, default=0)
+    priority = Column(String(30), nullable=False, default="normal")
+    risk_level = Column(String(30), nullable=False, default="low")
+    context_snapshot = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class AgentMissionStep(Base):
+    __tablename__ = "agent_mission_steps"
+    id = Column(Integer, primary_key=True)
+    mission_id = Column(Integer, ForeignKey("agent_missions.id"), nullable=False, index=True)
+    sequence = Column(Integer, nullable=False)
+    agent_key = Column(String(80), nullable=False)
+    tool_name = Column(String(120), nullable=False)
+    title = Column(String(255), nullable=False)
+    status = Column(String(40), nullable=False, default="pending", index=True)
+    requires_approval = Column(Boolean, nullable=False, default=False)
+    input_json = Column(JSON, nullable=False, default=dict)
+    output_json = Column(JSON, nullable=False, default=dict)
+    verification_json = Column(JSON, nullable=False, default=dict)
+    error_message = Column(Text, nullable=True)
+    started_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class AgentApproval(Base):
+    __tablename__ = "agent_approvals"
+    id = Column(Integer, primary_key=True)
+    mission_id = Column(Integer, ForeignKey("agent_missions.id"), nullable=False, index=True)
+    step_id = Column(Integer, ForeignKey("agent_mission_steps.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    action_summary = Column(Text, nullable=False)
+    status = Column(String(30), nullable=False, default="pending", index=True)
+    decision_note = Column(Text, nullable=True)
+    requested_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    decided_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class AgentMissionEvent(Base):
+    __tablename__ = "agent_mission_events"
+    id = Column(Integer, primary_key=True)
+    mission_id = Column(Integer, ForeignKey("agent_missions.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    event_type = Column(String(80), nullable=False)
+    message = Column(Text, nullable=False)
+    event_data = Column(JSON, nullable=False, default=dict)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class MissionCreateIn(BaseModel):
+    goal: str = Field(min_length=3, max_length=2000)
+    title: str = ""
+    priority: str = "normal"
+    lat: float | None = None
+    lng: float | None = None
+    timezone: str = ""
+
+
+class ApprovalDecisionIn(BaseModel):
+    approved: bool
+    note: str = ""
+
+
+def _mission_event(db: Session, mission: AgentMission, user_id: int, event_type: str, message: str, data: dict | None = None):
+    db.add(AgentMissionEvent(mission_id=mission.id, user_id=user_id, event_type=event_type, message=message, event_data=data or {}))
+
+
+def _mission_dict(mission: AgentMission, db: Session, include_events: bool = False) -> dict[str, Any]:
+    steps = db.query(AgentMissionStep).filter(AgentMissionStep.mission_id == mission.id).order_by(AgentMissionStep.sequence).all()
+    approvals = db.query(AgentApproval).filter(AgentApproval.mission_id == mission.id).order_by(AgentApproval.id).all()
+    result = {
+        "id": mission.id, "mission_uid": mission.mission_uid, "title": mission.title, "goal": mission.goal,
+        "status": mission.status, "primary_agent": mission.primary_agent, "participating_agents": mission.participating_agents,
+        "summary": mission.summary, "next_action": mission.next_action, "progress": mission.progress,
+        "priority": mission.priority, "risk_level": mission.risk_level, "plan": mission.plan_json,
+        "created_at": mission.created_at, "updated_at": mission.updated_at, "completed_at": mission.completed_at,
+        "steps": [{
+            "id": s.id, "sequence": s.sequence, "agent_key": s.agent_key,
+            "agent_name": AGENT_CATALOG.get(s.agent_key, {}).get("name", s.agent_key),
+            "tool_name": s.tool_name, "title": s.title, "status": s.status,
+            "requires_approval": s.requires_approval, "input": s.input_json,
+            "output": s.output_json, "verification": s.verification_json, "error": s.error_message,
+        } for s in steps],
+        "approvals": [{"id": a.id, "step_id": a.step_id, "action_summary": a.action_summary, "status": a.status, "decision_note": a.decision_note} for a in approvals],
+    }
+    if include_events:
+        events = db.query(AgentMissionEvent).filter(AgentMissionEvent.mission_id == mission.id).order_by(AgentMissionEvent.id.desc()).limit(50).all()
+        result["events"] = [{"id": e.id, "event_type": e.event_type, "message": e.message, "data": e.event_data, "created_at": e.created_at} for e in events]
+    return result
+
+
+def _fallback_mission_plan(goal: str) -> dict[str, Any]:
+    text_goal = goal.lower()
+    agents = ["supervisor"]
+    steps = [
+        {"agent": "supervisor", "tool": "profile.read", "title": "Load relevant member context", "input": {}},
+        {"agent": "supervisor", "tool": "memory.read", "title": "Review confirmed preferences and open context", "input": {}},
+    ]
+    category = None
+    if any(k in text_goal for k in ["trip", "travel", "route", "hotel", "driving", "vacation"]): category, agents = "travel", agents + ["travel"]
+    elif any(k in text_goal for k in ["benefit", "rating", "gi bill", "disability", "vre", "vr&e"]): category, agents = "benefits", agents + ["benefits"]
+    elif any(k in text_goal for k in ["form", "claim", "application"]): category, agents = "forms", agents + ["forms"]
+    elif any(k in text_goal for k in ["house", "housing", "apartment", "move", "relocat"]): category, agents = "housing", agents + ["housing"]
+    elif any(k in text_goal for k in ["job", "career", "resume", "employer", "interview"]): category, agents = "employment", agents + ["career"]
+    elif any(k in text_goal for k in ["music", "movie", "podcast", "entertainment", "playlist", "netflix"]): category, agents = "entertainment", agents + ["entertainment"]
+    elif any(k in text_goal for k in ["lonely", "stressed", "overwhelmed", "talk", "bad day", "support"]): category, agents = "companion", agents + ["companion"]
+
+    if category in {"travel", "housing", "employment"}:
+        steps.append({"agent": agents[-1], "tool": "resources.search", "title": f"Search trusted {category} resources", "input": {"category": category, "query": goal}})
+    elif category == "benefits":
+        steps.append({"agent": "benefits", "tool": "benefits.guide", "title": "Build a plain-English benefits pathway", "input": {"query": goal}})
+    elif category == "forms":
+        steps.append({"agent": "forms", "tool": "va_forms.search", "title": "Find the likely official VA form and checklist", "input": {"query": goal}})
+    elif category == "entertainment":
+        steps.append({"agent": "entertainment", "tool": "entertainment.suggest", "title": "Create personalized entertainment recommendations", "input": {"query": goal}})
+    elif category == "companion":
+        steps.append({"agent": "companion", "tool": "companion.support", "title": "Provide calm, practical personal support", "input": {"query": goal}})
+    else:
+        steps.append({"agent": "companion", "tool": "companion.support", "title": "Turn the request into a practical next-step plan", "input": {"query": goal}})
+        agents.append("companion")
+
+    if any(k in text_goal for k in ["remind", "calendar", "appointment", "follow up", "deadline"]):
+        agents.append("calendar")
+        steps.append({"agent": "calendar", "tool": "reminder.create", "title": "Prepare a follow-up reminder", "input": {"title": goal[:180], "when_text": "Confirm timing"}})
+    if any(k in text_goal for k in ["remember", "save my preference", "from now on"]):
+        steps.append({"agent": "supervisor", "tool": "memory.save", "title": "Prepare a memory update", "input": {"category": "mission", "key": "mission_preference", "value": goal}})
+
+    return {
+        "title": goal[:70].rstrip(" .") or "New mission",
+        "primary_agent": agents[-1] if len(agents) > 1 else "supervisor",
+        "participating_agents": list(dict.fromkeys(agents)),
+        "risk_level": "medium" if any(TOOL_CATALOG.get(s["tool"], {}).get("approval") for s in steps) else "low",
+        "success_definition": "The member receives a verified, practical result and a clear next action.",
+        "steps": steps,
+    }
+
+
+async def _plan_agent_mission(goal: str, user: User) -> dict[str, Any]:
+    fallback = _fallback_mission_plan(goal)
+    p = user.profile
+    planner_shape = {
+        "title": "Short mission title", "primary_agent": "travel", "participating_agents": ["supervisor", "travel"],
+        "risk_level": "low", "success_definition": "Specific measurable completion condition",
+        "steps": [{"agent": "supervisor", "tool": "profile.read", "title": "Load context", "input": {}}],
+    }
+    prompt = f"""Return only valid JSON matching this structure: {json.dumps(planner_shape)}
+
+You are the ValorBuddy Supervisor Agent. Core principle: {AGENTIC_CORE_PRINCIPLE}
+Create the smallest useful, safe plan for the member's real-world goal.
+Only use agents from: {json.dumps(list(AGENT_CATALOG.keys()))}
+Only use tools from: {json.dumps(list(TOOL_CATALOG.keys()))}
+Always begin with profile.read and memory.read. Read-only research can execute immediately.
+Actions that change data (reminder.create, memory.save) must remain approval-gated.
+Never add unrelated agents. Never diagnose, promise VA eligibility, or claim a VA submission.
+Member context: branch={getattr(p, 'branch', '')}, service_status={getattr(p, 'service_status', '')}, city={getattr(p, 'city', '')}, state={getattr(p, 'state', '')}, accessibility={getattr(p, 'accessibility_needs', [])}
+Goal: {goal}
+"""
+    raw = await gemini_reply(prompt, json.dumps(fallback), json_mode=True, model=GEMINI_PLANNER_MODEL)
+    try:
+        plan = json.loads(raw)
+        if not isinstance(plan.get("steps"), list) or not plan["steps"]:
+            return fallback
+        valid_steps = []
+        for step in plan["steps"][:10]:
+            tool = step.get("tool")
+            agent = step.get("agent")
+            if tool in TOOL_CATALOG and agent in AGENT_CATALOG:
+                valid_steps.append({"agent": agent, "tool": tool, "title": str(step.get("title") or tool)[:255], "input": step.get("input") or {}})
+        if not valid_steps:
+            return fallback
+        plan["steps"] = valid_steps
+        plan["participating_agents"] = [a for a in plan.get("participating_agents", []) if a in AGENT_CATALOG] or list(dict.fromkeys(s["agent"] for s in valid_steps))
+        plan["primary_agent"] = plan.get("primary_agent") if plan.get("primary_agent") in AGENT_CATALOG else plan["participating_agents"][-1]
+        return plan
+    except Exception:
+        return fallback
+
+
+async def _execute_agent_tool(tool_name: str, payload: dict[str, Any], mission: AgentMission, user: User, db: Session) -> dict[str, Any]:
+    p = user.profile
+    if tool_name == "profile.read":
+        return {"verified": True, "profile": profile_out(user).model_dump(), "source": "authenticated_profile"}
+    if tool_name == "memory.read":
+        facts = db.query(MemoryFact).filter(MemoryFact.user_id == user.id).order_by(MemoryFact.updated_at.desc()).limit(25).all()
+        return {"verified": True, "facts": [{"category": f.category, "key": f.key, "value": f.value, "confidence": f.confidence} for f in facts], "source": "member_controlled_memory"}
+    if tool_name == "resources.search":
+        category = payload.get("category", "events")
+        live, items, location = await google_places(city=getattr(p, "city", ""), state=getattr(p, "state", ""), query=payload.get("query") or category, lat=mission.context_snapshot.get("lat"), lng=mission.context_snapshot.get("lng"))
+        return {"verified": bool(items), "live": live, "items": items[:6], "location": location, "source": "google_places" if live else "fallback_search"}
+    if tool_name == "benefits.guide":
+        data = benefits_lookup(payload.get("query", mission.goal), getattr(p, "state", ""), getattr(p, "branch", ""))
+        return {"verified": True, **data, "source": "valorbuddy_benefits_guide", "notice": "Educational guidance; verify eligibility with VA or an accredited representative."}
+    if tool_name == "va_forms.search":
+        q = (payload.get("query") or mission.goal).lower()
+        all_forms = va_forms(q)
+        return {"verified": True, **all_forms, "source": "official_va_links"}
+    if tool_name == "entertainment.suggest":
+        items = music_suggestions(payload.get("query") or mission.goal, getattr(p, "branch", "Army"))
+        return {"verified": True, "items": items, "source": "personalized_suggestions"}
+    if tool_name == "companion.support":
+        prompt = f"""Member goal: {mission.goal}
+Profile: first_name={getattr(p,'first_name','Veteran')}, branch={getattr(p,'branch','')}, interests={getattr(p,'interests',[])}, preferred_tone={getattr(p,'preferred_tone','calm, practical, encouraging')}.
+Provide respectful, non-clinical personal support. Save time, reduce stress, improve trusted access, or strengthen quality of life. Give one grounding or organizing step and one concrete next action. Do not imply you replace a human friend, clinician, family member, or crisis service."""
+        response = await gemini_reply(prompt, "Take one slow breath, choose the single most important thing for the next 20 minutes, and make that the only mission. You do not have to solve everything at once.")
+        return {"verified": True, "response": response, "source": "valorbuddy_companion"}
+    if tool_name == "reminder.create":
+        row = Reminder(user_id=user.id, title=payload.get("title") or mission.title, when_text=payload.get("when_text") or "To be confirmed", note=f"Created from mission {mission.mission_uid}")
+        db.add(row); db.flush()
+        return {"verified": True, "reminder_id": row.id, "title": row.title, "when_text": row.when_text, "source": "valorbuddy_reminders"}
+    if tool_name == "memory.save":
+        row = MemoryFact(user_id=user.id, category=payload.get("category", "mission"), key=payload.get("key", f"mission_{mission.id}"), value=payload.get("value", mission.goal), confidence="confirmed", source="approved_agent_mission")
+        db.add(row); db.flush()
+        return {"verified": True, "memory_fact_id": row.id, "key": row.key, "value": row.value, "source": "member_approved_memory"}
+    raise ValueError(f"Unsupported tool: {tool_name}")
+
+
+async def _run_mission(mission: AgentMission, user: User, db: Session) -> AgentMission:
+    steps = db.query(AgentMissionStep).filter(AgentMissionStep.mission_id == mission.id).order_by(AgentMissionStep.sequence).all()
+    mission.status = "executing"
+    _mission_event(db, mission, user.id, "execution_started", "ValorBuddy started working the mission.")
+    db.commit()
+
+    for step in steps:
+        if step.status in {"completed", "skipped"}:
+            continue
+        if step.requires_approval:
+            approval = db.query(AgentApproval).filter(AgentApproval.step_id == step.id).first()
+            if not approval:
+                approval = AgentApproval(mission_id=mission.id, step_id=step.id, user_id=user.id, action_summary=step.title)
+                db.add(approval)
+            if approval.status == "denied":
+                step.status = "skipped"
+                _mission_event(db, mission, user.id, "step_skipped", f"Skipped: {step.title}")
+                db.commit()
+                continue
+            if approval.status != "approved":
+                step.status = "waiting_for_approval"
+                mission.status = "waiting_for_approval"
+                mission.next_action = f"Review and approve: {step.title}"
+                _mission_event(db, mission, user.id, "approval_requested", mission.next_action, {"step_id": step.id})
+                db.commit()
+                break
+        step.status = "running"; step.started_at = datetime.now(timezone.utc); db.commit()
+        try:
+            output = await _execute_agent_tool(step.tool_name, step.input_json or {}, mission, user, db)
+            step.output_json = output
+            verified = bool(output.get("verified", False))
+            step.verification_json = {"verified": verified, "checked_at": datetime.now(timezone.utc).isoformat(), "source": output.get("source", "internal")}
+            step.status = "completed" if verified else "failed"
+            step.completed_at = datetime.now(timezone.utc)
+            _mission_event(db, mission, user.id, "step_completed" if verified else "step_failed", f"{step.title}: {'completed' if verified else 'could not be verified'}", {"step_id": step.id, "tool": step.tool_name})
+            if not verified:
+                mission.status = "needs_attention"; mission.next_action = f"Review the result for: {step.title}"; db.commit(); break
+            db.commit()
+        except Exception as exc:
+            logger.exception("Agent tool failed: %s", exc)
+            step.status = "failed"; step.error_message = str(exc)[:1000]; step.completed_at = datetime.now(timezone.utc)
+            mission.status = "needs_attention"; mission.next_action = f"Retry or revise: {step.title}"
+            _mission_event(db, mission, user.id, "step_failed", f"The step could not be completed: {step.title}", {"error": str(exc)[:500]})
+            db.commit(); break
+
+    steps = db.query(AgentMissionStep).filter(AgentMissionStep.mission_id == mission.id).order_by(AgentMissionStep.sequence).all()
+    completed = sum(1 for s in steps if s.status in {"completed", "skipped"})
+    mission.progress = int((completed / max(len(steps), 1)) * 100)
+    if all(s.status in {"completed", "skipped"} for s in steps):
+        mission.status = "completed"; mission.progress = 100; mission.completed_at = datetime.now(timezone.utc)
+        mission.next_action = "Mission complete. Review the results and start the next mission when ready."
+        useful = [s.output_json for s in steps if s.output_json and s.tool_name not in {"profile.read", "memory.read"}]
+        mission.summary = "Mission completed with verified steps." if useful else "Mission context reviewed and organized."
+        _mission_event(db, mission, user.id, "mission_completed", "Mission completed and verified.")
+    mission.updated_at = datetime.now(timezone.utc)
+    db.commit(); db.refresh(mission)
+    return mission
+
+
+@app.get("/api/agentic/core")
+def agentic_core_info(user: User = Depends(get_current_user)):
+    return {
+        "version": "4.9.1", "name": "ValorBuddy Agentic Core", "core_principle": AGENTIC_CORE_PRINCIPLE,
+        "operating_model": "Goal → Plan → Execute → Verify → Remember → Follow up",
+        "agents": AGENT_CATALOG, "tools": TOOL_CATALOG,
+        "guardrails": ["Authenticated member context", "Approval before consequential actions", "Verified tool results", "No false VA submissions", "User-controlled memory", "Audit trail"],
+    }
+
+
+@app.post("/api/agentic/missions")
+async def create_agent_mission(payload: MissionCreateIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    plan = await _plan_agent_mission(payload.goal, user)
+    mission = AgentMission(
+        mission_uid=f"VB-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{secrets.token_hex(4).upper()}",
+        user_id=user.id, title=(payload.title or plan.get("title") or payload.goal[:70])[:255], goal=payload.goal,
+        status="planned", primary_agent=plan.get("primary_agent", "supervisor"),
+        participating_agents=plan.get("participating_agents", ["supervisor"]), plan_json=plan,
+        priority=payload.priority, risk_level=plan.get("risk_level", "low"),
+        context_snapshot={"lat": payload.lat, "lng": payload.lng, "timezone": payload.timezone, "created_from": "mission_control"},
+        next_action="ValorBuddy is ready to execute the plan.",
+    )
+    db.add(mission); db.flush()
+    for i, item in enumerate(plan.get("steps", []), 1):
+        tool = item["tool"]
+        db.add(AgentMissionStep(
+            mission_id=mission.id, sequence=i, agent_key=item["agent"], tool_name=tool,
+            title=item.get("title", tool), requires_approval=bool(TOOL_CATALOG.get(tool, {}).get("approval")), input_json=item.get("input") or {},
+        ))
+    _mission_event(db, mission, user.id, "mission_created", "Mission planned by the Supervisor Agent.", {"agents": mission.participating_agents})
+    db.commit(); db.refresh(mission)
+    mission = await _run_mission(mission, user, db)
+    return _mission_dict(mission, db, include_events=True)
+
+
+@app.get("/api/agentic/missions")
+def list_agent_missions(status: str = "", user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    query = db.query(AgentMission).filter(AgentMission.user_id == user.id)
+    if status:
+        query = query.filter(AgentMission.status == status)
+    rows = query.order_by(AgentMission.updated_at.desc()).limit(100).all()
+    return [_mission_dict(row, db) for row in rows]
+
+
+@app.get("/api/agentic/missions/{mission_id}")
+def get_agent_mission(mission_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    mission = db.query(AgentMission).filter(AgentMission.id == mission_id, AgentMission.user_id == user.id).first()
+    if not mission: raise HTTPException(status_code=404, detail="Mission not found")
+    return _mission_dict(mission, db, include_events=True)
+
+
+@app.post("/api/agentic/missions/{mission_id}/run")
+async def run_agent_mission(mission_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    mission = db.query(AgentMission).filter(AgentMission.id == mission_id, AgentMission.user_id == user.id).first()
+    if not mission: raise HTTPException(status_code=404, detail="Mission not found")
+    if mission.status in {"completed", "cancelled"}: return _mission_dict(mission, db, include_events=True)
+    mission = await _run_mission(mission, user, db)
+    return _mission_dict(mission, db, include_events=True)
+
+
+@app.post("/api/agentic/approvals/{approval_id}")
+async def decide_agent_approval(approval_id: int, payload: ApprovalDecisionIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    approval = db.query(AgentApproval).filter(AgentApproval.id == approval_id, AgentApproval.user_id == user.id).first()
+    if not approval: raise HTTPException(status_code=404, detail="Approval request not found")
+    if approval.status != "pending": raise HTTPException(status_code=409, detail="Approval has already been decided")
+    approval.status = "approved" if payload.approved else "denied"; approval.decision_note = payload.note; approval.decided_at = datetime.now(timezone.utc)
+    step = db.query(AgentMissionStep).filter(AgentMissionStep.id == approval.step_id).first()
+    mission = db.query(AgentMission).filter(AgentMission.id == approval.mission_id).first()
+    if not payload.approved and step: step.status = "skipped"
+    _mission_event(db, mission, user.id, "approval_decided", f"Action {'approved' if payload.approved else 'declined'}: {approval.action_summary}")
+    db.commit()
+    mission = await _run_mission(mission, user, db)
+    return _mission_dict(mission, db, include_events=True)
+
+
+@app.post("/api/agentic/missions/{mission_id}/cancel")
+def cancel_agent_mission(mission_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    mission = db.query(AgentMission).filter(AgentMission.id == mission_id, AgentMission.user_id == user.id).first()
+    if not mission: raise HTTPException(status_code=404, detail="Mission not found")
+    mission.status = "cancelled"; mission.next_action = "Mission cancelled by the member."; mission.updated_at = datetime.now(timezone.utc)
+    _mission_event(db, mission, user.id, "mission_cancelled", "Mission cancelled by the member.")
+    db.commit(); return _mission_dict(mission, db, include_events=True)
