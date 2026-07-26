@@ -87,3 +87,19 @@ npx cap sync
 - Follow-up questions now include the previously displayed result context, so questions such as “Are these veteran-owned?” and “Why did you choose them?” are answered against the actual options already shown.
 - Previous results remain visible during explanation follow-ups.
 - Added clearer distinction between veteran-serving locations, verified veteran-owned businesses, and confirmed scheduled events.
+
+
+## ValorBuddy v4.8 standardization
+- Removed test-login shortcuts and automatic demo-user creation.
+- Added editable military profile: first/last name, rank, branch, service status, service period, deployment history, VA rating, location, accessibility and music preferences.
+- AI prompts now receive the authenticated member profile for personalized guidance.
+- Added travel safety, housing/credit, vehicle purchase, investments education, veteran-owned businesses, discounts, hiring companies, and VA forms/program guidance.
+- Added editable Music & Entertainment favorites with add/delete support.
+- Added mobile navigation so Voice and Logout remain reachable on small screens.
+- Admin is controlled by ADMIN_EMAIL and ADMIN_PASSWORD environment variables. No production password is committed to source.
+
+### Required Render variables
+`ADMIN_EMAIL=eugene.ebem@gmail.com`
+`ADMIN_PASSWORD=<strong unique password>`
+
+For real-time interruptible speech, the recommended next integration is Gemini Live API or Google ADK Live. The current browser speech layer remains as a compatibility fallback.

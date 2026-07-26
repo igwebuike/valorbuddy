@@ -19,7 +19,7 @@ from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadF
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, create_engine, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, create_engine, func, inspect, text
 from sqlalchemy.orm import Session, declarative_base, relationship, sessionmaker
 
 APP_NAME = os.getenv("APP_NAME", "ValorBuddy Enterprise API")
@@ -40,6 +40,8 @@ GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "global")
 GOOGLE_GENAI_USE_VERTEXAI = os.getenv("GOOGLE_GENAI_USE_VERTEXAI", "false").lower() == "true"
 ENABLE_GOOGLE_SEARCH_GROUNDING = os.getenv("ENABLE_GOOGLE_SEARCH_GROUNDING", "true").lower() == "true"
 AI_TIMEOUT_SECONDS = int(os.getenv("AI_TIMEOUT_SECONDS", "35"))
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "eugene.ebem@gmail.com").lower().strip()
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 logger = logging.getLogger("valorbuddy.ai")
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY") or os.getenv("GOOGLE_MAPS_API_KEY")
 GOOGLE_CALENDAR_ENABLED = os.getenv("GOOGLE_CALENDAR_ENABLED", "false").lower() == "true"
@@ -74,6 +76,14 @@ class UserProfile(Base):
     branch = Column(String(80), nullable=False, default="Army")
     city = Column(String(120), nullable=False, default="")
     state = Column(String(80), nullable=False, default="TX")
+    rank = Column(String(120), nullable=True, default="")
+    service_status = Column(String(80), nullable=False, default="Veteran")
+    service_start_year = Column(String(10), nullable=True, default="")
+    service_end_year = Column(String(10), nullable=True, default="")
+    deployment_history = Column(Text, nullable=True, default="")
+    va_rating = Column(String(30), nullable=True, default="")
+    accessibility_needs = Column(JSON, nullable=False, default=list)
+    preferred_music_genres = Column(JSON, nullable=False, default=list)
     interests = Column(JSON, nullable=False, default=list)
     preferred_tone = Column(String(120), nullable=False, default="calm, practical, encouraging")
     companion_mode = Column(Boolean, nullable=False, default=True)
@@ -237,15 +247,41 @@ def admin_required(user: User = Depends(get_current_user)) -> User:
     return user
 
 
+
 class RegisterRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6)
     first_name: str
     last_name: str = ""
+    rank: str = ""
     branch: str = "Army"
+    service_status: str = "Veteran"
+    service_start_year: str = ""
+    service_end_year: str = ""
+    deployment_history: str = ""
+    va_rating: str = ""
     city: str = ""
     state: str = ""
     interests: List[str] = []
+    accessibility_needs: List[str] = []
+    preferred_music_genres: List[str] = []
+
+
+class ProfileUpdate(BaseModel):
+    first_name: str
+    last_name: str = ""
+    rank: str = ""
+    branch: str = "Army"
+    service_status: str = "Veteran"
+    service_start_year: str = ""
+    service_end_year: str = ""
+    deployment_history: str = ""
+    va_rating: str = ""
+    city: str = ""
+    state: str = ""
+    interests: List[str] = []
+    accessibility_needs: List[str] = []
+    preferred_music_genres: List[str] = []
 
 
 class LoginRequest(BaseModel):
@@ -259,10 +295,18 @@ class ProfileOut(BaseModel):
     role: str
     first_name: str
     last_name: str | None = ""
+    rank: str = ""
     branch: str
+    service_status: str = "Veteran"
+    service_start_year: str = ""
+    service_end_year: str = ""
+    deployment_history: str = ""
+    va_rating: str = ""
     city: str
     state: str
     interests: List[str] = []
+    accessibility_needs: List[str] = []
+    preferred_music_genres: List[str] = []
 
 
 class LoginResponse(BaseModel):
@@ -320,7 +364,16 @@ class BranchUpdate(BaseModel):
 
 def profile_out(user: User) -> ProfileOut:
     p = user.profile
-    return ProfileOut(id=user.id, email=user.email, role=user.role, first_name=p.first_name if p else "Veteran", last_name=p.last_name if p else "", branch=p.branch if p else "Army", city=p.city if p else "", state=p.state if p else "", interests=p.interests if p else [])
+    return ProfileOut(
+        id=user.id, email=user.email, role=user.role,
+        first_name=p.first_name if p else "Veteran", last_name=p.last_name if p else "",
+        rank=p.rank if p else "", branch=p.branch if p else "Army",
+        service_status=p.service_status if p else "Veteran",
+        service_start_year=p.service_start_year if p else "", service_end_year=p.service_end_year if p else "",
+        deployment_history=p.deployment_history if p else "", va_rating=p.va_rating if p else "",
+        city=p.city if p else "", state=p.state if p else "", interests=p.interests if p else [],
+        accessibility_needs=p.accessibility_needs if p else [], preferred_music_genres=p.preferred_music_genres if p else []
+    )
 
 
 def _genai_client():
@@ -376,6 +429,15 @@ If the user expresses intent to harm themselves or someone else, or says they ma
 
 RESPONSE STYLE
 Keep most responses under 220 words unless the user asks for detail. Be direct, natural, specific, and action-oriented. Never say “My next useful step would be,” “I can help by,” or list unrelated capabilities. Actually help.
+
+PROFILE INTELLIGENCE
+Use the member profile as context, not as decoration. Personalize recommendations using service branch, rank, service status, years served, deployment history, VA disability rating, location, interests, accessibility needs, family role, and saved preferences. Never expose sensitive profile details unnecessarily. Ask for missing profile details only when they materially improve the answer.
+
+PRIORITY SUPPORT AREAS
+Provide practical, current guidance for travel safety, veteran-friendly housing and credit preparation, directions and trip ideas, general investment education, vehicle purchasing, veteran-owned small businesses, military discounts, veteran hiring companies, education, healthcare, VA forms, claims, facilities, caregivers, spouses, dependents, and transition support. For financial, legal, medical, housing, credit, and investment topics, give educational guidance and clearly state when a licensed or accredited professional is needed.
+
+VA FORMS AND PROGRAMS
+Use official VA information when discussing forms or programs. Identify the likely form, explain its purpose in plain English, link or direct the user to the official source when available, and provide a checklist of information commonly needed. Do not claim to submit restricted VA forms unless an authorized VA API integration is configured and the user has completed required consent and identity verification.
 
 Every response should leave the user better informed, more confident, or one step closer to completing the goal."""
 
@@ -723,6 +785,8 @@ def infer_intent(text: str) -> str:
         return "get_today_briefing"
     if any(x in t for x in ["who am i", "my profile", "profile", "branch"]):
         return "get_user_profile"
+    if any(x in t for x in ["travel", "trip", "route", "driving", "road safety", "hotel", "housing", "house", "mortgage", "credit", "investment", "invest", "car", "auto", "vehicle", "veteran owned", "veteran-owned", "military discount", "veteran discount", "hire veterans", "veteran jobs", "company hiring", "va form", "forms", "small business"]):
+        return "live_web"
     return "general"
 
 
@@ -927,7 +991,16 @@ Answer naturally and specifically. Include spouse, child, dependent, caregiver, 
         f"{first_name}, here is the most practical answer I can give right now. "
         "I’ll keep it focused, make a recommendation, and give you a clear next action."
     )
-    prompt = f"""User profile: first_name={first_name}, branch={branch}, current_city={city}, current_state={state}
+    profile = user.profile if user and user.profile else None
+    profile_context = {
+        "first_name": first_name, "last_name": getattr(profile, "last_name", ""), "rank": getattr(profile, "rank", ""),
+        "branch": branch, "service_status": getattr(profile, "service_status", user_type),
+        "service_years": f"{getattr(profile, 'service_start_year', '')}-{getattr(profile, 'service_end_year', '')}",
+        "deployment_history": getattr(profile, "deployment_history", ""), "va_rating": getattr(profile, "va_rating", ""),
+        "current_city": city, "current_state": state, "interests": getattr(profile, "interests", []),
+        "accessibility_needs": getattr(profile, "accessibility_needs", [])
+    }
+    prompt = f"""Member profile: {profile_context}
 Recent memories: {[m.title for m in recent]}
 Recent reminders: {[r.title for r in rems]}
 Primary intent: {intent}
@@ -948,7 +1021,7 @@ Answer the user's actual request directly and stay on that single topic. Do not 
     return {"response": response, "intent": intent, "data": {"plan": plan, "grounded": use_grounding}}
 
 
-app = FastAPI(title=APP_NAME, version="4.7.0")
+app = FastAPI(title=APP_NAME, version="4.8.0")
 origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
@@ -957,16 +1030,30 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
+    # Lightweight additive migration for existing PostgreSQL/SQLite deployments.
+    additions = {
+        "rank": "VARCHAR(120) DEFAULT ''", "service_status": "VARCHAR(80) DEFAULT 'Veteran'",
+        "service_start_year": "VARCHAR(10) DEFAULT ''", "service_end_year": "VARCHAR(10) DEFAULT ''",
+        "deployment_history": "TEXT DEFAULT ''", "va_rating": "VARCHAR(30) DEFAULT ''",
+        "accessibility_needs": "JSON", "preferred_music_genres": "JSON"
+    }
+    with engine.begin() as conn:
+        existing = {c["name"] for c in inspect(engine).get_columns("user_profiles")}
+        for name, sql_type in additions.items():
+            if name not in existing:
+                try:
+                    conn.execute(text(f"ALTER TABLE user_profiles ADD COLUMN {name} {sql_type}"))
+                except Exception as exc:
+                    logger.warning("Profile migration skipped for %s: %s", name, exc)
     db = SessionLocal()
     try:
-        if not db.query(User).filter(User.email == "admin@valorbuddy.com").first():
-            admin = User(email="admin@valorbuddy.com", password_hash=hash_password("ValorAdmin123!"), role="admin")
+        admin = db.query(User).filter(User.email == ADMIN_EMAIL).first()
+        if not admin and ADMIN_PASSWORD:
+            admin = User(email=ADMIN_EMAIL, password_hash=hash_password(ADMIN_PASSWORD), role="admin")
             db.add(admin); db.flush()
-            db.add(UserProfile(user_id=admin.id, first_name="Eugene", last_name="", branch="Army", city="Dallas", state="TX", interests=["analytics", "veteran pilots"]))
-        if not db.query(User).filter(User.email == "demo@valorbuddy.com").first():
-            demo = User(email="demo@valorbuddy.com", password_hash=hash_password("ValorDemo123!"), role="veteran")
-            db.add(demo); db.flush()
-            db.add(UserProfile(user_id=demo.id, first_name="James", last_name="", branch="Army", city="Dallas", state="TX", interests=["events", "benefits", "music", "memories"]))
+            db.add(UserProfile(user_id=admin.id, first_name="Eugene", last_name="Ebem", branch="Army", service_status="Veteran", city="Dallas", state="TX", interests=["administration", "veteran support"]))
+        elif admin and admin.role != "admin":
+            admin.role = "admin"
         db.commit()
     finally:
         db.close()
@@ -974,7 +1061,7 @@ def startup():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": APP_NAME, "version": "4.7.0", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
+    return {"status": "ok", "app": APP_NAME, "version": "4.8.0", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
 
 
 @app.get("/db/tables")
@@ -988,7 +1075,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Email already exists")
     user = User(email=str(payload.email).lower(), password_hash=hash_password(payload.password), role="veteran")
     db.add(user); db.flush()
-    db.add(UserProfile(user_id=user.id, first_name=payload.first_name, last_name=payload.last_name, branch=payload.branch, city=payload.city, state=payload.state, interests=payload.interests))
+    db.add(UserProfile(user_id=user.id, first_name=payload.first_name, last_name=payload.last_name, rank=payload.rank, branch=payload.branch, service_status=payload.service_status, service_start_year=payload.service_start_year, service_end_year=payload.service_end_year, deployment_history=payload.deployment_history, va_rating=payload.va_rating, city=payload.city, state=payload.state, interests=payload.interests, accessibility_needs=payload.accessibility_needs, preferred_music_genres=payload.preferred_music_genres))
     db.add(AdminAuditLog(user_id=user.id, action="user.registered", details=user.email))
     db.commit(); db.refresh(user)
     token = create_access_token(user)
@@ -1031,10 +1118,13 @@ def update_profile_branch(payload: BranchUpdate, user: User = Depends(get_curren
 
 
 @app.post("/api/profile")
-def update_profile(payload: RegisterRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    p = user.profile
-    p.first_name = payload.first_name; p.last_name = payload.last_name; p.branch = payload.branch; p.city = payload.city; p.state = payload.state; p.interests = payload.interests; p.updated_at = datetime.now(timezone.utc)
-    db.commit()
+def update_profile(payload: ProfileUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    p = user.profile or UserProfile(user_id=user.id, first_name=payload.first_name)
+    for field in ("first_name", "last_name", "rank", "branch", "service_status", "service_start_year", "service_end_year", "deployment_history", "va_rating", "city", "state", "interests", "accessibility_needs", "preferred_music_genres"):
+        setattr(p, field, getattr(payload, field))
+    p.updated_at = datetime.now(timezone.utc)
+    db.add(p); db.add(AdminAuditLog(user_id=user.id, action="profile.updated", details=f"{payload.first_name} {payload.last_name}".strip()))
+    db.commit(); db.refresh(user)
     return profile_out(user).model_dump()
 
 
@@ -1083,13 +1173,40 @@ def search_benefits(query: str = "benefits", state: str = "TX", branch: str = "A
 def suggest_music(mood: str = "calm", branch: str = "Army"):
     return {"items": music_suggestions(mood, branch)}
 
+@app.get("/api/music/favorites")
+def music_favorites(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    rows = db.query(MusicFavorite).filter(MusicFavorite.user_id == user.id).order_by(MusicFavorite.id.desc()).all()
+    return [{"id": r.id, "title": r.title, "url": r.url, "mood": r.mood} for r in rows]
+
+class MusicFavoriteIn(BaseModel):
+    title: str
+    url: str = ""
+    mood: str = ""
+
+@app.post("/api/music/favorites")
+def add_music_favorite(payload: MusicFavoriteIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    row = MusicFavorite(user_id=user.id, title=payload.title, url=payload.url, mood=payload.mood)
+    db.add(row); db.commit(); db.refresh(row)
+    return {"id": row.id, "title": row.title, "url": row.url, "mood": row.mood}
+
+@app.delete("/api/music/favorites/{favorite_id}")
+def delete_music_favorite(favorite_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    row = db.query(MusicFavorite).filter(MusicFavorite.id == favorite_id, MusicFavorite.user_id == user.id).first()
+    if not row: raise HTTPException(status_code=404, detail="Music preference not found")
+    db.delete(row); db.commit(); return {"deleted": True}
+
+
+def time_greeting() -> str:
+    hour = datetime.now().hour
+    return "Good morning" if hour < 12 else ("Good afternoon" if hour < 18 else "Good evening")
+
 
 @app.get("/api/briefing")
 async def today_briefing(lat: float | None = None, lng: float | None = None, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     p = user.profile
     rems = db.query(Reminder).filter(Reminder.user_id == user.id, Reminder.status == "active").order_by(Reminder.id.desc()).limit(3).all()
     live, events, location_meta = await google_places(city=p.city, state=p.state, query="veteran events VA VFW American Legion family friendly", lat=lat, lng=lng)
-    return {"greeting": f"Good to see you, {p.first_name}. How is your day going?", "location": f"{location_meta.get('city') or p.city}, {location_meta.get('state') or p.state}", "reminders": [{"title": r.title, "when_text": r.when_text} for r in rems], "events": events[:3], "wellness_prompt": ("Live Google Places is connected." if live else "Google Places is in demo mode. Add GOOGLE_PLACES_API_KEY in Render to make activities live.")}
+    return {"greeting": f"{time_greeting()}, {p.first_name}. I’m ValorBuddy. How can I help today?", "location": f"{location_meta.get('city') or p.city}, {location_meta.get('state') or p.state}", "reminders": [{"title": r.title, "when_text": r.when_text} for r in rems], "events": events[:3], "wellness_prompt": ("Live Google Places is connected." if live else "Live place results are unavailable. Check the Google Places configuration.")}
 
 
 @app.post("/api/companion/chat")
@@ -1146,8 +1263,9 @@ async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db))
     text = payload.message or payload.query or payload.title or payload.memory or ""
     email = (payload.email or "").lower().strip()
     user = db.query(User).filter(User.email == email).first() if email else None
-    if not user:
-        user = db.query(User).filter(User.email == "demo@valorbuddy.com").first()
+    # Never silently attach an unknown caller to a demo account.
+    if not user and email:
+        logger.info("Vapi caller not matched to a registered profile: %s", email)
 
     profile = user.profile if user and user.profile else None
     first_name = payload.first_name or (profile.first_name if profile else "there")
@@ -1189,7 +1307,7 @@ def admin_overview(_: User = Depends(admin_required), db: Session = Depends(get_
 @app.get("/admin/users")
 def admin_users(_: User = Depends(admin_required), db: Session = Depends(get_db)):
     rows = db.query(User).order_by(User.id.desc()).all()
-    return [{"id": u.id, "email": u.email, "role": u.role, "active": u.is_active, "first_name": u.profile.first_name if u.profile else "", "branch": u.profile.branch if u.profile else "", "city": u.profile.city if u.profile else "", "state": u.profile.state if u.profile else ""} for u in rows]
+    return [{"id": u.id, "email": u.email, "role": u.role, "active": u.is_active, "first_name": u.profile.first_name if u.profile else "", "last_name": u.profile.last_name if u.profile else "", "rank": u.profile.rank if u.profile else "", "branch": u.profile.branch if u.profile else "", "service_status": u.profile.service_status if u.profile else "", "va_rating": u.profile.va_rating if u.profile else "", "city": u.profile.city if u.profile else "", "state": u.profile.state if u.profile else ""} for u in rows]
 
 
 @app.get("/admin/activity")
