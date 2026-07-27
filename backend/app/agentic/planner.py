@@ -1,7 +1,7 @@
 from __future__ import annotations
 from .router import route_goal
 from .catalog import TOOL_CATALOG
-AGENT_TOOL={'travel':'travel.search','benefits':'benefits.guide','forms':'va_forms.search','housing':'housing.search','employment':'employment.search','career':'employment.search','events':'resources.search','discounts':'discounts.search','vehicle':'vehicle.research','finance':'finance.educate','documents':'documents.review','entertainment':'entertainment.suggest','family':'family.plan','wellness':'wellness.support','companion':'companion.support','life_ops':'reminder.create','health':'resources.search'}
+AGENT_TOOL={'travel':'travel.search','benefits':'benefits.guide','forms':'va_forms.search','housing':'housing.search','employment':'employment.search','career':'career.generate','events':'resources.search','discounts':'discounts.search','vehicle':'vehicle.research','finance':'finance.educate','documents':'documents.review','entertainment':'entertainment.suggest','family':'family.plan','wellness':'wellness.support','companion':'companion.support','life_ops':'reminder.create','health':'resources.search'}
 def build_fallback_plan(goal:str)->dict:
  agents=['supervisor']+route_goal(goal)
  steps=[{'agent':'supervisor','tool':'profile.read','title':'Load service, location, accessibility, and preference context','input':{}},{'agent':'supervisor','tool':'memory.read','title':'Review confirmed preferences and active commitments','input':{}}]

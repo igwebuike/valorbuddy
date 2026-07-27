@@ -29,6 +29,7 @@ TOOL_CATALOG = {
  "benefits.guide":{"agent":"benefits","risk":"low","approval":False,"description":"Build a plain-English benefits pathway."},
  "va_forms.search":{"agent":"forms","risk":"low","approval":False,"description":"Find official VA forms and document checklists."},
  "housing.search":{"agent":"housing","risk":"low","approval":False,"description":"Search housing and nearby support resources."},
+ "career.generate":{"agent":"career","risk":"low","approval":False,"description":"Generate a verified resume, cover letter, career plan, or veteran business plan from MOS and service facts."},
  "employment.search":{"agent":"employment","risk":"low","approval":False,"description":"Search veteran-friendly employment resources."},
  "discounts.search":{"agent":"discounts","risk":"low","approval":False,"description":"Search and verify discount resources."},
  "vehicle.research":{"agent":"vehicle","risk":"low","approval":False,"description":"Research vehicle incentives and ownership considerations."},
