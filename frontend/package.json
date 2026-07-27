@@ -3,17 +3,25 @@
   "version": "4.9.1",
   "private": true,
   "type": "module",
+  
+  "engines": {
+    "node": "20.x"
+  },
+
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "node ./node_modules/vite/bin/vite.js build",
+    "dev": "vite --host",
+    "build": "vite build",
     "preview": "vite preview"
   },
+
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
-    "vite": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "lucide-react": "latest"
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "lucide-react": "^0.453.0"
   },
-  "devDependencies": {}
+
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.10"
+  }
 }
