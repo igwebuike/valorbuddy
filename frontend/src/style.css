@@ -298,3 +298,295 @@ html[data-branch="navy"],body[data-branch="navy"],.app.navy,.loginPage.navy{
 .intelPanel{background:#07170e!important;color:#fff!important;border:2px solid var(--border)!important}
 .intelPanel p,.intelPanel li,.intelPanel small{color:#fff!important;opacity:1!important}
 .intelPanel h3,.intelPanel b{color:#ffd86b!important}
+
+
+/* =========================================================
+   ValorBuddy v5.3.1 — ACTION BUTTONS & READABILITY FIX
+   Scoped rules only; no global theme replacement.
+   ========================================================= */
+
+.actionsPage,
+.readablePage,
+.profilePage {
+  font-size: 17px;
+}
+
+.actionsPage h1,
+.readablePage h1,
+.profilePage h1,
+.actionsPage h2,
+.readablePage h2 {
+  font-weight: 950 !important;
+  letter-spacing: .01em;
+}
+
+.actionsPage .pageLead,
+.readablePage .pageLead,
+.profilePage .pageLead {
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  line-height: 1.65 !important;
+  opacity: 1 !important;
+}
+
+.actionComposer {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 12px !important;
+  align-items: stretch !important;
+}
+
+.actionComposer input {
+  min-height: 56px !important;
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+}
+
+.actionButton {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 9px !important;
+  min-height: 54px !important;
+  padding: 14px 20px !important;
+  background: var(--accent) !important;
+  color: #06110a !important;
+  -webkit-text-fill-color: #06110a !important;
+  border: 2px solid color-mix(in srgb, var(--accent) 82%, white) !important;
+  border-radius: 9px !important;
+  box-shadow: 0 8px 22px rgba(0,0,0,.28) !important;
+  font-size: 1rem !important;
+  font-weight: 950 !important;
+  opacity: 1 !important;
+  cursor: pointer !important;
+}
+
+.spaceforce .actionButton,
+.navy .actionButton,
+.airforce .actionButton {
+  color: #080818 !important;
+  -webkit-text-fill-color: #080818 !important;
+}
+
+.actionButton:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.actionButton:disabled {
+  opacity: .7 !important;
+  cursor: wait !important;
+}
+
+.wideAction {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+}
+
+/* Profile labels, help text, and values */
+.highReadabilityProfile {
+  gap: 20px !important;
+  background: #f7f8fb !important;
+}
+
+.highReadabilityProfile .profileField,
+.highReadabilityProfile label {
+  gap: 8px !important;
+}
+
+.highReadabilityProfile .fieldLabel,
+.highReadabilityProfile .profileField > span,
+.highReadabilityProfile label > span {
+  color: #13233d !important;
+  -webkit-text-fill-color: #13233d !important;
+  font-size: 1rem !important;
+  font-weight: 950 !important;
+  letter-spacing: .025em !important;
+  opacity: 1 !important;
+}
+
+.highReadabilityProfile .fieldHelp,
+.highReadabilityProfile .profileField small,
+.highReadabilityProfile label small {
+  color: #344a63 !important;
+  -webkit-text-fill-color: #344a63 !important;
+  font-size: .93rem !important;
+  font-weight: 750 !important;
+  line-height: 1.45 !important;
+  opacity: 1 !important;
+}
+
+.highReadabilityProfile input,
+.highReadabilityProfile select,
+.highReadabilityProfile textarea {
+  min-height: 52px !important;
+  color: #111827 !important;
+  -webkit-text-fill-color: #111827 !important;
+  background: #fff !important;
+  border: 2px solid #73849a !important;
+  font-size: 1rem !important;
+  font-weight: 650 !important;
+  opacity: 1 !important;
+}
+
+.highReadabilityProfile textarea {
+  min-height: 125px !important;
+}
+
+/* Reminder, Memory, Career, Benefits, Activities form labels */
+.darkForm label > span,
+.featureForm label > span {
+  font-size: 1rem !important;
+  font-weight: 950 !important;
+  opacity: 1 !important;
+}
+
+.darkForm input,
+.darkForm textarea,
+.darkForm select,
+.missionComposer textarea {
+  font-size: 1rem !important;
+  font-weight: 650 !important;
+  opacity: 1 !important;
+}
+
+/* AI Assistant */
+.assistantPage .assistantReadable,
+.assistantPage .userReadable {
+  font-size: 1.05rem !important;
+  font-weight: 700 !important;
+  line-height: 1.7 !important;
+  opacity: 1 !important;
+}
+
+.assistantPage .composer button {
+  min-width: 210px !important;
+}
+
+/* Benefits and Activities recommendation modal */
+.smartModal {
+  color: #14263a !important;
+}
+
+.smartModal .modalHeader h2 {
+  color: #fff !important;
+  -webkit-text-fill-color: #fff !important;
+}
+
+.smartModal .modalHeader p {
+  color: #edf5ff !important;
+  -webkit-text-fill-color: #edf5ff !important;
+  font-weight: 650 !important;
+  opacity: 1 !important;
+}
+
+.smartModal .smartResultCard h3,
+.smartModal .resultTitleRow h3 {
+  color: #102b4d !important;
+  -webkit-text-fill-color: #102b4d !important;
+  font-weight: 950 !important;
+}
+
+.smartModal .resultLocation {
+  color: #334e68 !important;
+  -webkit-text-fill-color: #334e68 !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
+
+.smartModal .assistantExplains {
+  color: #18324a !important;
+  -webkit-text-fill-color: #18324a !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
+
+.smartModal .assistantExplains b {
+  color: #08264b !important;
+  -webkit-text-fill-color: #08264b !important;
+  font-weight: 950 !important;
+}
+
+.smartModal .nextStep,
+.smartModal .nextStep span,
+.smartModal .communityVoice,
+.smartModal .communityVoice p,
+.smartModal .reviewPanel,
+.smartModal .reviewPanel blockquote,
+.smartModal .reviewPanel blockquote span {
+  color: #20384f !important;
+  -webkit-text-fill-color: #20384f !important;
+  font-weight: 650 !important;
+  opacity: 1 !important;
+}
+
+.smartModal .nextStep b,
+.smartModal .communityVoice b,
+.smartModal .reviewPanel > b {
+  color: #755000 !important;
+  -webkit-text-fill-color: #755000 !important;
+  font-weight: 950 !important;
+}
+
+.smartModal .reviewPanel blockquote small {
+  color: #4c647b !important;
+  -webkit-text-fill-color: #4c647b !important;
+  font-weight: 750 !important;
+  opacity: 1 !important;
+}
+
+.smartModal .modalFooter,
+.smartModal .modalFooter span {
+  color: #334e68 !important;
+  -webkit-text-fill-color: #334e68 !important;
+  font-weight: 700 !important;
+  opacity: 1 !important;
+}
+
+.smartModal .resultActions a,
+.smartModal .resultActions button {
+  font-size: .95rem !important;
+  font-weight: 950 !important;
+}
+
+/* Ensure standard page buttons never disappear */
+.actionsPage .composer button,
+.actionsPage .openResultsButton,
+.missionComposer .actionButton {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Mobile */
+@media (max-width: 900px) {
+  .actionsPage,
+  .readablePage,
+  .profilePage {
+    font-size: 16px;
+  }
+
+  .actionComposer,
+  .missionComposer {
+    grid-template-columns: 1fr !important;
+  }
+
+  .actionButton,
+  .actionsPage .composer button,
+  .assistantPage .composer button {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 54px !important;
+  }
+
+  .highReadabilityProfile {
+    padding: 16px !important;
+  }
+
+  .smartModal .assistantExplains,
+  .smartModal .nextStep,
+  .smartModal .communityVoice,
+  .smartModal .reviewPanel {
+    font-size: 1rem !important;
+    line-height: 1.6 !important;
+  }
+}
