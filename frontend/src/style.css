@@ -259,3 +259,34 @@ html[data-branch="navy"],body[data-branch="navy"],.app.navy,.loginPage.navy{
 .mediaViewerNotice{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:10px 16px;background:#fff4cf;color:#18344d}.mediaViewerNotice p{margin:0;color:#18344d;font-weight:650}.mediaViewerNotice button{background:#082b55;color:#fff;border:0;padding:10px 13px;font-weight:850}
 .mediaViewer iframe{width:100%;height:100%;border:0;background:#fff}
 @media(max-width:820px){.featureForm,.careerLayout{grid-template-columns:1fr}.featureForm .wide{grid-column:auto}.mediaViewer{width:100%;height:96vh}.mediaViewerNotice{display:grid}}
+
+
+/* ValorBuddy v5.2.9 approved media adapters */
+.mediaCenterPage{min-height:calc(100vh - 170px)}
+.providerTabs{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+.providerTabs button{min-height:42px;padding:9px 13px;background:#07170e;color:#fff;border:2px solid var(--border);font-weight:850;cursor:pointer}
+.providerTabs button.active{background:var(--accent);color:#07130b;border-color:var(--accent2)}
+.mediaWorkspace{display:grid;grid-template-columns:minmax(320px,.8fr) minmax(420px,1.2fr);gap:18px;align-items:stretch}
+.providerPanel,.mediaPreviewPanel{background:#07170e;border:2px solid var(--border);border-radius:14px;padding:20px;color:#fff;min-height:390px}
+.providerHeading,.playerTitle{display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.providerHeading small,.playerTitle small{color:#ffd86b;font-weight:900;letter-spacing:.08em}
+.providerHeading h2,.playerTitle h3{color:#fff;margin:3px 0 0}
+.providerPanel>p{color:#eef8ed;line-height:1.6;opacity:1}
+.supportBadge{display:inline-flex;padding:6px 10px;border-radius:999px;font-size:.76rem;font-weight:900;text-transform:uppercase;white-space:nowrap}
+.supportBadge.embedded{background:#d6f4dc;color:#075728;border:1px solid #5eb678}.supportBadge.handoff{background:#fff0bd;color:#644700;border:1px solid #d5aa27}
+.mediaSearchRow{display:grid;grid-template-columns:1fr auto;gap:9px;margin:18px 0}
+.mediaSearchRow input,.mediaUrlField input{width:100%;min-height:50px;border:2px solid #65db78;background:#020a05;color:#fff;-webkit-text-fill-color:#fff;padding:11px 13px;border-radius:9px;font-size:1rem}
+.mediaSearchRow input::placeholder,.mediaUrlField input::placeholder{color:#cfe2d2;-webkit-text-fill-color:#cfe2d2;opacity:1}
+.mediaSearchRow button,.mediaActionRow button,.playerTitle button,.cardActions button{min-height:44px;padding:9px 13px;border:2px solid var(--border);background:#102f18;color:#fff;font-weight:850;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.mediaUrlField{display:grid;gap:7px}.mediaUrlField span{color:#ffd86b;font-weight:900}
+.mediaActionRow{display:flex;flex-wrap:wrap;gap:9px;margin-top:14px}
+.mediaError{margin-top:12px;padding:12px;border-left:5px solid #ffb347;background:#3b2307;color:#fff2d4;font-weight:700;line-height:1.5}
+.mediaPreviewPanel{display:grid;min-width:0}
+.mediaPreviewPanel iframe{width:100%;height:100%;min-height:350px;border:0;border-radius:10px;background:#111}
+.playerTitle{margin-bottom:12px}.playerTitle button{min-height:38px}
+.playerEmpty,.handoffCard{display:grid;place-items:center;align-content:center;text-align:center;gap:12px;min-height:350px;padding:24px;border:2px dashed #52715a;border-radius:12px;background:#041009}
+.playerEmpty svg,.handoffCard svg{width:48px;height:48px;color:#ffd86b}
+.playerEmpty h3,.handoffCard h3{color:#ffd86b;margin:0}.playerEmpty p,.handoffCard p{max-width:580px;color:#eef8ed;line-height:1.6;opacity:1;margin:0}
+.saveMediaForm{grid-template-columns:repeat(3,minmax(0,1fr)) auto;align-items:end}
+@media(max-width:1050px){.mediaWorkspace{grid-template-columns:1fr}.saveMediaForm{grid-template-columns:1fr 1fr}.saveMediaForm button{grid-column:1/-1}}
+@media(max-width:700px){.providerTabs{display:grid;grid-template-columns:1fr 1fr}.providerTabs button{width:100%}.mediaSearchRow{grid-template-columns:1fr}.mediaWorkspace{grid-template-columns:1fr}.providerPanel,.mediaPreviewPanel{padding:14px;min-height:auto}.mediaPreviewPanel iframe,.playerEmpty,.handoffCard{min-height:280px}.saveMediaForm{grid-template-columns:1fr}.mediaActionRow{display:grid}.mediaActionRow button{width:100%}.supportBadge{white-space:normal;text-align:center}}
