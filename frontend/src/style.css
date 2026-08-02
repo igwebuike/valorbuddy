@@ -491,3 +491,466 @@ html body .app .agentMissionResult span{
   html body .app .profileFormActions button{width:100%!important;justify-content:center!important}
   html body .app .assistantReadable,html body .app .userReadable{font-size:1rem!important;line-height:1.58!important}
 }
+
+
+/* =========================================================
+   ValorBuddy v5.2.7 — PLATFORM-WIDE COLOR & CONTRAST AUDIT
+   Explicit contextual colors override faint inherited theme
+   variables on light cards, modals, forms, reports, and mobile.
+   ========================================================= */
+
+/* ---------- Universal readability safeguards ---------- */
+html body .app,
+html body .app main,
+html body .app section,
+html body .app article,
+html body .app div,
+html body .app p,
+html body .app span,
+html body .app small,
+html body .app label,
+html body .app li,
+html body .app blockquote{
+  text-rendering:optimizeLegibility;
+}
+
+html body .app p,
+html body .app li,
+html body .app blockquote,
+html body .app small{
+  opacity:1!important;
+}
+
+html body .app button,
+html body .app a,
+html body .app input,
+html body .app textarea,
+html body .app select{
+  font-family:Inter,system-ui,Segoe UI,Arial,sans-serif!important;
+}
+
+/* ---------- Recommendation and Benefits modal ---------- */
+html body .smartModalBackdrop{
+  background:rgba(1,11,25,.88)!important;
+  backdrop-filter:blur(10px)!important;
+}
+
+html body .smartModal{
+  background:#eef4fb!important;
+  color:#10243a!important;
+  border:2px solid #d2aa25!important;
+  box-shadow:0 32px 100px rgba(0,0,0,.58)!important;
+}
+
+html body .smartModal .modalHeader{
+  background:linear-gradient(135deg,#071d3a 0%,#0a3a72 100%)!important;
+  color:#fff!important;
+}
+
+html body .smartModal .modalEyebrow{
+  color:#ffd85f!important;
+  -webkit-text-fill-color:#ffd85f!important;
+  opacity:1!important;
+  font-weight:950!important;
+}
+
+html body .smartModal .modalHeader h2{
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  text-shadow:0 2px 3px rgba(0,0,0,.55)!important;
+  font-weight:950!important;
+}
+
+html body .smartModal .modalHeader p{
+  color:#eef7ff!important;
+  -webkit-text-fill-color:#eef7ff!important;
+  opacity:1!important;
+  font-size:1rem!important;
+  font-weight:650!important;
+}
+
+html body .smartModal .modalClose{
+  background:#061a32!important;
+  color:#fff!important;
+  border:2px solid rgba(255,255,255,.7)!important;
+}
+
+html body .smartModal .smartResultCard{
+  background:#fff!important;
+  color:#10243a!important;
+  border:2px solid #c8d6e5!important;
+  box-shadow:0 12px 30px rgba(7,31,63,.13)!important;
+}
+
+html body .smartModal .resultRank{
+  background:#d5ac1b!important;
+  color:#071c37!important;
+  -webkit-text-fill-color:#071c37!important;
+  font-weight:950!important;
+}
+
+html body .smartModal .resultTitleRow h3{
+  color:#0a2545!important;
+  -webkit-text-fill-color:#0a2545!important;
+  font-size:1.24rem!important;
+  font-weight:950!important;
+}
+
+html body .smartModal .resultLocation{
+  color:#29445f!important;
+  -webkit-text-fill-color:#29445f!important;
+  opacity:1!important;
+  font-weight:700!important;
+}
+
+html body .smartModal .assistantExplains{
+  background:#e5effc!important;
+  color:#173651!important;
+  -webkit-text-fill-color:#173651!important;
+  border-left:5px solid #c59600!important;
+  font-size:.98rem!important;
+  font-weight:650!important;
+  line-height:1.62!important;
+}
+
+html body .smartModal .assistantExplains b{
+  color:#082b55!important;
+  -webkit-text-fill-color:#082b55!important;
+  font-weight:950!important;
+}
+
+html body .smartModal .nextStep{
+  background:#edf3f8!important;
+  color:#10243a!important;
+  -webkit-text-fill-color:#10243a!important;
+  border:1px solid #c4d2df!important;
+}
+
+html body .smartModal .nextStep b{
+  color:#8b5c00!important;
+  -webkit-text-fill-color:#8b5c00!important;
+  font-weight:950!important;
+}
+
+html body .smartModal .nextStep span{
+  color:#18344d!important;
+  -webkit-text-fill-color:#18344d!important;
+  opacity:1!important;
+  font-weight:650!important;
+}
+
+html body .smartModal .communityVoice{
+  background:#fff5d9!important;
+  color:#27384a!important;
+  -webkit-text-fill-color:#27384a!important;
+  border:2px solid #d9ae33!important;
+}
+
+html body .smartModal .communityVoice b{
+  color:#775000!important;
+  -webkit-text-fill-color:#775000!important;
+  font-weight:950!important;
+}
+
+html body .smartModal .communityVoice p{
+  color:#294057!important;
+  -webkit-text-fill-color:#294057!important;
+  opacity:1!important;
+  font-weight:650!important;
+}
+
+html body .smartModal .reviewPanel{
+  background:#edf2f7!important;
+  color:#10243a!important;
+  -webkit-text-fill-color:#10243a!important;
+  border:1px solid #c7d3df!important;
+}
+
+html body .smartModal .reviewPanel>b{
+  color:#0a315a!important;
+  -webkit-text-fill-color:#0a315a!important;
+  font-weight:950!important;
+}
+
+html body .smartModal .reviewPanel blockquote{
+  background:#fff!important;
+  color:#243e57!important;
+  -webkit-text-fill-color:#243e57!important;
+  border-left:4px solid #587b9c!important;
+  opacity:1!important;
+}
+
+html body .smartModal .reviewPanel blockquote span{
+  color:#243e57!important;
+  -webkit-text-fill-color:#243e57!important;
+  opacity:1!important;
+  font-weight:650!important;
+}
+
+html body .smartModal .reviewPanel blockquote small{
+  color:#4c647b!important;
+  -webkit-text-fill-color:#4c647b!important;
+  opacity:1!important;
+  font-weight:750!important;
+}
+
+html body .smartModal .ratingPill{
+  background:#fff0b8!important;
+  color:#614300!important;
+  -webkit-text-fill-color:#614300!important;
+  border:1px solid #d5ad28!important;
+}
+
+html body .smartModal .openPill.open{
+  background:#d7f4df!important;
+  color:#07572a!important;
+  -webkit-text-fill-color:#07572a!important;
+  border:1px solid #58a973!important;
+}
+
+html body .smartModal .openPill.closed{
+  background:#ffe0e0!important;
+  color:#7d1111!important;
+  -webkit-text-fill-color:#7d1111!important;
+  border:1px solid #d98686!important;
+}
+
+html body .smartModal .resultActions a,
+html body .smartModal .resultActions button{
+  background:#fff!important;
+  color:#082b55!important;
+  -webkit-text-fill-color:#082b55!important;
+  border:2px solid #7893ad!important;
+  font-weight:950!important;
+  min-height:44px!important;
+}
+
+html body .smartModal .resultActions .primaryAction{
+  background:#082b55!important;
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+  border-color:#082b55!important;
+}
+
+html body .smartModal .modalFooter,
+html body .smartModal .modalFooter span{
+  color:#29445f!important;
+  -webkit-text-fill-color:#29445f!important;
+  opacity:1!important;
+  font-weight:700!important;
+}
+
+html body .smartModal .modalFooter button{
+  color:#082b55!important;
+  -webkit-text-fill-color:#082b55!important;
+  font-weight:950!important;
+}
+
+/* ---------- All light surfaces across the platform ---------- */
+html body .app .intelPanel,
+html body .app .generatedDoc,
+html body .app .profileReadiness,
+html body .app .careerGrid .card,
+html body .app .documentCard,
+html body .app .memoryCard{
+  color:var(--text)!important;
+}
+
+html body .app .intelPanel p,
+html body .app .intelPanel li,
+html body .app .generatedDoc p,
+html body .app .generatedDoc li,
+html body .app .profileReadiness p{
+  color:var(--text)!important;
+  -webkit-text-fill-color:var(--text)!important;
+  opacity:1!important;
+  font-weight:600!important;
+}
+
+html body .app .generatedDoc pre{
+  color:var(--text)!important;
+  -webkit-text-fill-color:var(--text)!important;
+  opacity:1!important;
+}
+
+/* ---------- Dark-theme cards and standard page text ---------- */
+html body .app:not(.navy) .pageLead,
+html body .app:not(.navy) .card p,
+html body .app:not(.navy) .card small,
+html body .app:not(.navy) .muted,
+html body .app:not(.navy) .voiceBox p,
+html body .app:not(.navy) .voiceBox small{
+  color:#eef8ed!important;
+  -webkit-text-fill-color:#eef8ed!important;
+  opacity:1!important;
+}
+
+html body .app:not(.navy) .card h3,
+html body .app:not(.navy) .page h1,
+html body .app:not(.navy) .page h2{
+  color:var(--accent2)!important;
+  -webkit-text-fill-color:var(--accent2)!important;
+}
+
+/* ---------- Navy light theme explicit readability ---------- */
+html body .app.navy .page,
+html body .app.navy .card,
+html body .app.navy .hero,
+html body .app.navy .glance,
+html body .app.navy .profileCard{
+  color:#10213d!important;
+}
+
+html body .app.navy .page p,
+html body .app.navy .page li,
+html body .app.navy .card p,
+html body .app.navy .card small,
+html body .app.navy .pageLead,
+html body .app.navy .muted{
+  color:#253d5b!important;
+  -webkit-text-fill-color:#253d5b!important;
+  opacity:1!important;
+  font-weight:600!important;
+}
+
+html body .app.navy .page h1,
+html body .app.navy .page h2,
+html body .app.navy .card h3{
+  color:#00205b!important;
+  -webkit-text-fill-color:#00205b!important;
+  font-weight:950!important;
+}
+
+/* ---------- Inputs everywhere ---------- */
+html body .app input,
+html body .app textarea,
+html body .app select{
+  opacity:1!important;
+}
+
+html body .app:not(.navy) input,
+html body .app:not(.navy) textarea,
+html body .app:not(.navy) select{
+  color:#fff!important;
+  -webkit-text-fill-color:#fff!important;
+}
+
+html body .app:not(.navy) input::placeholder,
+html body .app:not(.navy) textarea::placeholder{
+  color:#d6e5d7!important;
+  -webkit-text-fill-color:#d6e5d7!important;
+  opacity:1!important;
+}
+
+html body .app.navy input,
+html body .app.navy textarea,
+html body .app.navy select{
+  background:#fff!important;
+  color:#10213d!important;
+  -webkit-text-fill-color:#10213d!important;
+  border:2px solid #627b9b!important;
+}
+
+html body .app.navy input::placeholder,
+html body .app.navy textarea::placeholder{
+  color:#52657d!important;
+  -webkit-text-fill-color:#52657d!important;
+  opacity:1!important;
+}
+
+/* ---------- Buttons and links ---------- */
+html body .app button,
+html body .app a{
+  opacity:1!important;
+}
+
+html body .app button:focus-visible,
+html body .app a:focus-visible,
+html body .app input:focus-visible,
+html body .app textarea:focus-visible,
+html body .app select:focus-visible{
+  outline:4px solid rgba(255,216,95,.45)!important;
+  outline-offset:3px!important;
+}
+
+/* ---------- Status, chips, missions ---------- */
+html body .app .statusPill,
+html body .app .chipRow span,
+html body .app .stepRow,
+html body .app .nextAction,
+html body .app .missionNotice{
+  opacity:1!important;
+}
+
+html body .app:not(.navy) .stepRow small,
+html body .app:not(.navy) .nextAction span,
+html body .app:not(.navy) .missionNotice span{
+  color:#eef8ed!important;
+  -webkit-text-fill-color:#eef8ed!important;
+}
+
+/* ---------- Mobile ---------- */
+@media(max-width:720px){
+  html body .smartModalBackdrop{
+    padding:8px!important;
+  }
+
+  html body .smartModal{
+    width:calc(100vw - 16px)!important;
+    max-height:94vh!important;
+    border-radius:16px!important;
+  }
+
+  html body .smartModal .modalHeader{
+    padding:24px 54px 20px 18px!important;
+  }
+
+  html body .smartModal .modalHeader h2{
+    font-size:1.65rem!important;
+    line-height:1.15!important;
+  }
+
+  html body .smartModal .smartResultWrap{
+    padding:12px!important;
+  }
+
+  html body .smartModal .smartResultCard{
+    padding:14px!important;
+  }
+
+  html body .smartModal .assistantExplains,
+  html body .smartModal .nextStep,
+  html body .smartModal .communityVoice,
+  html body .smartModal .reviewPanel{
+    font-size:.98rem!important;
+    line-height:1.55!important;
+  }
+
+  html body .smartModal .resultActions{
+    display:grid!important;
+    grid-template-columns:1fr 1fr!important;
+    gap:8px!important;
+  }
+
+  html body .smartModal .resultActions a,
+  html body .smartModal .resultActions button{
+    width:100%!important;
+    margin:0!important;
+  }
+}
+
+/* ---------- Optional high-contrast OS preference ---------- */
+@media(prefers-contrast:more){
+  html body .app *{
+    text-shadow:none!important;
+  }
+
+  html body .app .card,
+  html body .app .page,
+  html body .app .smartResultCard,
+  html body .app input,
+  html body .app textarea,
+  html body .app select{
+    border-width:3px!important;
+  }
+}
