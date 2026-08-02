@@ -1543,6 +1543,56 @@ def list_documents(user: User = Depends(get_current_user), db: Session = Depends
     return [{"id": r.id, "filename": r.filename, "doc_type": r.doc_type, "file_url": r.file_url, "ai_summary": r.ai_summary, "analysis": r.analysis_json or {}, "status": r.status, "processed_at": r.processed_at} for r in rows]
 
 
+
+@app.delete("/api/documents/{document_id}")
+def delete_document(
+    document_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Permanently delete a document owned by the signed-in user."""
+    document = (
+        db.query(Document)
+        .filter(Document.id == document_id, Document.user_id == user.id)
+        .first()
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    stored_file = None
+    if document.file_url and document.file_url.startswith("/uploads/"):
+        candidate = (UPLOAD_DIR / Path(document.file_url).name).resolve()
+        if candidate.parent == UPLOAD_DIR.resolve():
+            stored_file = candidate
+
+    filename = document.filename
+    db.delete(document)
+    db.add(
+        AdminAuditLog(
+            user_id=user.id,
+            action="document.deleted",
+            details=f"{document_id}:{filename}",
+        )
+    )
+    db.commit()
+
+    if stored_file and stored_file.exists():
+        try:
+            stored_file.unlink()
+        except OSError as exc:
+            logger.warning(
+                "Document record deleted, but file cleanup failed for %s: %s",
+                stored_file,
+                exc,
+            )
+
+    return {
+        "deleted": True,
+        "document_id": document_id,
+        "filename": filename,
+    }
+
+
 @app.post("/api/vapi/action")
 async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db)):
     text = payload.message or payload.query or payload.title or payload.memory or ""

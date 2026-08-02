@@ -213,3 +213,17 @@ html[data-branch="navy"],body[data-branch="navy"],.app.navy,.loginPage.navy{
 .agentStep b,.agentStep small{display:block;color:#fff}
 .agentStep small{opacity:.88;margin-top:3px}
 @media(max-width:760px){.agentStepGrid{grid-template-columns:1fr}.agentMissionTop{flex-direction:column}.agentMissionResult{padding:14px}}
+
+/* ValorBuddy v5.2.3 */
+.documentActions{display:flex;flex-wrap:wrap;align-items:center;gap:.65rem;margin-top:.8rem}
+.documentActions a,.documentActions button{min-height:42px}
+.mediaPlatformHub{display:grid;gap:1rem;margin:1rem 0 1.25rem}
+.vetTvCard{display:flex;align-items:center;gap:.9rem;padding:1rem;border:1px solid var(--accent);background:var(--panel2);color:var(--text);text-decoration:none}
+.vetTvCard svg:first-child{width:32px;height:32px;color:var(--accent2)}
+.vetTvCard div{display:grid;gap:.2rem;flex:1}
+.vetTvCard span{color:var(--muted)}
+.platformDirectory{display:flex;flex-wrap:wrap;gap:.55rem}
+.platformDirectory a,.mediaLinks a{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:.5rem .75rem;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);text-decoration:none;font-weight:700}
+.platformDirectory a:hover,.platformDirectory a:focus-visible,.mediaLinks a:hover,.mediaLinks a:focus-visible,.vetTvCard:hover,.vetTvCard:focus-visible{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 18%,var(--panel2));outline:2px solid var(--accent2);outline-offset:2px}
+.mediaLinks{display:flex;flex-wrap:wrap;gap:.5rem;margin:.8rem 0}
+@media(max-width:768px){.documentActions>*,.platformDirectory a,.mediaLinks a{flex:1 1 calc(50% - .5rem)}.vetTvCard{min-height:72px}}
