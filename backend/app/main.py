@@ -19,6 +19,7 @@ from google import genai
 from google.genai import types
 import jwt
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
@@ -33,10 +34,10 @@ SECRET_KEY = os.getenv("SECRET_KEY", "dev-change-me-valorbuddy")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))
 CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
-# Prefer GOOGLE_API_KEY so the existing Render variable continues to work.
-# GEMINI_API_KEY remains a backward-compatible alias.
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-GEMINI_API_KEY = GOOGLE_API_KEY
+# Prefer the dedicated ValorBuddy Gemini key.
+# GOOGLE_API_KEY remains a backward-compatible fallback only.
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 GEMINI_PLANNER_MODEL = os.getenv("GEMINI_PLANNER_MODEL", GEMINI_MODEL)
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "")
@@ -1288,30 +1289,169 @@ async def today_briefing(lat: float | None = None, lng: float | None = None, use
 
 
 @app.post("/api/companion/chat")
-async def companion_chat(payload: CompanionRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+async def companion_chat(
+    payload: CompanionRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Route conversational requests and persist JSON-safe mission metadata.
+
+    Complex, outcome-oriented requests are executed through the Supervisor
+    mission runtime. Casual conversation continues through the standard
+    conversational router.
+    """
     p = user.profile
     conv = db.get(Conversation, payload.conversation_id) if payload.conversation_id else None
+
+    if conv and conv.user_id not in (None, user.id):
+        raise HTTPException(status_code=404, detail="Conversation not found")
+
     if not conv:
-        conv = Conversation(user_id=user.id, source="web", title="ValorBuddy companion")
-        db.add(conv); db.flush()
+        conv = Conversation(
+            user_id=user.id,
+            source="web",
+            title="ValorBuddy companion",
+        )
+        db.add(conv)
+        db.flush()
+
+    conversation_id = conv.id
     selected_agents = route_goal(payload.message)
     mission = None
-    # Complex, outcome-oriented requests become missions. Casual conversation remains conversational.
-    outcome_terms = ("help me", "find", "plan", "build", "create", "prepare", "compare", "apply", "move", "travel", "resume", "business plan", "benefit", "housing", "job", "document")
-    should_mission = selected_agents != ["companion"] and (len(payload.message.split()) >= 5 or any(x in payload.message.lower() for x in outcome_terms))
+
+    outcome_terms = (
+        "help me",
+        "find",
+        "plan",
+        "build",
+        "create",
+        "prepare",
+        "compare",
+        "apply",
+        "move",
+        "travel",
+        "resume",
+        "business plan",
+        "benefit",
+        "housing",
+        "job",
+        "career",
+        "transition",
+        "cybersecurity",
+        "document",
+        "analyze",
+    )
+    message_lower = payload.message.lower()
+    should_mission = selected_agents != ["companion"] and (
+        len(payload.message.split()) >= 5
+        or any(term in message_lower for term in outcome_terms)
+    )
+
     if should_mission:
-        mission = await create_agent_mission(MissionCreateIn(goal=payload.message, lat=payload.lat, lng=payload.lng, timezone=payload.timezone), user, db)
-        useful = [step.get("output") for step in mission.get("steps", []) if step.get("output") and step.get("tool_name") not in {"profile.read", "memory.read"}]
-        synth_prompt = build_agent_prompt("supervisor", member=profile_out(user).model_dump(), request=payload.message, context={"mission": mission.get("title"), "agents": mission.get("participating_agents"), "verified_results": useful, "next_action": mission.get("next_action")})
-        reply = await gemini_reply(synth_prompt, mission.get("summary") or "I created and worked the mission. Open Mission Control to review the completed steps and next action.")
-        result = {"mode": "mission", "response": reply, "intent": "agentic_mission", "data": {"mission": mission, "agents": selected_agents}}
+        mission = await create_agent_mission(
+            MissionCreateIn(
+                goal=payload.message,
+                lat=payload.lat,
+                lng=payload.lng,
+                timezone=payload.timezone,
+            ),
+            user,
+            db,
+        )
+
+        useful_outputs = [
+            step.get("output")
+            for step in mission.get("steps", [])
+            if step.get("output")
+            and step.get("tool_name") not in {"profile.read", "memory.read"}
+        ]
+
+        synth_prompt = build_agent_prompt(
+            "supervisor",
+            member=profile_out(user).model_dump(),
+            request=payload.message,
+            context={
+                "mission": mission.get("title"),
+                "agents": mission.get("participating_agents"),
+                "verified_results": useful_outputs,
+                "next_action": mission.get("next_action"),
+            },
+        )
+        reply = await gemini_reply(
+            synth_prompt,
+            mission.get("summary")
+            or (
+                "I created and worked the mission. Open Mission Control "
+                "to review the completed steps and next action."
+            ),
+        )
+        result: dict[str, Any] = {
+            "mode": "mission",
+            "response": reply,
+            "intent": "agentic_mission",
+            "data": {
+                "mission": mission,
+                "agents": selected_agents,
+            },
+        }
     else:
-        result = await route_valorbuddy_message(text=payload.message, first_name=p.first_name, branch=p.branch, city=p.city, state=p.state, lat=payload.lat, lng=payload.lng, user=user, db=db)
+        result = await route_valorbuddy_message(
+            text=payload.message,
+            first_name=p.first_name,
+            branch=p.branch,
+            city=p.city,
+            state=p.state,
+            lat=payload.lat,
+            lng=payload.lng,
+            user=user,
+            db=db,
+        )
         reply = result.get("response", "")
-    db.add(Message(conversation_id=conv.id, user_id=user.id, role="user", content=payload.message))
-    db.add(Message(conversation_id=conv.id, user_id=user.id, role="assistant", content=reply, metadata_json={"intent": result.get("intent"), "data": result.get("data", {})}))
-    db.commit()
-    return {"conversation_id": conv.id, **result, "reply": reply}
+
+    # Convert datetimes, UUIDs, enums, and Pydantic values before inserting
+    # them into PostgreSQL JSON columns or returning them through FastAPI.
+    safe_result = jsonable_encoder(result)
+    safe_metadata = {
+        "intent": safe_result.get("intent"),
+        "data": safe_result.get("data", {}),
+    }
+
+    try:
+        db.add(
+            Message(
+                conversation_id=conversation_id,
+                user_id=user.id,
+                role="user",
+                content=payload.message,
+                metadata_json={},
+            )
+        )
+        db.add(
+            Message(
+                conversation_id=conversation_id,
+                user_id=user.id,
+                role="assistant",
+                content=reply,
+                metadata_json=safe_metadata,
+            )
+        )
+        db.commit()
+    except Exception:
+        # A logging/persistence problem must not discard a completed mission
+        # or hide a valid AI response from the veteran.
+        db.rollback()
+        logger.exception(
+            "Failed to persist companion conversation for user_id=%s",
+            user.id,
+        )
+
+    return jsonable_encoder(
+        {
+            "conversation_id": conversation_id,
+            **safe_result,
+            "reply": reply,
+        }
+    )
 
 
 
