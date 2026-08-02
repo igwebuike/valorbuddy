@@ -1304,7 +1304,7 @@ async def companion_chat(payload: CompanionRequest, user: User = Depends(get_cur
         useful = [step.get("output") for step in mission.get("steps", []) if step.get("output") and step.get("tool_name") not in {"profile.read", "memory.read"}]
         synth_prompt = build_agent_prompt("supervisor", member=profile_out(user).model_dump(), request=payload.message, context={"mission": mission.get("title"), "agents": mission.get("participating_agents"), "verified_results": useful, "next_action": mission.get("next_action")})
         reply = await gemini_reply(synth_prompt, mission.get("summary") or "I created and worked the mission. Open Mission Control to review the completed steps and next action.")
-        result = {"response": reply, "intent": "agentic_mission", "data": {"mission": mission, "agents": selected_agents}}
+        result = {"mode": "mission", "response": reply, "intent": "agentic_mission", "data": {"mission": mission, "agents": selected_agents}}
     else:
         result = await route_valorbuddy_message(text=payload.message, first_name=p.first_name, branch=p.branch, city=p.city, state=p.state, lat=payload.lat, lng=payload.lng, user=user, db=db)
         reply = result.get("response", "")
