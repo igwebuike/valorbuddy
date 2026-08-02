@@ -290,3 +290,11 @@ html[data-branch="navy"],body[data-branch="navy"],.app.navy,.loginPage.navy{
 .saveMediaForm{grid-template-columns:repeat(3,minmax(0,1fr)) auto;align-items:end}
 @media(max-width:1050px){.mediaWorkspace{grid-template-columns:1fr}.saveMediaForm{grid-template-columns:1fr 1fr}.saveMediaForm button{grid-column:1/-1}}
 @media(max-width:700px){.providerTabs{display:grid;grid-template-columns:1fr 1fr}.providerTabs button{width:100%}.mediaSearchRow{grid-template-columns:1fr}.mediaWorkspace{grid-template-columns:1fr}.providerPanel,.mediaPreviewPanel{padding:14px;min-height:auto}.mediaPreviewPanel iframe,.playerEmpty,.handoffCard{min-height:280px}.saveMediaForm{grid-template-columns:1fr}.mediaActionRow{display:grid}.mediaActionRow button{width:100%}.supportBadge{white-space:normal;text-align:center}}
+
+/* ValorBuddy v5.3.0 restoration */
+.documentUploadForm{background:#07170e!important;border:2px solid var(--border)!important;color:#fff!important}
+.documentUploadForm label,.documentUploadForm label span{color:#ffd86b!important;font-weight:900!important}
+.documentUploadForm input,.documentUploadForm select{background:#fff!important;color:#10243a!important;-webkit-text-fill-color:#10243a!important;border:2px solid #718379!important}
+.intelPanel{background:#07170e!important;color:#fff!important;border:2px solid var(--border)!important}
+.intelPanel p,.intelPanel li,.intelPanel small{color:#fff!important;opacity:1!important}
+.intelPanel h3,.intelPanel b{color:#ffd86b!important}
