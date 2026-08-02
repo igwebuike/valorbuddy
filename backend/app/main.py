@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import os
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -93,6 +95,14 @@ class UserProfile(Base):
     military_mos = Column(String(160), nullable=False, default="")
     military_job_title = Column(String(255), nullable=False, default="")
     military_experience = Column(Text, nullable=False, default="")
+    civilian_career_goal = Column(String(255), nullable=True, default="")
+    business_interest = Column(Text, nullable=True, default="")
+    military_specialty_description = Column(Text, nullable=True, default="")
+    years_of_service = Column(Integer, nullable=True)
+    security_clearance = Column(String(100), nullable=True, default="")
+    highest_education = Column(String(255), nullable=True, default="")
+    civilian_certifications = Column(Text, nullable=True, default="")
+    linkedin_url = Column(Text, nullable=True, default="")
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     user = relationship("User", back_populates="profile")
@@ -160,6 +170,9 @@ class Document(Base):
     file_url = Column(String(500), nullable=True)
     extracted_text = Column(Text, nullable=True)
     ai_summary = Column(Text, nullable=True)
+    analysis_json = Column(JSON, nullable=False, default=dict)
+    status = Column(String(40), nullable=False, default="processed")
+    processed_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
@@ -205,6 +218,9 @@ class CareerDocument(Base):
     content = Column(Text, nullable=False)
     source_profile = Column(JSON, nullable=False, default=dict)
     status = Column(String(40), nullable=False, default="draft")
+    version = Column(Integer, nullable=False, default=1)
+    ai_generated = Column(Boolean, nullable=False, default=True)
+    source_document_id = Column(Integer, ForeignKey("documents.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
@@ -306,6 +322,14 @@ class ProfileUpdate(BaseModel):
     military_mos: str = ""
     military_job_title: str = ""
     military_experience: str = ""
+    civilian_career_goal: str = ""
+    business_interest: str = ""
+    military_specialty_description: str = ""
+    years_of_service: int | None = None
+    security_clearance: str = ""
+    highest_education: str = ""
+    civilian_certifications: str = ""
+    linkedin_url: str = ""
 
 
 class LoginRequest(BaseModel):
@@ -335,6 +359,14 @@ class ProfileOut(BaseModel):
     military_mos: str = ""
     military_job_title: str = ""
     military_experience: str = ""
+    civilian_career_goal: str = ""
+    business_interest: str = ""
+    military_specialty_description: str = ""
+    years_of_service: int | None = None
+    security_clearance: str = ""
+    highest_education: str = ""
+    civilian_certifications: str = ""
+    linkedin_url: str = ""
 
 
 class LoginResponse(BaseModel):
@@ -415,7 +447,15 @@ def profile_out(user: User) -> ProfileOut:
         profile_data=p.profile_data if p and p.profile_data else {},
         military_mos=(p.military_mos or (p.profile_data or {}).get("mos","")) if p else "",
         military_job_title=(p.military_job_title or "") if p else "",
-        military_experience=(p.military_experience or "") if p else ""
+        military_experience=(p.military_experience or "") if p else "",
+        civilian_career_goal=(p.civilian_career_goal or "") if p else "",
+        business_interest=(p.business_interest or "") if p else "",
+        military_specialty_description=(p.military_specialty_description or "") if p else "",
+        years_of_service=p.years_of_service if p else None,
+        security_clearance=(p.security_clearance or "") if p else "",
+        highest_education=(p.highest_education or "") if p else "",
+        civilian_certifications=(p.civilian_certifications or "") if p else "",
+        linkedin_url=(p.linkedin_url or "") if p else ""
     )
 
 
@@ -1158,7 +1198,7 @@ def update_profile_branch(payload: BranchUpdate, user: User = Depends(get_curren
 @app.post("/api/profile")
 def update_profile(payload: ProfileUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     p = user.profile or UserProfile(user_id=user.id, first_name=payload.first_name)
-    for field in ("first_name", "last_name", "rank", "branch", "service_status", "service_start_year", "service_end_year", "deployment_history", "va_rating", "city", "state", "interests", "accessibility_needs", "preferred_music_genres", "profile_data", "military_mos", "military_job_title", "military_experience"):
+    for field in ("first_name", "last_name", "rank", "branch", "service_status", "service_start_year", "service_end_year", "deployment_history", "va_rating", "city", "state", "interests", "accessibility_needs", "preferred_music_genres", "profile_data", "military_mos", "military_job_title", "military_experience", "civilian_career_goal", "business_interest", "military_specialty_description", "years_of_service", "security_clearance", "highest_education", "civilian_certifications", "linkedin_url"):
         setattr(p, field, getattr(payload, field))
     p.updated_at = datetime.now(timezone.utc)
     db.add(p); db.add(AdminAuditLog(user_id=user.id, action="profile.updated", details=f"{payload.first_name} {payload.last_name}".strip()))
@@ -1254,46 +1294,113 @@ async def companion_chat(payload: CompanionRequest, user: User = Depends(get_cur
     if not conv:
         conv = Conversation(user_id=user.id, source="web", title="ValorBuddy companion")
         db.add(conv); db.flush()
-    result = await route_valorbuddy_message(
-        text=payload.message,
-        first_name=p.first_name,
-        branch=p.branch,
-        city=p.city,
-        state=p.state,
-        lat=payload.lat,
-        lng=payload.lng,
-        user=user,
-        db=db,
-    )
-    reply = result.get("response", "")
+    selected_agents = route_goal(payload.message)
+    mission = None
+    # Complex, outcome-oriented requests become missions. Casual conversation remains conversational.
+    outcome_terms = ("help me", "find", "plan", "build", "create", "prepare", "compare", "apply", "move", "travel", "resume", "business plan", "benefit", "housing", "job", "document")
+    should_mission = selected_agents != ["companion"] and (len(payload.message.split()) >= 5 or any(x in payload.message.lower() for x in outcome_terms))
+    if should_mission:
+        mission = await create_agent_mission(MissionCreateIn(goal=payload.message, lat=payload.lat, lng=payload.lng, timezone=payload.timezone), user, db)
+        useful = [step.get("output") for step in mission.get("steps", []) if step.get("output") and step.get("tool_name") not in {"profile.read", "memory.read"}]
+        synth_prompt = build_agent_prompt("supervisor", member=profile_out(user).model_dump(), request=payload.message, context={"mission": mission.get("title"), "agents": mission.get("participating_agents"), "verified_results": useful, "next_action": mission.get("next_action")})
+        reply = await gemini_reply(synth_prompt, mission.get("summary") or "I created and worked the mission. Open Mission Control to review the completed steps and next action.")
+        result = {"response": reply, "intent": "agentic_mission", "data": {"mission": mission, "agents": selected_agents}}
+    else:
+        result = await route_valorbuddy_message(text=payload.message, first_name=p.first_name, branch=p.branch, city=p.city, state=p.state, lat=payload.lat, lng=payload.lng, user=user, db=db)
+        reply = result.get("response", "")
     db.add(Message(conversation_id=conv.id, user_id=user.id, role="user", content=payload.message))
     db.add(Message(conversation_id=conv.id, user_id=user.id, role="assistant", content=reply, metadata_json={"intent": result.get("intent"), "data": result.get("data", {})}))
     db.commit()
     return {"conversation_id": conv.id, **result, "reply": reply}
 
 
+
+def _extract_document_text(filename: str, content: bytes) -> str:
+    # Extract readable text from common veteran documents without OCR hallucination.
+    lower = (filename or "").lower()
+    try:
+        if lower.endswith((".txt", ".md", ".csv", ".json")):
+            return content.decode("utf-8", errors="ignore")[:50000]
+        if lower.endswith(".pdf"):
+            from pypdf import PdfReader
+            reader = PdfReader(io.BytesIO(content))
+            return "\n".join((page.extract_text() or "") for page in reader.pages)[:50000]
+        if lower.endswith(".docx"):
+            from docx import Document as DocxDocument
+            doc = DocxDocument(io.BytesIO(content))
+            return "\n".join(p.text for p in doc.paragraphs if p.text.strip())[:50000]
+    except Exception as exc:
+        logger.warning("Document text extraction failed for %s: %s", filename, exc)
+    return ""
+
+
+def _document_type_from_name(filename: str, requested: str, extracted: str) -> str:
+    text = f"{filename} {extracted[:2500]}".lower()
+    if any(x in text for x in ["resume", "curriculum vitae", "professional experience", "work experience"]): return "resume"
+    if any(x in text for x in ["dd214", "certificate of release", "discharge from active duty"]): return "dd214"
+    if any(x in text for x in ["department of veterans affairs", "va decision", "disability rating"]): return "va_record"
+    if any(x in text for x in ["certificate", "certification", "license"]): return "certification"
+    return requested if requested and requested != "general" else "general"
+
+
+async def _analyze_document(filename: str, doc_type: str, extracted: str, user: User) -> dict[str, Any]:
+    if not extracted.strip():
+        return {"classification": doc_type, "summary": "File stored securely. This file did not contain machine-readable text, so OCR or a clearer digital copy is needed for full analysis.", "skills": [], "suggested_actions": ["Open the file to confirm it is readable", "Upload a text-based PDF or DOCX for deeper analysis"]}
+    profile = profile_out(user).model_dump()
+    shape = {"classification": doc_type, "summary": "", "skills": [], "experience_highlights": [], "education": [], "certifications": [], "suggested_roles": [], "missing_information": [], "suggested_actions": []}
+    prompt = f'''Return only valid JSON matching this structure: {json.dumps(shape)}
+You are the ValorBuddy Documents Agent and Career Agent working together.
+Analyze the uploaded document using only its actual text. Do not invent credentials, dates, employers, MOS codes, clearances, awards, metrics, or education.
+Identify transferable skills and useful next actions. If it is a resume, suggest up to five realistic civilian role directions and explain missing information needed to improve it.
+Member profile context: {json.dumps(profile, default=str)}
+Filename: {filename}
+Detected type: {doc_type}
+Document text:\n{extracted[:18000]}'''
+    raw = await gemini_reply(prompt, json.dumps(shape), json_mode=True)
+    try:
+        data = json.loads(raw)
+        return data if isinstance(data, dict) else shape
+    except Exception:
+        return {**shape, "summary": raw[:3000]}
+
 @app.post("/api/documents")
 async def upload_document(doc_type: str = Form("general"), file: UploadFile = File(...), user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     content = await file.read()
-    safe_name = f"{user.id}_{int(datetime.now().timestamp())}_{file.filename}"
+    if not content:
+        raise HTTPException(status_code=400, detail="The selected file is empty")
+    if len(content) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="File is larger than the 20 MB upload limit")
+    original_name = Path(file.filename or "document").name
+    safe_name = f"{user.id}_{int(datetime.now().timestamp())}_{re.sub(r'[^A-Za-z0-9._-]+','_',original_name)}"
     path = UPLOAD_DIR / safe_name
     path.write_bytes(content)
-    extracted = ""
-    try:
-        if file.filename.lower().endswith((".txt", ".md", ".csv")):
-            extracted = content.decode("utf-8", errors="ignore")[:6000]
-    except Exception:
-        extracted = ""
-    summary = await gemini_reply(f"Summarize this veteran document in simple helpful terms:\n{extracted[:4000]}", "Document uploaded and stored. AI search is ready for text-based files.")
-    row = Document(user_id=user.id, filename=file.filename, doc_type=doc_type, file_url=f"/uploads/{safe_name}", extracted_text=extracted, ai_summary=summary)
-    db.add(row); db.commit(); db.refresh(row)
-    return {"id": row.id, "filename": row.filename, "doc_type": row.doc_type, "file_url": row.file_url, "ai_summary": row.ai_summary}
+    extracted = _extract_document_text(original_name, content)
+    detected_type = _document_type_from_name(original_name, doc_type, extracted)
+    analysis = await _analyze_document(original_name, detected_type, extracted, user)
+    summary = str(analysis.get("summary") or "Document uploaded and indexed.")[:6000]
+    row = Document(user_id=user.id, filename=original_name, doc_type=detected_type, file_url=f"/uploads/{safe_name}", extracted_text=extracted, ai_summary=summary, analysis_json=analysis, status="processed" if extracted else "needs_ocr", processed_at=datetime.now(timezone.utc))
+    db.add(row); db.flush()
+    # Persist high-value extracted facts as reviewable memory, never as invented truth.
+    if detected_type == "resume":
+        skills = analysis.get("skills") or []
+        if skills:
+            db.add(MemoryFact(user_id=user.id, category="career", key=f"resume_{row.id}_skills", value=", ".join(map(str, skills[:20])), confidence="extracted", source=f"document:{row.id}"))
+    db.add(AdminAuditLog(user_id=user.id, action="document.intelligently_processed", details=f"{detected_type}:{original_name}"))
+    db.commit(); db.refresh(row)
+    mission = None
+    if detected_type in {"resume", "dd214", "certification", "va_record"} and extracted:
+        goal = f"Review my uploaded {detected_type} named {original_name}, identify what it means for me, and recommend the strongest next actions."
+        try:
+            mission = await create_agent_mission(MissionCreateIn(goal=goal, title=f"Analyze {original_name}"), user, db)
+        except Exception as exc:
+            logger.exception("Automatic document mission failed: %s", exc)
+    return {"id": row.id, "filename": row.filename, "doc_type": row.doc_type, "file_url": row.file_url, "ai_summary": row.ai_summary, "analysis": analysis, "status": row.status, "mission": mission}
 
 
 @app.get("/api/documents")
 def list_documents(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.query(Document).filter(Document.user_id == user.id).order_by(Document.id.desc()).all()
-    return [{"id": r.id, "filename": r.filename, "doc_type": r.doc_type, "file_url": r.file_url, "ai_summary": r.ai_summary} for r in rows]
+    return [{"id": r.id, "filename": r.filename, "doc_type": r.doc_type, "file_url": r.file_url, "ai_summary": r.ai_summary, "analysis": r.analysis_json or {}, "status": r.status, "processed_at": r.processed_at} for r in rows]
 
 
 @app.post("/api/vapi/action")
@@ -1528,6 +1635,10 @@ async def generate_career_document(payload: CareerGenerateIn, user: User = Depen
       "name": f"{p.first_name} {p.last_name or ''}".strip(), "branch": p.branch, "rank": p.rank or "",
       "service_status": p.service_status, "service_years": f"{p.service_start_year or ''}-{p.service_end_year or ''}",
       "mos": mos, "military_job_title": military_title, "military_experience": experience,
+      "military_specialty_description": p.military_specialty_description or "", "years_of_service": p.years_of_service,
+      "civilian_career_goal": p.civilian_career_goal or "", "business_interest": p.business_interest or "",
+      "security_clearance": p.security_clearance or "", "highest_education": p.highest_education or "",
+      "civilian_certifications": p.civilian_certifications or "", "linkedin_url": p.linkedin_url or "",
       "campaigns": (p.profile_data or {}).get("campaigns",""), "decorations": (p.profile_data or {}).get("decorations",""),
       "target": payload.target, "notes": payload.notes
     }
@@ -1553,7 +1664,8 @@ TRANSFERABLE EXPERIENCE
 NEXT STEP
 Review this draft, add verified accomplishments and measurable outcomes, and tailor it to the specific opportunity. No unverified credentials or metrics were added."""
     content = await gemini_reply(prompt, fallback)
-    row = CareerDocument(user_id=user.id, document_type=payload.document_type, title=f"{doc_labels[payload.document_type]} — {payload.target}", target=payload.target, content=content, source_profile=facts)
+    source_doc = db.query(Document).filter(Document.user_id == user.id, Document.doc_type == "resume").order_by(Document.id.desc()).first()
+    row = CareerDocument(user_id=user.id, document_type=payload.document_type, title=f"{doc_labels[payload.document_type]} — {payload.target}", target=payload.target, content=content, source_profile=facts, source_document_id=source_doc.id if source_doc else None)
     db.add(row); db.add(AdminAuditLog(user_id=user.id, action="career.document.generated", details=f"{payload.document_type}:{payload.target}"))
     db.commit(); db.refresh(row)
     return {"id":row.id,"document_type":row.document_type,"title":row.title,"target":row.target,"content":row.content,"status":row.status,"created_at":row.created_at}
