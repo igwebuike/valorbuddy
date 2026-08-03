@@ -218,7 +218,7 @@ function PrivacyPolicy(){
           <li>Request access, correction, export, restriction, objection, or deletion where applicable.</li>
           <li>Withdraw consent for optional processing by disabling the relevant permission or contacting us.</li>
         </ul>
-        <div className="privacyCallout"><h3>Account and data deletion</h3><p>To request deletion of your ValorBuddy account and associated personal data, email <a href="mailto:eugene.ebem@datastruma.com?subject=ValorBuddy%20Account%20Deletion%20Request">eugene.ebem@datastruma.com</a> with the subject “ValorBuddy Account Deletion Request.” We may need to verify your identity before completing the request.</p></div>
+        <div className="privacyCallout"><h3>Account and data deletion</h3><p>To request deletion of your ValorBuddy account and associated personal data, visit our <a href="/delete-account">Account Deletion page</a>. You may also email <a href="mailto:eugene.ebem@datastruma.com?subject=ValorBuddy%20Account%20Deletion%20Request">eugene.ebem@datastruma.com</a>. We may need to verify your identity before completing the request.</p></div>
       </section>
 
       <section className="privacyCard">
@@ -251,9 +251,78 @@ function PrivacyPolicy(){
   </div>
 }
 
+function AccountDeletion(){
+  const updated='August 2, 2026';
+  const subject='ValorBuddy Account Deletion Request';
+  const mailto=`mailto:eugene.ebem@datastruma.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent('Please delete my ValorBuddy account and associated data.\n\nAccount email: \nFull name: \nReason (optional): \n')}`;
+  return <div className="privacyPage deletionPage">
+    <header className="privacyHeader">
+      <a className="privacyBrand" href="/" aria-label="Return to ValorBuddy home"><img src={valorLogo} alt="ValorBuddy"/><span><b>ValorBuddy</b><small>Your Digital Battle Buddy</small></span></a>
+      <nav className="privacyNav"><a href="/privacy-policy">Privacy Policy</a><a className="privacyHomeLink" href="/">Return to ValorBuddy</a></nav>
+    </header>
+    <main className="privacyShell">
+      <section className="privacyHero deletionHero">
+        <span className="privacyEyebrow">TAGUS TECHNOLOGIES LLC</span>
+        <h1>Delete Your ValorBuddy Account</h1>
+        <p>Use this page to request deletion of your ValorBuddy account and the personal data associated with it.</p>
+        <div className="privacyMeta"><span><b>Last updated:</b> {updated}</span><span><b>App:</b> ValorBuddy</span></div>
+      </section>
+
+      <section className="privacyCard deletionAction">
+        <h2>Submit a deletion request</h2>
+        <p>Send the request from the email address connected to your ValorBuddy account. This helps us verify that you are authorized to delete the account.</p>
+        <a className="deletionButton" href={mailto}>Email account deletion request</a>
+        <p className="deletionEmail">Email: <a href="mailto:eugene.ebem@datastruma.com">eugene.ebem@datastruma.com</a><br/>Subject: <b>{subject}</b></p>
+      </section>
+
+      <section className="privacyCard">
+        <h2>What to include</h2>
+        <ol className="deletionSteps">
+          <li>The email address used for your ValorBuddy account.</li>
+          <li>Your full name as shown in the account.</li>
+          <li>A clear statement that you want the ValorBuddy account deleted.</li>
+          <li>If you cannot email from the registered address, explain why so we can complete an alternate identity check.</li>
+        </ol>
+      </section>
+
+      <section className="privacyCard">
+        <h2>What will be deleted</h2>
+        <ul>
+          <li>Your ValorBuddy user account and profile information.</li>
+          <li>Saved AI conversation history, missions, reminders, memories, favorites, and preferences associated with the account.</li>
+          <li>User-uploaded documents and files associated with the account, subject to the retention limits below.</li>
+          <li>Stored location preferences and other account-linked personalization data.</li>
+        </ul>
+      </section>
+
+      <section className="privacyCard">
+        <h2>Data that may be retained</h2>
+        <p>We may retain limited information when required for legal, fraud-prevention, security, accounting, dispute-resolution, or regulatory purposes. Data may also remain temporarily in encrypted backups until those backups are overwritten through the normal retention cycle. Retained information will not be used to continue providing the deleted account.</p>
+      </section>
+
+      <section className="privacyCard">
+        <h2>Processing time</h2>
+        <p>We will acknowledge the request and may ask for identity verification. Verified requests are generally completed within 30 days, unless additional time is permitted or required by law. We will confirm when the account deletion process has been completed.</p>
+      </section>
+
+      <section className="privacyCard">
+        <h2>Delete some data without deleting your account</h2>
+        <p>Where available, you may delete individual reminders, memories, documents, favorites, or other saved items inside ValorBuddy. You may also email us to request deletion or correction of specific information without closing your entire account.</p>
+      </section>
+
+      <section className="privacyCard privacyContact">
+        <h2>Contact</h2>
+        <address><b>TAGUS Technologies LLC</b><br/>ValorBuddy Privacy Team<br/><a href="mailto:eugene.ebem@datastruma.com">eugene.ebem@datastruma.com</a><br/><a href="https://valorbuddy.com/privacy-policy">Privacy Policy</a></address>
+      </section>
+    </main>
+    <footer className="privacyFooter"><span>© 2026 TAGUS Technologies LLC. All rights reserved.</span><span><a href="/privacy-policy">Privacy Policy</a> · <a href="/">ValorBuddy Home</a></span></footer>
+  </div>
+}
+
 function App(){
   const path=window.location.pathname.replace(/\/+$/,'')||'/';
   if(path==='/privacy'||path==='/privacy-policy') return <PrivacyPolicy/>;
+  if(path==='/delete-account'||path==='/account-deletion'||path==='/delete-my-account') return <AccountDeletion/>;
   return <ValorBuddyApplication/>;
 }
 
