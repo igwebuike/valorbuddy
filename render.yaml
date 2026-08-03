@@ -17,6 +17,10 @@ services:
     rootDir: frontend
     buildCommand: npm install --include=dev && chmod +x node_modules/@esbuild/linux-x64/bin/esbuild || true && npm run build
     staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
       - key: VITE_API_BASE_URL
         value: https://valorbuddy.onrender.com

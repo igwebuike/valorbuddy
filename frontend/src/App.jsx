@@ -118,7 +118,146 @@ function cleanVisibleText(value=''){
     .trim();
 }
 
-function App(){const[token,setToken]=useState(localStorage.getItem('valor_token'));const[user,setUser]=useState(null);const[screen,setScreen]=useState('dashboard');const[mobileNav,setMobileNav]=useState(false);const[loading,setLoading]=useState(true);const[branchTheme,setBranchTheme]=useState(()=>normalizeBranch(localStorage.getItem('valor_branch_theme')||'Army'));useEffect(()=>{saveBrowserLocation()},[]);useEffect(()=>{applyBranchTheme(branchTheme)},[branchTheme]);useEffect(()=>{if(!token){setLoading(false);return}api('/auth/me').then(u=>{const normalized=normalizeBranch(localStorage.getItem('valor_branch_theme')||u.branch);setUser({...u,branch:normalized});setBranchTheme(normalized)}).catch(()=>{localStorage.removeItem('valor_token');setToken(null)}).finally(()=>setLoading(false))},[token]);if(loading)return <div className="boot"><Shield/>ValorBuddy loading...</div>;if(!token||!user)return <Auth onLogin={(t,u)=>{const normalized=normalizeBranch(u.branch);localStorage.setItem('valor_token',t);applyBranchTheme(normalized);setBranchTheme(normalized);setToken(t);setUser({...u,branch:normalized})}}/>;const safeBranch=normalizeBranch(branchTheme||user.branch);const b=branches[safeBranch]||branches.Army;return <div className={`app ${b.cls}`} data-branch={b.cls} style={b.style}><Sidebar user={{...user,branch:safeBranch}} screen={screen} setScreen={(x)=>{setScreen(x);setMobileNav(false)}} mobileOpen={mobileNav}/><main><Topbar user={{...user,branch:safeBranch}} b={b} setScreen={setScreen} setUser={setUser} setBranchTheme={setBranchTheme} onMenu={()=>setMobileNav(v=>!v)} onLogout={()=>{localStorage.removeItem('valor_token');setToken(null);setUser(null)}}/><GlobalSearch user={{...user,branch:safeBranch}} setScreen={setScreen}/>{screen==='dashboard'&&<Dashboard user={{...user,branch:safeBranch}} setScreen={setScreen}/>} {screen==='companion'&&<Companion user={{...user,branch:safeBranch}}/>} {screen==='events'&&<Events user={{...user,branch:safeBranch}}/>} {screen==='memories'&&<Memories/>} {screen==='reminders'&&<Reminders/>} {screen==='documents'&&<Documents/>} {screen==='benefits'&&<Benefits user={{...user,branch:safeBranch}}/>} {screen==='music'&&<MusicPage user={{...user,branch:safeBranch}}/>} {screen==='missions'&&<MissionControl user={{...user,branch:safeBranch}}/>} {screen==='career'&&<CareerBusiness user={{...user,branch:safeBranch}}/>} {screen==='admin'&&<Admin/>} {screen==='profile'&&<Profile user={{...user,branch:safeBranch}} setUser={setUser}/>}</main></div>}
+
+function PrivacyPolicy(){
+  const updated='August 2, 2026';
+  return <div className="privacyPage">
+    <header className="privacyHeader">
+      <a className="privacyBrand" href="/" aria-label="Return to ValorBuddy home"><img src={valorLogo} alt="ValorBuddy"/><span><b>ValorBuddy</b><small>Your Digital Battle Buddy</small></span></a>
+      <a className="privacyHomeLink" href="/">Return to ValorBuddy</a>
+    </header>
+    <main className="privacyShell">
+      <section className="privacyHero">
+        <span className="privacyEyebrow">TAGUS TECHNOLOGIES LLC</span>
+        <h1>ValorBuddy Privacy Policy</h1>
+        <p>ValorBuddy supports veterans, service members, military families, caregivers, and authorized users with AI-assisted guidance, reminders, document tools, local recommendations, career resources, and other digital services.</p>
+        <div className="privacyMeta"><span><b>Effective date:</b> {updated}</span><span><b>Last updated:</b> {updated}</span></div>
+      </section>
+
+      <section className="privacyCard privacySummary">
+        <h2>Privacy at a glance</h2>
+        <div className="privacySummaryGrid">
+          <div><Shield/><h3>Your information has a purpose</h3><p>We collect information needed to provide, secure, personalize, and improve ValorBuddy.</p></div>
+          <div><Lock/><h3>You control your account</h3><p>You may request access, correction, export, or deletion of your information.</p></div>
+          <div><EyeOff/><h3>We do not sell personal data</h3><p>ValorBuddy does not sell your personal information or uploaded documents.</p></div>
+        </div>
+      </section>
+
+      <section className="privacyCard">
+        <h2>1. Who we are</h2>
+        <p>ValorBuddy is operated by <b>TAGUS Technologies LLC</b>. In this policy, “ValorBuddy,” “we,” “us,” and “our” refer to TAGUS Technologies LLC and the ValorBuddy service, including the ValorBuddy mobile application and website.</p>
+      </section>
+
+      <section className="privacyCard">
+        <h2>2. Information we collect</h2>
+        <h3>Information you provide</h3>
+        <ul>
+          <li><b>Account and profile information:</b> name, email address, password-protected account credentials, military branch, service status, rank, location, career information, and other profile details you choose to provide.</li>
+          <li><b>Military and career information:</b> MOS, AFSC, rating, military role, service history, deployments, education, certifications, career goals, and business interests.</li>
+          <li><b>Content you create:</b> AI conversations, missions, memories, reminders, notes, saved media links, favorites, and feedback.</li>
+          <li><b>Documents you upload:</b> resumes, DD214 records, VA-related documents, certifications, PDFs, DOCX files, and other files you choose to submit for storage or analysis.</li>
+          <li><b>Communications:</b> information you provide when contacting support or requesting help.</li>
+        </ul>
+        <h3>Information collected through device features</h3>
+        <ul>
+          <li><b>Location:</b> with your permission, approximate or precise location may be used to identify nearby VA facilities, veteran organizations, activities, travel resources, and other relevant places.</li>
+          <li><b>Microphone and voice:</b> with your permission, microphone access may be used for voice conversations and commands. Audio may be processed to provide the requested voice feature.</li>
+          <li><b>Photos, camera, and files:</b> only when you choose to upload or attach content.</li>
+          <li><b>Notifications:</b> device notification identifiers and preferences may be used to deliver reminders and service updates when notifications are enabled.</li>
+        </ul>
+        <h3>Information collected automatically</h3>
+        <p>We may collect device type, operating system, app version, IP address, timestamps, diagnostic data, crash information, security events, and feature usage information needed to operate and protect the service.</p>
+      </section>
+
+      <section className="privacyCard">
+        <h2>3. How we use information</h2>
+        <ul>
+          <li>Provide and personalize ValorBuddy features.</li>
+          <li>Answer questions and complete user-requested AI tasks.</li>
+          <li>Analyze user-submitted documents and generate requested summaries or drafts.</li>
+          <li>Provide local recommendations, directions, travel guidance, events, and nearby resources.</li>
+          <li>Create and deliver reminders, alerts, and notifications.</li>
+          <li>Maintain accounts, saved preferences, favorites, memories, and conversation history.</li>
+          <li>Detect fraud, abuse, security threats, errors, and service disruptions.</li>
+          <li>Improve accessibility, reliability, relevance, and performance.</li>
+          <li>Comply with law and enforce our terms and policies.</li>
+        </ul>
+      </section>
+
+      <section className="privacyCard">
+        <h2>4. AI-assisted features</h2>
+        <p>ValorBuddy uses artificial intelligence to respond to questions, explain options, help organize information, analyze documents, and generate drafts. AI output may be incomplete or inaccurate and should be reviewed before relying on it.</p>
+        <p>ValorBuddy is not a government agency, law firm, financial institution, healthcare provider, or emergency service. Information provided by the app is for general informational and organizational support and does not replace professional, legal, medical, financial, benefits, or emergency advice.</p>
+      </section>
+
+      <section className="privacyCard">
+        <h2>5. When information is shared</h2>
+        <p>We may share information only as needed with service providers that help operate ValorBuddy, such as cloud hosting, databases, authentication, AI processing, mapping and places services, communications, analytics, document processing, and app distribution providers.</p>
+        <p>These providers may process information on our behalf under their own contractual and security obligations. Depending on the feature you use, providers may include Google services, Google Play, mapping or places services, voice-processing services, cloud infrastructure providers, and other vendors necessary to fulfill your request.</p>
+        <p>We may also disclose information when required by law, to protect rights or safety, to investigate abuse or security incidents, or as part of a merger, financing, acquisition, or sale of business assets subject to appropriate safeguards.</p>
+        <p><b>We do not sell your personal information.</b></p>
+      </section>
+
+      <section className="privacyCard">
+        <h2>6. Documents and sensitive information</h2>
+        <p>Uploaded documents may contain sensitive personal information. Upload only information you are authorized and comfortable providing. Do not upload classified information, passwords, access codes, complete payment card details, or information belonging to another person without permission.</p>
+        <p>Documents are used to provide the feature you request, such as extraction, summarization, career assistance, benefits organization, or secure retrieval. You may request deletion as described below.</p>
+      </section>
+
+      <section className="privacyCard">
+        <h2>7. Data retention</h2>
+        <p>We retain information for as long as reasonably necessary to provide the service, maintain your account, meet legal and security obligations, resolve disputes, and enforce agreements. Retention periods vary by data type and purpose. Information may remain in encrypted backups for a limited period after deletion before being overwritten.</p>
+      </section>
+
+      <section className="privacyCard">
+        <h2>8. Your choices and rights</h2>
+        <ul>
+          <li>Update profile information within ValorBuddy where available.</li>
+          <li>Control location, microphone, camera, file, and notification permissions through your device settings.</li>
+          <li>Delete individual memories, reminders, documents, favorites, or other saved items where the app provides that option.</li>
+          <li>Request access, correction, export, restriction, objection, or deletion where applicable.</li>
+          <li>Withdraw consent for optional processing by disabling the relevant permission or contacting us.</li>
+        </ul>
+        <div className="privacyCallout"><h3>Account and data deletion</h3><p>To request deletion of your ValorBuddy account and associated personal data, email <a href="mailto:eugene.ebem@datastruma.com?subject=ValorBuddy%20Account%20Deletion%20Request">eugene.ebem@datastruma.com</a> with the subject “ValorBuddy Account Deletion Request.” We may need to verify your identity before completing the request.</p></div>
+      </section>
+
+      <section className="privacyCard">
+        <h2>9. Security</h2>
+        <p>We use reasonable administrative, technical, and organizational safeguards designed to protect information. However, no internet transmission, mobile application, or storage system can be guaranteed to be completely secure. Keep your credentials confidential and notify us promptly of suspected unauthorized access.</p>
+      </section>
+
+      <section className="privacyCard">
+        <h2>10. Children’s privacy</h2>
+        <p>ValorBuddy is not directed to children under 13, and we do not knowingly collect personal information from children under 13. If you believe a child has provided personal information without appropriate authorization, contact us so we can review and delete it where required.</p>
+      </section>
+
+      <section className="privacyCard">
+        <h2>11. Third-party links and services</h2>
+        <p>ValorBuddy may provide links to third-party websites, music providers, government resources, maps, veteran organizations, employers, and other services. Their privacy practices are governed by their own policies, and we are not responsible for their content or practices.</p>
+      </section>
+
+      <section className="privacyCard">
+        <h2>12. Changes to this policy</h2>
+        <p>We may update this policy as ValorBuddy changes. We will post the revised policy on this page and update the “Last updated” date. Material changes may also be communicated through the app or by other appropriate means.</p>
+      </section>
+
+      <section className="privacyCard privacyContact">
+        <h2>13. Contact us</h2>
+        <p>Questions, privacy requests, and complaints may be directed to:</p>
+        <address><b>TAGUS Technologies LLC</b><br/>ValorBuddy Privacy Team<br/><a href="mailto:eugene.ebem@datastruma.com">eugene.ebem@datastruma.com</a><br/><a href="https://valorbuddy.com">https://valorbuddy.com</a></address>
+      </section>
+    </main>
+    <footer className="privacyFooter"><span>© 2026 TAGUS Technologies LLC. All rights reserved.</span><a href="/">ValorBuddy Home</a></footer>
+  </div>
+}
+
+function App(){
+  const path=window.location.pathname.replace(/\/+$/,'')||'/';
+  if(path==='/privacy'||path==='/privacy-policy') return <PrivacyPolicy/>;
+  return <ValorBuddyApplication/>;
+}
+
+function ValorBuddyApplication(){const[token,setToken]=useState(localStorage.getItem('valor_token'));const[user,setUser]=useState(null);const[screen,setScreen]=useState('dashboard');const[mobileNav,setMobileNav]=useState(false);const[loading,setLoading]=useState(true);const[branchTheme,setBranchTheme]=useState(()=>normalizeBranch(localStorage.getItem('valor_branch_theme')||'Army'));useEffect(()=>{saveBrowserLocation()},[]);useEffect(()=>{applyBranchTheme(branchTheme)},[branchTheme]);useEffect(()=>{if(!token){setLoading(false);return}api('/auth/me').then(u=>{const normalized=normalizeBranch(localStorage.getItem('valor_branch_theme')||u.branch);setUser({...u,branch:normalized});setBranchTheme(normalized)}).catch(()=>{localStorage.removeItem('valor_token');setToken(null)}).finally(()=>setLoading(false))},[token]);if(loading)return <div className="boot"><Shield/>ValorBuddy loading...</div>;if(!token||!user)return <Auth onLogin={(t,u)=>{const normalized=normalizeBranch(u.branch);localStorage.setItem('valor_token',t);applyBranchTheme(normalized);setBranchTheme(normalized);setToken(t);setUser({...u,branch:normalized})}}/>;const safeBranch=normalizeBranch(branchTheme||user.branch);const b=branches[safeBranch]||branches.Army;return <div className={`app ${b.cls}`} data-branch={b.cls} style={b.style}><Sidebar user={{...user,branch:safeBranch}} screen={screen} setScreen={(x)=>{setScreen(x);setMobileNav(false)}} mobileOpen={mobileNav}/><main><Topbar user={{...user,branch:safeBranch}} b={b} setScreen={setScreen} setUser={setUser} setBranchTheme={setBranchTheme} onMenu={()=>setMobileNav(v=>!v)} onLogout={()=>{localStorage.removeItem('valor_token');setToken(null);setUser(null)}}/><GlobalSearch user={{...user,branch:safeBranch}} setScreen={setScreen}/>{screen==='dashboard'&&<Dashboard user={{...user,branch:safeBranch}} setScreen={setScreen}/>} {screen==='companion'&&<Companion user={{...user,branch:safeBranch}}/>} {screen==='events'&&<Events user={{...user,branch:safeBranch}}/>} {screen==='memories'&&<Memories/>} {screen==='reminders'&&<Reminders/>} {screen==='documents'&&<Documents/>} {screen==='benefits'&&<Benefits user={{...user,branch:safeBranch}}/>} {screen==='music'&&<MusicPage user={{...user,branch:safeBranch}}/>} {screen==='missions'&&<MissionControl user={{...user,branch:safeBranch}}/>} {screen==='career'&&<CareerBusiness user={{...user,branch:safeBranch}}/>} {screen==='admin'&&<Admin/>} {screen==='profile'&&<Profile user={{...user,branch:safeBranch}} setUser={setUser}/>}</main></div>}
 function Auth({onLogin}){const[tab,setTab]=useState('login');const[show,setShow]=useState(false);const[err,setErr]=useState('');const[form,setForm]=useState({email:'',password:'',first_name:'',last_name:'',branch:'Army',city:'',state:'',rank:'',service_status:'Veteran',service_start_year:'',service_end_year:'',deployment_history:'',va_rating:''});async function submit(e){e.preventDefault();setErr('');try{const endpoint=tab==='login'?'/auth/login':'/auth/register';const d=await api(endpoint,{method:'POST',body:JSON.stringify(form)});onLogin(d.token,d.user)}catch(ex){setErr(ex.message)}}const currentTheme=branches[normalizeBranch(form.branch)]||branches.Army;return <div className={`loginPage ${currentTheme.cls}`} data-branch={currentTheme.cls} style={currentTheme.style}><div className="loginCard"><div className="brand"><Shield/><h1>ValorBuddy</h1><p>Your digital battle buddy</p></div><div className="tabs"><button className={tab==='login'?'active':''}onClick={()=>setTab('login')}>Login</button><button className={tab==='register'?'active':''}onClick={()=>setTab('register')}>Create Account</button></div><form onSubmit={submit}>{tab==='register'&&<><label>Service Branch<select value={form.branch}onChange={e=>setForm({...form,branch:e.target.value})}>{Object.keys(branches).map(x=><option key={x}>{x}</option>)}</select></label><div className="row"><label>First Name<input value={form.first_name}onChange={e=>setForm({...form,first_name:e.target.value})}/></label><label>Last Name<input value={form.last_name}onChange={e=>setForm({...form,last_name:e.target.value})}/></label></div><div className="row"><label>Rank<input value={form.rank}onChange={e=>setForm({...form,rank:e.target.value})} placeholder="Optional"/></label><label>Status<select value={form.service_status} onChange={e=>setForm({...form,service_status:e.target.value})}><option>Veteran</option><option>Retired</option><option>Active Duty</option><option>Reserve</option><option>National Guard</option><option>Spouse</option><option>Dependent</option><option>Caregiver</option></select></label></div><div className="row"><label>City<input value={form.city}onChange={e=>setForm({...form,city:e.target.value})}/></label><label>State<input value={form.state}onChange={e=>setForm({...form,state:e.target.value})}/></label></div></>}<label>Email<input type="email" value={form.email}onChange={e=>setForm({...form,email:e.target.value})}/></label><label>Password<div className="password"><input type={show?'text':'password'} value={form.password}onChange={e=>setForm({...form,password:e.target.value})}/><button type="button"onClick={()=>setShow(!show)}>{show?<EyeOff/>:<Eye/>}</button></div></label>{err&&<p className="err">{err}</p>}<button className="primary">{tab==='login'?'Enter Mission Control':'Create Account'}</button></form></div></div>}
 function Sidebar({user,screen,setScreen,mobileOpen}){const nav=[['dashboard','Dashboard',Shield],['companion','AI Assistant',Brain],['events','Activities',MapPin],['benefits','Benefits',Search],['memories','Memories',Heart],['reminders','Reminders',Bell],['documents','Document Intelligence',Folder],['missions','Mission Control',Brain],['career','Career & Business',Briefcase],['music','Music & Media',Music],['profile','Profile',User]];if(user.role==='admin')nav.push(['admin','Admin Dashboard',BarChart3]);return <aside className={mobileOpen?"mobileOpen":""}><div className="logo"><div className="logoStack"><img src={valorLogo} alt="ValorBuddy logo"/><img className="branchMini" src={(branches[normalizeBranch(user.branch)]||branches.Army).emblem} alt={`${user.branch} service emblem`}/></div><div><b>VALORBUDDY</b><span>Your Digital Battle Buddy</span></div></div><div className="miniProfile"><User/><div><b>{user.rank?`${user.rank} `:""}{user.first_name} {user.last_name||""}</b><span>{user.branch} • {user.service_status||"Veteran"}</span><small>{user.city}, {user.state}</small></div></div>{nav.map(([id,label,Icon])=><button className={screen===id?'active':''}key={id}onClick={()=>setScreen(id)}><Icon/>{label}</button>)}<div className="pledge">COMMITMENT<br/><span>Supporting those who served. Always.</span></div></aside>}
 function Topbar({user,b,setScreen,setUser,setBranchTheme,onLogout,onMenu}){async function changeBranch(branch){const normalized=applyBranchTheme(branch);setBranchTheme(normalized);setUser(u=>({...u,branch:normalized}));requestAnimationFrame(()=>applyBranchTheme(normalized));setTimeout(()=>applyBranchTheme(normalized),80);try{await api('/api/profile/branch',{method:'POST',body:JSON.stringify({branch:normalized})})}catch(e){console.warn('Branch theme save failed; keeping local theme',e)}}return <header><button className="mobileMenu" onClick={onMenu} aria-label="Open navigation"><Menu/></button><div className="commandIdentity"><img src={b.emblem} alt={`${user.branch} service emblem`}/><div><b>{b.label}</b><span>{b.motto}</span></div></div><div className="status">// PRIVATE //</div><nav>{Object.keys(branches).map(x=><button type="button" title={`Switch to ${x} theme`} className={normalizeBranch(user.branch)===x?'active':''}key={x}onClick={()=>changeBranch(x)}>{x}</button>)}</nav><button onClick={()=>setScreen('companion')}><Mic/>Voice</button><button onClick={onLogout} className="logout"><LogOut/>Logout</button></header>}
