@@ -309,9 +309,12 @@ class RegisterRequest(BaseModel):
     va_rating: str = ""
     city: str = ""
     state: str = ""
-    interests: List[str] = []
-    accessibility_needs: List[str] = []
-    preferred_music_genres: List[str] = []
+    interests: List[str] = Field(default_factory=list)
+    accessibility_needs: List[str] = Field(default_factory=list)
+    preferred_music_genres: List[str] = Field(default_factory=list)
+    # Optional registration metadata. The frontend does not have to send this;
+    # registration must still succeed with an empty profile_data object.
+    profile_data: dict[str, Any] = Field(default_factory=dict)
 
 
 class ProfileUpdate(BaseModel):
@@ -1308,7 +1311,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Email already exists")
     user = User(email=str(payload.email).lower(), password_hash=hash_password(payload.password), role="veteran")
     db.add(user); db.flush()
-    db.add(UserProfile(user_id=user.id, first_name=payload.first_name, last_name=payload.last_name, rank=payload.rank, branch=payload.branch, service_status=payload.service_status, service_start_year=payload.service_start_year, service_end_year=payload.service_end_year, deployment_history=payload.deployment_history, va_rating=payload.va_rating, city=payload.city, state=payload.state, interests=payload.interests, accessibility_needs=payload.accessibility_needs, preferred_music_genres=payload.preferred_music_genres, profile_data=payload.profile_data))
+    db.add(UserProfile(user_id=user.id, first_name=payload.first_name, last_name=payload.last_name, rank=payload.rank, branch=payload.branch, service_status=payload.service_status, service_start_year=payload.service_start_year, service_end_year=payload.service_end_year, deployment_history=payload.deployment_history, va_rating=payload.va_rating, city=payload.city, state=payload.state, interests=payload.interests, accessibility_needs=payload.accessibility_needs, preferred_music_genres=payload.preferred_music_genres, profile_data=dict(getattr(payload, "profile_data", {}) or {})))
     db.add(AdminAuditLog(user_id=user.id, action="user.registered", details=user.email))
     db.commit(); db.refresh(user)
     token = create_access_token(user)
