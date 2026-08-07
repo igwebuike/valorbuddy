@@ -7,6 +7,8 @@ import os
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
+import threading
 from pathlib import Path
 from urllib.parse import quote_plus
 from typing import Any, List, Optional
@@ -50,6 +52,9 @@ ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 logger = logging.getLogger("valorbuddy.ai")
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY") or os.getenv("GOOGLE_MAPS_API_KEY")
 GOOGLE_CALENDAR_ENABLED = os.getenv("GOOGLE_CALENDAR_ENABLED", "false").lower() == "true"
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
+REMINDER_FROM_EMAIL = os.getenv("REMINDER_FROM_EMAIL", "ValorBuddy <reminders@valorbuddy.com>").strip()
+REMINDER_POLL_SECONDS = max(15, int(os.getenv("REMINDER_POLL_SECONDS", "30")))
 DATA_DIR = Path(os.getenv("DATA_DIR", "/tmp/valorbuddy"))
 UPLOAD_DIR = DATA_DIR / "uploads"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -158,6 +163,11 @@ class Reminder(Base):
     when_text = Column(String(255), nullable=True)
     note = Column(Text, nullable=True)
     status = Column(String(50), nullable=False, default="active")
+    timezone_name = Column(String(120), nullable=True, default="UTC")
+    due_at = Column(DateTime(timezone=True), nullable=True, index=True)
+    notified_at = Column(DateTime(timezone=True), nullable=True)
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    delivery_state = Column(String(50), nullable=False, default="scheduled")
     calendar_event_id = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
@@ -390,6 +400,11 @@ class ReminderIn(BaseModel):
     time: str = ""
     when_text: str = ""
     note: str = ""
+    timezone: str = "UTC"
+
+
+class ReminderUpdate(BaseModel):
+    status: str = ""
 
 
 class MemoryIn(BaseModel):
@@ -417,6 +432,7 @@ class VapiActionRequest(BaseModel):
     mood: str = "calm"
     user_type: str = "Veteran"
     context_items: List[dict[str, Any]] = []
+    timezone: str = "UTC"
 
 
 class BranchUpdate(BaseModel):
@@ -575,6 +591,10 @@ async def plan_request(message: str, context: dict[str, Any]) -> dict[str, Any]:
         "default_query": "",
         "search_query": "",
         "response_goal": "",
+        "reminder_title": "",
+        "reminder_date": "",
+        "reminder_time": "",
+        "reminder_timezone": "",
     }
     prompt = f"""Return only valid JSON matching this shape: {json.dumps(schema)}
 
@@ -582,7 +602,7 @@ Identify ONE primary intent and select the minimum tools required.
 - Use local_search with needs_places=true for nearby activities, veteran events, VFW, American Legion, restaurants, VA facilities, stores, parks, directions, or any 'near me' request.
 - Use live_web with needs_google_search=true for current weather, traffic, road conditions, news, current policies, changing benefits rules, jobs, discounts, prices, public event schedules, or other time-sensitive facts not reliably covered by Places.
 - Use benefits for benefits guidance.
-- Use create_reminder only when the user explicitly asks to create/save a reminder.
+- Use create_reminder only when the user explicitly asks to create/save a reminder. For reminder requests, resolve relative dates such as today, tomorrow, next Friday, and stated clock times using Context.local_now and Context.timezone. Populate reminder_title, reminder_date as YYYY-MM-DD, reminder_time as HH:MM (24-hour), and reminder_timezone. If the date or time truly cannot be determined, set needs_clarification=true instead of creating an unscheduled reminder.
 - Use save_memory only when the user explicitly asks to remember/save something.
 - Use music for music requests.
 
@@ -885,7 +905,7 @@ async def route_valorbuddy_message(
     lat: float | None = None, lng: float | None = None, user_type: str = "Veteran",
     user: Optional[User] = None, db: Optional[Session] = None, explicit_intent: str = "general",
     title: str = "", date: str = "", time: str = "", memory: str = "", mood: str = "calm",
-    context_items: Optional[list[dict[str, Any]]] = None
+    context_items: Optional[list[dict[str, Any]]] = None, timezone_name: str = "UTC"
 ) -> dict[str, Any]:
     """Agentic router: decides which tool to call, gathers data, then composes a human answer."""
     message = clean_text(text)
@@ -932,9 +952,14 @@ async def route_valorbuddy_message(
         recent_messages = db.query(Message).filter(Message.user_id == user.id).order_by(Message.id.desc()).limit(8).all()
         recent_memories = db.query(Memory).filter(Memory.user_id == user.id).order_by(Memory.id.desc()).limit(5).all()
         recent_reminders = db.query(Reminder).filter(Reminder.user_id == user.id, Reminder.status == "active").order_by(Reminder.id.desc()).limit(5).all()
+    try:
+        local_now = datetime.now(ZoneInfo(timezone_name or "UTC"))
+    except Exception:
+        local_now = datetime.now(timezone.utc)
     context = {
         "first_name": first_name, "branch": branch, "profile_city": city, "profile_state": state,
         "gps_available": lat is not None and lng is not None, "latitude": lat, "longitude": lng, "user_type": user_type,
+        "timezone": timezone_name or "UTC", "local_now": local_now.isoformat(),
         "recent_conversation": [{"role": m.role, "content": m.content[:500]} for m in reversed(recent_messages)],
         "memories": [{"title": m.title, "note": (m.note or "")[:300]} for m in recent_memories],
         "reminders": [{"title": r.title, "when": r.when_text} for r in recent_reminders],
@@ -1036,12 +1061,21 @@ Answer naturally and specifically. Include spouse, child, dependent, caregiver, 
         return {"response": response, "intent": intent, "data": {**data, "plan": plan}}
 
     if intent == "create_reminder":
-        reminder_title = title or message or "Reminder"
-        when_text = f"{date} {time}".strip() or "Soon"
+        reminder_title = clean_text(title or plan.get("reminder_title") or message or "Reminder")[:255]
+        reminder_date = clean_text(date or plan.get("reminder_date"))
+        reminder_time = clean_text(time or plan.get("reminder_time"))
+        reminder_tz = clean_text(plan.get("reminder_timezone") or timezone_name or "UTC")
+        if not reminder_date or not reminder_time:
+            return {"response": f"{first_name}, I can save that reminder, but I need the exact date and time first.", "intent": "clarification", "data": {"awaiting_clarification": True, "default_query": message}}
+        due_at = reminder_due_at(reminder_date, reminder_time, reminder_tz)
+        if not due_at or due_at <= datetime.now(timezone.utc):
+            return {"response": f"{first_name}, that reminder time has already passed or could not be understood. Give me a future date and time and I’ll schedule it.", "intent": "clarification", "data": {"awaiting_clarification": True, "default_query": message}}
+        when_text = f"{reminder_date} {reminder_time}"
+        reminder_id = None
         if user and db:
-            row = Reminder(user_id=user.id, title=reminder_title, date=date, time=time, when_text=when_text)
-            db.add(row); db.commit()
-        return {"response": f"Done, {first_name}. I saved this reminder: {reminder_title}. Time: {when_text}.", "intent": intent}
+            row = Reminder(user_id=user.id, title=reminder_title, date=reminder_date, time=reminder_time, when_text=when_text, timezone_name=reminder_tz, due_at=due_at, delivery_state="scheduled")
+            db.add(row); db.add(AdminAuditLog(user_id=user.id, action="reminder.created_by_assistant", details=reminder_title)); db.commit(); db.refresh(row); reminder_id = row.id
+        return {"response": f"Done, {first_name}. I scheduled {reminder_title} for {when_text}.", "intent": intent, "data": {"reminder_id": reminder_id, "date": reminder_date, "time": reminder_time, "timezone": reminder_tz}}
 
     if intent == "save_memory":
         mem_title = title or "Saved memory"
@@ -1106,6 +1140,103 @@ Answer the user's actual request directly and stay on that single topic. Do not 
     return {"response": response, "intent": intent, "data": {"plan": plan, "grounded": use_grounding}}
 
 
+def reminder_due_at(date_text: str, time_text: str, timezone_name: str = "UTC") -> datetime | None:
+    date_text = (date_text or "").strip()
+    time_text = (time_text or "").strip() or "09:00"
+    if not date_text:
+        return None
+    try:
+        local_dt = datetime.fromisoformat(f"{date_text}T{time_text[:5]}:00")
+        try:
+            tz = ZoneInfo((timezone_name or "UTC").strip())
+        except Exception:
+            tz = timezone.utc
+        return local_dt.replace(tzinfo=tz).astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
+def reminder_status(row: Reminder, now: datetime | None = None) -> str:
+    now = now or datetime.now(timezone.utc)
+    stored = (row.status or "active").lower()
+    if stored in {"completed", "cancelled", "dismissed"}:
+        return stored
+    due = row.due_at
+    if not due:
+        due = reminder_due_at(row.date or "", row.time or "", row.timezone_name or "UTC")
+    if due:
+        if due.tzinfo is None:
+            due = due.replace(tzinfo=timezone.utc)
+        if due <= now:
+            if now - due <= timedelta(minutes=5):
+                return "due now"
+            return "overdue"
+    return "upcoming"
+
+
+def reminder_payload(row: Reminder) -> dict:
+    return {
+        "id": row.id, "title": row.title, "date": row.date, "time": row.time,
+        "when_text": row.when_text, "note": row.note or "",
+        "status": reminder_status(row), "stored_status": row.status,
+        "timezone": row.timezone_name or "UTC",
+        "due_at": row.due_at.isoformat() if row.due_at else None,
+        "notified_at": row.notified_at.isoformat() if row.notified_at else None,
+        "delivery_state": row.delivery_state or "scheduled",
+    }
+
+
+def send_reminder_email(user_email: str, row: Reminder) -> bool:
+    if not RESEND_API_KEY or not user_email:
+        return False
+    try:
+        when = row.when_text or "the scheduled time"
+        body = f"Reminder: {row.title}\n\nScheduled for: {when}"
+        if row.note:
+            body += f"\n\nNotes: {row.note}"
+        with httpx.Client(timeout=15) as client:
+            response = client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
+                json={"from": REMINDER_FROM_EMAIL, "to": [user_email], "subject": f"ValorBuddy reminder: {row.title}", "text": body},
+            )
+        return response.status_code < 300
+    except Exception as exc:
+        logger.warning("Reminder email failed for reminder %s: %s", row.id, exc)
+        return False
+
+
+def process_due_reminders_once():
+    now = datetime.now(timezone.utc)
+    db = SessionLocal()
+    try:
+        rows = db.query(Reminder).filter(
+            Reminder.due_at.isnot(None),
+            Reminder.due_at <= now,
+            Reminder.notified_at.is_(None),
+            Reminder.status == "active",
+        ).order_by(Reminder.due_at.asc()).limit(100).all()
+        for row in rows:
+            user = db.query(User).filter(User.id == row.user_id).first()
+            sent = send_reminder_email(user.email if user else "", row)
+            if sent:
+                row.notified_at = now
+                row.delivery_state = "email sent"
+                db.add(AdminAuditLog(user_id=row.user_id, action="reminder.notified", details=row.title))
+        db.commit()
+    except Exception as exc:
+        db.rollback()
+        logger.warning("Reminder dispatcher cycle failed: %s", exc)
+    finally:
+        db.close()
+
+
+def reminder_dispatcher_loop():
+    while True:
+        process_due_reminders_once()
+        time.sleep(REMINDER_POLL_SECONDS)
+
+
 app = FastAPI(title=APP_NAME, version="5.0.0")
 origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -1130,6 +1261,20 @@ def startup():
                     conn.execute(text(f"ALTER TABLE user_profiles ADD COLUMN {name} {sql_type}"))
                 except Exception as exc:
                     logger.warning("Profile migration skipped for %s: %s", name, exc)
+        reminder_additions = {
+            "timezone_name": "VARCHAR(120) DEFAULT 'UTC'",
+            "due_at": "TIMESTAMP",
+            "notified_at": "TIMESTAMP",
+            "completed_at": "TIMESTAMP",
+            "delivery_state": "VARCHAR(50) DEFAULT 'scheduled'",
+        }
+        reminder_existing = {c["name"] for c in inspect(engine).get_columns("reminders")}
+        for name, sql_type in reminder_additions.items():
+            if name not in reminder_existing:
+                try:
+                    conn.execute(text(f"ALTER TABLE reminders ADD COLUMN {name} {sql_type}"))
+                except Exception as exc:
+                    logger.warning("Reminder migration skipped for %s: %s", name, exc)
     db = SessionLocal()
     try:
         admin = db.query(User).filter(User.email == ADMIN_EMAIL).first()
@@ -1142,6 +1287,9 @@ def startup():
         db.commit()
     finally:
         db.close()
+    if os.getenv("REMINDER_DISPATCHER_ENABLED", "true").lower() == "true":
+        thread = threading.Thread(target=reminder_dispatcher_loop, name="valorbuddy-reminders", daemon=True)
+        thread.start()
 
 
 @app.get("/health")
@@ -1225,15 +1373,55 @@ async def events_search(city: str = "", state: str = "", keyword: str = "veteran
 
 @app.post("/api/reminders")
 def create_reminder(payload: ReminderIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    row = Reminder(user_id=user.id, title=payload.title, date=payload.date, time=payload.time, when_text=payload.when_text or f"{payload.date} {payload.time}".strip(), note=payload.note)
-    db.add(row); db.add(AdminAuditLog(user_id=user.id, action="reminder.created", details=payload.title)); db.commit(); db.refresh(row)
-    return {"id": row.id, "title": row.title, "date": row.date, "time": row.time, "when_text": row.when_text, "status": row.status, "calendar_enabled": GOOGLE_CALENDAR_ENABLED}
+    title = payload.title.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Reminder title is required")
+    due_at = reminder_due_at(payload.date, payload.time, payload.timezone)
+    if payload.date and not due_at:
+        raise HTTPException(status_code=400, detail="Please choose a valid reminder date and time")
+    if due_at and due_at <= datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="Reminder time must be in the future")
+    row = Reminder(
+        user_id=user.id, title=title, date=payload.date, time=payload.time,
+        when_text=payload.when_text or f"{payload.date} {payload.time}".strip(), note=payload.note,
+        timezone_name=payload.timezone or "UTC", due_at=due_at, status="active", delivery_state="scheduled",
+    )
+    db.add(row); db.add(AdminAuditLog(user_id=user.id, action="reminder.created", details=title)); db.commit(); db.refresh(row)
+    result = reminder_payload(row)
+    result["calendar_enabled"] = GOOGLE_CALENDAR_ENABLED
+    result["email_delivery_available"] = bool(RESEND_API_KEY)
+    return result
 
 
 @app.get("/api/reminders")
 def list_reminders(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    rows = db.query(Reminder).filter(Reminder.user_id == user.id).order_by(Reminder.id.desc()).all()
-    return [{"id": r.id, "title": r.title, "date": r.date, "time": r.time, "when_text": r.when_text, "status": r.status} for r in rows]
+    rows = db.query(Reminder).filter(Reminder.user_id == user.id).order_by(Reminder.due_at.asc().nullslast(), Reminder.id.desc()).all()
+    return [reminder_payload(r) for r in rows]
+
+
+@app.patch("/api/reminders/{reminder_id}")
+def update_reminder(reminder_id: int, payload: ReminderUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    row = db.query(Reminder).filter(Reminder.id == reminder_id, Reminder.user_id == user.id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    status = (payload.status or "").strip().lower()
+    if status not in {"active", "completed", "cancelled", "dismissed"}:
+        raise HTTPException(status_code=400, detail="Unsupported reminder status")
+    row.status = status
+    row.completed_at = datetime.now(timezone.utc) if status == "completed" else None
+    db.add(AdminAuditLog(user_id=user.id, action=f"reminder.{status}", details=row.title))
+    db.commit(); db.refresh(row)
+    return reminder_payload(row)
+
+
+@app.delete("/api/reminders/{reminder_id}")
+def delete_reminder(reminder_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    row = db.query(Reminder).filter(Reminder.id == reminder_id, Reminder.user_id == user.id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    title = row.title
+    db.delete(row); db.add(AdminAuditLog(user_id=user.id, action="reminder.deleted", details=title)); db.commit()
+    return {"ok": True}
 
 
 @app.post("/api/memories")
@@ -1247,6 +1435,16 @@ def create_memory(payload: MemoryIn, user: User = Depends(get_current_user), db:
 def list_memories(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.query(Memory).filter(Memory.user_id == user.id).order_by(Memory.id.desc()).all()
     return [{"id": r.id, "title": r.title, "note": r.note, "tags": r.tags, "image_url": r.image_url} for r in rows]
+
+
+@app.delete("/api/memories/{memory_id}")
+def delete_memory(memory_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    row = db.query(Memory).filter(Memory.id == memory_id, Memory.user_id == user.id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    title = row.title
+    db.delete(row); db.add(AdminAuditLog(user_id=user.id, action="memory.deleted", details=title)); db.commit()
+    return {"ok": True}
 
 
 @app.get("/api/benefits/search")
@@ -1446,6 +1644,7 @@ async def companion_chat(
             lng=payload.lng,
             user=user,
             db=db,
+            timezone_name=payload.timezone or "UTC",
         )
         reply = result.get("response", "")
 
@@ -1671,6 +1870,7 @@ async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db))
         memory=payload.memory,
         mood=payload.mood,
         context_items=payload.context_items,
+        timezone_name=payload.timezone or "UTC",
     )
     return result
 
