@@ -807,6 +807,9 @@ def benefits_lookup(query: str, state: str, branch: str) -> dict[str, Any]:
         items.append({"title": "VA home loan pathway", "summary": "VA-backed home loans may support buying, refinancing, or repairing a home for eligible veterans and some surviving spouses.", "next_step": "Check Certificate of Eligibility and talk with a VA-approved lender.", "assistant_explanation": "Confirm eligibility, estimate an affordable monthly payment, and compare VA-approved lenders before selecting a property.", "community_note": "Veteran homebuyers frequently recommend comparing lender fees and not assuming every lender offers the same VA loan terms."})
     if any(x in q for x in ["health", "clinic", "medical", "mental", "doctor"]):
         items.append({"title": "VA healthcare and local care navigation", "summary": "Find VA clinics, Vet Centers, community care questions, and appointment reminders. For urgent or crisis needs, call emergency services or 988 then press 1.", "next_step": "Use VA.gov or local VA facility contacts for official enrollment and appointment details.", "assistant_explanation": "ValorBuddy can help locate the closest facility and prepare questions, while the VA confirms enrollment and care options.", "community_note": "Veterans often suggest bringing a medication list, records, and written questions to appointments."})
+    if any(x in q for x in ["form", "application", "21-526", "22-1990", "10-10", "26-1880"]):
+        for f in va_forms(query).get("items", [])[:4]:
+            items.append({"title": f"{f['form']} — {f['title']}", "summary": f["purpose"], "next_step": f"Gather: {', '.join(f.get('documents', []))}. Then use the official VA form page.", "assistant_explanation": "ValorBuddy can explain this form and help you prepare a checklist, but the official submission stays with VA.gov or the authorized submission channel.", "community_note": "Keep copies of supporting documents and confirm the latest instructions on the official VA page.", "url": f["url"]})
     if not items:
         items = [
             {"title": "Benefits command center", "summary": "Common categories include healthcare, disability compensation, education, home loan, employment, pension, caregiver, survivor, spouse, and dependent benefits.", "next_step": "Choose a category and ValorBuddy will build a plain-English checklist.", "assistant_explanation": "Pick the benefit area that matters most and receive a focused eligibility and document checklist.", "community_note": "Veterans commonly recommend working one benefit category at a time and keeping copies of every submission."},
@@ -1265,6 +1268,9 @@ class MusicFavoriteIn(BaseModel):
     url: str = ""
     mood: str = ""
 
+class MusicGenreIn(BaseModel):
+    genre: str = Field(min_length=1, max_length=60)
+
 @app.post("/api/music/favorites")
 def add_music_favorite(payload: MusicFavoriteIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     row = MusicFavorite(user_id=user.id, title=payload.title, url=payload.url, mood=payload.mood)
@@ -1276,6 +1282,38 @@ def delete_music_favorite(favorite_id: int, user: User = Depends(get_current_use
     row = db.query(MusicFavorite).filter(MusicFavorite.id == favorite_id, MusicFavorite.user_id == user.id).first()
     if not row: raise HTTPException(status_code=404, detail="Music preference not found")
     db.delete(row); db.commit(); return {"deleted": True}
+
+@app.get("/api/music/genres")
+def music_genres(user: User = Depends(get_current_user)):
+    genres = list(dict.fromkeys((user.profile.preferred_music_genres or []) if user.profile else []))
+    return {"items": genres}
+
+@app.post("/api/music/genres")
+def add_music_genre(payload: MusicGenreIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not user.profile:
+        user.profile = UserProfile(user_id=user.id, first_name="Veteran", branch="Army", city="", state="")
+        db.add(user.profile)
+    value = " ".join(payload.genre.strip().split())
+    genres = list(dict.fromkeys(user.profile.preferred_music_genres or []))
+    if value and value.lower() not in {g.lower() for g in genres}:
+        genres.append(value)
+    user.profile.preferred_music_genres = genres
+    user.profile.updated_at = datetime.now(timezone.utc)
+    db.add(AdminAuditLog(user_id=user.id, action="music.genre_added", details=value))
+    db.commit()
+    return {"items": genres}
+
+@app.delete("/api/music/genres/{genre}")
+def delete_music_genre(genre: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not user.profile:
+        return {"items": []}
+    target = genre.strip().lower()
+    genres = [g for g in (user.profile.preferred_music_genres or []) if str(g).lower() != target]
+    user.profile.preferred_music_genres = genres
+    user.profile.updated_at = datetime.now(timezone.utc)
+    db.add(AdminAuditLog(user_id=user.id, action="music.genre_removed", details=genre))
+    db.commit()
+    return {"items": genres}
 
 
 def time_greeting() -> str:
@@ -1765,13 +1803,35 @@ async def resource_search(category: str, query: str = "", city: str = "", state:
 def va_forms(query: str = ""):
     forms = [
         {"form":"VA Form 21-526EZ","title":"Disability Compensation","purpose":"Apply for disability compensation or related benefits.","url":"https://www.va.gov/find-forms/about-form-21-526ez/","documents":["DD214 or separation records","Medical evidence","Dependency records when applicable"]},
+        {"form":"VA Form 20-0995","title":"Decision Review Request: Supplemental Claim","purpose":"Request review of a VA decision using new and relevant evidence.","url":"https://www.va.gov/find-forms/about-form-20-0995/","documents":["VA decision letter","New and relevant evidence","Supporting statements when applicable"]},
+        {"form":"VA Form 20-0996","title":"Decision Review Request: Higher-Level Review","purpose":"Request a higher-level review of an eligible VA decision.","url":"https://www.va.gov/find-forms/about-form-20-0996/","documents":["VA decision information","Issues you want reviewed"]},
         {"form":"VA Form 22-1990","title":"Education Benefits","purpose":"Apply for VA education benefits.","url":"https://www.va.gov/find-forms/about-form-22-1990/","documents":["Service history","School or training program information","Direct deposit information"]},
         {"form":"VA Form 10-10EZ","title":"Health Care Application","purpose":"Apply for VA health care.","url":"https://www.va.gov/find-forms/about-form-10-10ez/","documents":["Military service information","Insurance information","Household financial information when requested"]},
-        {"form":"VA Form 26-1880","title":"Certificate of Eligibility","purpose":"Request a VA home loan Certificate of Eligibility.","url":"https://www.va.gov/find-forms/about-form-26-1880/","documents":["Proof of service","Current duty statement when applicable","Discharge documentation"]}
+        {"form":"VA Form 26-1880","title":"Certificate of Eligibility","purpose":"Request a VA home loan Certificate of Eligibility.","url":"https://www.va.gov/find-forms/about-form-26-1880/","documents":["Proof of service","Current duty statement when applicable","Discharge documentation"]},
+        {"form":"VA Form 21-686c","title":"Declaration of Status of Dependents","purpose":"Add or update qualifying dependents for certain VA benefits.","url":"https://www.va.gov/find-forms/about-form-21-686c/","documents":["Marriage information","Birth or adoption records","Dependent identifying information"]}
     ]
     q=query.lower().strip()
-    if q: forms=[f for f in forms if q in json.dumps(f).lower()] or forms
-    return {"items": forms, "submission_status": "not_integrated", "notice": "ValorBuddy can explain and prepare information, but does not claim submission unless an authorized VA integration confirms it."}
+    if q:
+        matched=[f for f in forms if q in json.dumps(f).lower() or any(word in json.dumps(f).lower() for word in q.split() if len(word)>2)]
+        if matched: forms=matched
+    return {"items": forms, "submission_status": "official_handoff", "notice": "ValorBuddy can explain forms and prepare checklists. Final filing and eligibility verification remain with VA.gov or an authorized representative."}
+
+@app.get("/api/va/programs")
+def va_programs(query: str = ""):
+    programs = [
+        {"title":"VA Accredited Representative / VSO Assistance","summary":"Find an accredited Veterans Service Organization representative, attorney, or claims agent for help with VA benefits and claims.","url":"https://www.va.gov/get-help-from-accredited-representative/"},
+        {"title":"VA Solid Start","summary":"A VA outreach program that contacts transitioning service members during the first year after separation to help connect them with benefits and services.","url":"https://benefits.va.gov/transition/solid-start.asp"},
+        {"title":"VA Caregiver Support Program","summary":"Information and support for eligible family caregivers of Veterans, including program options and caregiver resources.","url":"https://www.caregiver.va.gov/"},
+        {"title":"Veteran Readiness and Employment (VR&E)","summary":"Employment, training, education, and independent-living support for eligible Veterans and service members with service-connected disabilities.","url":"https://www.va.gov/careers-employment/vocational-rehabilitation/"},
+        {"title":"VA Education and Training","summary":"Official information for GI Bill and other VA education and training benefits.","url":"https://www.va.gov/education/"},
+        {"title":"VA Home Loan Assistance","summary":"Official VA home loan information, eligibility guidance, Certificate of Eligibility resources, and housing assistance.","url":"https://www.va.gov/housing-assistance/home-loans/"},
+        {"title":"Veterans Transportation Service","summary":"Transportation information and resources for eligible Veterans traveling to VA-authorized health care appointments.","url":"https://www.va.gov/health-care/get-reimbursed-for-travel-pay/"}
+    ]
+    q=query.lower().strip()
+    if q:
+        matched=[x for x in programs if q in json.dumps(x).lower() or any(word in json.dumps(x).lower() for word in q.split() if len(word)>2)]
+        if matched: programs=matched
+    return {"items": programs, "notice":"Program eligibility and availability must be confirmed on the official program page."}
 
 @app.get("/api/admin/settings")
 def admin_settings(user: User = Depends(platform_admin_required), db: Session = Depends(get_db)):

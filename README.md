@@ -173,3 +173,10 @@ The existing startup migration calls `Base.metadata.create_all()`, so these tabl
 
 ## Validation note
 Python syntax compilation passed. Frontend dependency installation could not finish in the build environment because the internal npm registry returned HTTP 503. Run `npm ci && npm run build` locally or in Render, where dependencies are installed during deployment.
+
+## ValorBuddy v5.3.2 safe UX update
+- VA forms/program hub + assistant explanations
+- user tutorial
+- editable music genres
+- profile editing hardening
+- Navy/Air Force contrast fixes

@@ -602,3 +602,84 @@ html[data-branch="navy"],body[data-branch="navy"],.app.navy,.loginPage.navy{
 
 .privacyNav{display:flex;align-items:center;gap:12px}.privacyNav>a:not(.privacyHomeLink){color:#f2d36b;font-weight:800;text-decoration:none;padding:8px 4px}.deletionHero{background:linear-gradient(135deg,#0b452f,#07271c)}.deletionAction{text-align:left;border-top:5px solid #d6b443}.deletionButton{display:inline-flex;align-items:center;justify-content:center;margin:14px 0;padding:14px 20px;border-radius:10px;background:#0b5e3d!important;color:#fff!important;text-decoration:none;font-weight:900;box-shadow:0 8px 22px rgba(11,94,61,.2)}.deletionButton:hover{transform:translateY(-1px);background:#084b31!important}.deletionEmail{padding:14px 16px;background:#f4f8f5;border:1px solid #cee1d3;border-radius:10px}.deletionSteps{padding-left:24px;color:#31475a}.deletionSteps li{margin:12px 0;padding-left:5px}.deletionPage .privacyFooter span:last-child{display:flex;gap:8px}
 @media(max-width:760px){.privacyNav{gap:7px}.privacyNav>a:not(.privacyHomeLink){display:none}.deletionButton{width:100%;text-align:center}}
+
+/* =========================================================
+   ValorBuddy v5.3.2 — additive UX, profile and contrast fixes
+   Scoped to preserve the existing stable branch themes.
+   ========================================================= */
+
+/* Navy + Air Force control contrast: fix pale/blurred chips and action labels. */
+.app.navy .pageSuggestions button,
+.app.navy .suggestionWrap button,
+.app.navy .openResultsButton,
+.app.navy .resourceActions button,
+.app.navy .resourceActions a,
+.app.navy .tutorialCard button {
+  background:#ffffff!important;
+  color:#062c59!important;
+  -webkit-text-fill-color:#062c59!important;
+  border:2px solid #c5a24f!important;
+  opacity:1!important;
+  text-shadow:none!important;
+  font-weight:900!important;
+}
+.app.navy .pageSuggestions button:hover,
+.app.navy .suggestionWrap button:hover,
+.app.navy .resourceActions button:hover,
+.app.navy .resourceActions a:hover {background:#fff4c9!important;color:#00205b!important;-webkit-text-fill-color:#00205b!important}
+
+.app.airforce .pageSuggestions button,
+.app.airforce .suggestionWrap button,
+.app.airforce .openResultsButton,
+.app.airforce .resourceActions button,
+.app.airforce .resourceActions a,
+.app.airforce .tutorialCard button {
+  background:#f7fbff!important;
+  color:#071a2f!important;
+  -webkit-text-fill-color:#071a2f!important;
+  border:2px solid #5fb7ff!important;
+  opacity:1!important;
+  text-shadow:none!important;
+  font-weight:900!important;
+}
+.app.airforce .pageSuggestions button:hover,
+.app.airforce .suggestionWrap button:hover,
+.app.airforce .resourceActions button:hover,
+.app.airforce .resourceActions a:hover {background:#dceeff!important;color:#061426!important;-webkit-text-fill-color:#061426!important}
+
+/* Ensure text remains readable across all branch cards and neutral controls. */
+.app .pageSuggestions button,.app .suggestionWrap button,.app .card button,.app .contentCard button,.app .profileActions button,.app .providerTabs button,.app .mediaActionRow button{opacity:1!important;text-shadow:none!important}
+.app.navy .contentCard,.app.navy .officialResourceCard,.app.navy .tutorialCard,.app.navy .genreManager{background:#fff!important;color:#10213d!important}
+.app.navy .contentCard h3,.app.navy .officialResourceCard h3,.app.navy .tutorialCard h2,.app.navy .genreManager h2{color:#00205b!important}
+.app.navy .contentCard p,.app.navy .officialResourceCard p,.app.navy .tutorialCard p,.app.navy .genreManager p{color:#263d59!important}
+
+/* Profile editing: explicit interactive layer and mobile/WebView typing behavior. */
+.profilePage,.profilePage *{position:relative}
+.highReadabilityProfile{z-index:2!important}
+.highReadabilityProfile input,.highReadabilityProfile textarea,.highReadabilityProfile select{
+  pointer-events:auto!important;user-select:text!important;-webkit-user-select:text!important;touch-action:manipulation!important;
+  caret-color:#111827!important;cursor:text!important;line-height:1.4!important;
+}
+.highReadabilityProfile select{cursor:pointer!important}
+.highReadabilityProfile input:focus,.highReadabilityProfile textarea:focus,.highReadabilityProfile select:focus{outline:3px solid color-mix(in srgb,var(--accent) 55%,#2b74ff)!important;outline-offset:1px!important;border-color:var(--accent)!important}
+.profileMessage{margin:12px 0;padding:12px 14px;border:1px solid var(--border);background:color-mix(in srgb,var(--accent) 10%,var(--panel));color:var(--text);font-weight:800}
+
+/* User tutorial */
+.tutorialGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:20px}
+.tutorialCard{display:grid;grid-template-columns:48px 1fr;gap:14px;padding:20px;border:2px solid var(--border);background:var(--panel);color:var(--text)}
+.tutorialCard>span{display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--accent);color:#07110a;font-weight:950;font-size:1.15rem}
+.tutorialCard h2{margin:0 0 8px;color:var(--accent2)}.tutorialCard p{color:var(--muted);line-height:1.6}
+.tutorialCard button{display:inline-flex;align-items:center;gap:7px;padding:10px 12px;border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text);font-weight:850}
+.tutorialSafety{display:flex;gap:14px;margin-top:18px;padding:18px;border-left:5px solid var(--accent);background:var(--panel);color:var(--text)}.tutorialSafety h2{margin:0 0 5px}.tutorialSafety p{margin:0;color:var(--muted)}
+
+/* Music genre add/delete control */
+.genreManager{display:grid;gap:14px;padding:20px;margin:16px 0;border:2px solid var(--border);background:var(--panel);color:var(--text)}
+.genreManager small{color:var(--accent2);font-weight:950;letter-spacing:.08em}.genreManager h2{margin:3px 0;color:var(--text)}.genreManager p{margin:0;color:var(--muted)}
+.genreComposer{display:grid;grid-template-columns:1fr auto;gap:10px}.genreComposer input{min-height:50px;padding:11px 13px;border:2px solid var(--border);background:#fff;color:#10213d;-webkit-text-fill-color:#10213d;font-size:1rem}.genreComposer button{min-height:50px}
+.genreChips{display:flex;flex-wrap:wrap;gap:9px}.genreChips>span:not(.emptyGenre){display:inline-flex;align-items:center;gap:7px;padding:7px 8px 7px 12px;border:1px solid var(--border);border-radius:999px;background:color-mix(in srgb,var(--accent) 12%,var(--panel2));color:var(--text);font-weight:850}.genreChips span button{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;border:0;background:rgba(0,0,0,.22);color:inherit;padding:0;cursor:pointer}.genreChips span button svg{width:14px;height:14px}.emptyGenre{color:var(--muted)}
+
+/* Official benefits resources */
+.officialResourceSearch{margin-top:28px;padding:18px;border:2px solid var(--border);background:var(--panel)}.officialResourceSearch h2{margin-top:0}.officialResourceSearch p{color:var(--muted)}
+.officialResourceGrid{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}.officialResourceGrid>section{display:grid;gap:12px;align-content:start}.officialResourceCard{padding:18px;border:2px solid var(--border);background:var(--panel);color:var(--text)}.officialResourceCard small{color:var(--accent);font-weight:900}.officialResourceCard h3{color:var(--accent2);margin:6px 0}.officialResourceCard p{color:var(--muted);line-height:1.55}.resourceActions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.resourceActions button,.resourceActions a{display:inline-flex;align-items:center;gap:7px;min-height:42px;padding:9px 12px;border:1px solid var(--border);background:rgba(255,255,255,.06);color:var(--text);text-decoration:none;font-weight:850}
+
+@media(max-width:800px){.tutorialGrid,.officialResourceGrid{grid-template-columns:1fr}.genreComposer{grid-template-columns:1fr}.tutorialCard{grid-template-columns:40px 1fr;padding:15px}.resourceActions{display:grid}.resourceActions>*{width:100%;justify-content:center}}

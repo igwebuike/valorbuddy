@@ -1,8 +1,6 @@
 {
-  "appId": "com.valorbuddy.app",
+  "appId": "com.tagustechnologies.valorbuddy",
   "appName": "ValorBuddy",
   "webDir": "dist",
-  "server": {
-    "androidScheme": "https"
-  }
+  "server": { "androidScheme": "https" }
 }
