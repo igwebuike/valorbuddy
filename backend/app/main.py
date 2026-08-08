@@ -23,6 +23,7 @@ import jwt
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, create_engine, func, inspect, text
@@ -78,6 +79,9 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False, default="veteran")
     is_active = Column(Boolean, nullable=False, default=True)
+    is_verified = Column(Boolean, nullable=False, default=False)
+    verified_at = Column(DateTime(timezone=True), nullable=True)
+    verified_by = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     profile = relationship("UserProfile", back_populates="user", uselist=False)
 
@@ -390,6 +394,15 @@ class PartnerRegisterRequest(BaseModel):
 
 class PartnerPlanUpdate(BaseModel):
     plan_code: str = Field(pattern="^(community|professional|enterprise)$")
+
+
+class PartnerStatusUpdate(BaseModel):
+    approval_status: str = Field(pattern="^(pending_review|approved|rejected|suspended)$")
+
+
+class UserVerificationUpdate(BaseModel):
+    is_verified: bool | None = None
+    is_active: bool | None = None
 
 
 class ProfileOut(BaseModel):
@@ -1287,6 +1300,24 @@ app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credent
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 
+@app.middleware("http")
+async def isolate_partner_accounts(request, call_next):
+    """Keep institutional tokens out of Veteran and admin APIs, even if called directly."""
+    authorization = request.headers.get("authorization", "")
+    if authorization.lower().startswith("bearer "):
+        try:
+            token = authorization.split(" ", 1)[1].strip()
+            claims = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            role = str(claims.get("role") or "")
+            path = request.url.path
+            partner_allowed = path.startswith("/api/partner/") or path in {"/api/partner/overview", "/auth/me", "/health"}
+            if role.startswith("partner") and (path.startswith("/api/") or path.startswith("/admin/")) and not partner_allowed:
+                return JSONResponse(status_code=403, content={"detail": "This account is restricted to the institutional Partner Portal."})
+        except Exception:
+            pass
+    return await call_next(request)
+
+
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
@@ -1298,6 +1329,18 @@ def startup():
         "accessibility_needs": "JSON", "preferred_music_genres": "JSON", "profile_data": "JSON"
     }
     with engine.begin() as conn:
+        user_additions = {
+            "is_verified": "BOOLEAN DEFAULT FALSE",
+            "verified_at": "TIMESTAMP",
+            "verified_by": "INTEGER",
+        }
+        user_existing = {c["name"] for c in inspect(engine).get_columns("users")}
+        for name, sql_type in user_additions.items():
+            if name not in user_existing:
+                try:
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {sql_type}"))
+                except Exception as exc:
+                    logger.warning("User verification migration skipped for %s: %s", name, exc)
         existing = {c["name"] for c in inspect(engine).get_columns("user_profiles")}
         for name, sql_type in additions.items():
             if name not in existing:
@@ -1328,6 +1371,9 @@ def startup():
             db.add(UserProfile(user_id=admin.id, first_name="Eugene", last_name="Ebem", branch="Army", service_status="Veteran", city="Dallas", state="TX", interests=["administration", "veteran support"]))
         elif admin and admin.role != "admin":
             admin.role = "admin"
+        if admin:
+            admin.is_verified = True
+            admin.verified_at = admin.verified_at or datetime.now(timezone.utc)
         db.commit()
     finally:
         db.close()
@@ -1393,6 +1439,25 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     token = create_access_token(user)
     db.add(AuthToken(user_id=user.id, token=token)); db.add(AdminAuditLog(user_id=user.id, action="user.login", details=user.email)); db.commit()
+    return LoginResponse(token=token, user=profile_out(user))
+
+
+@app.post("/auth/partner/login", response_model=LoginResponse)
+def partner_login(payload: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == str(payload.email).lower()).first()
+    if not user or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="This partner account is inactive. Contact ValorBuddy support.")
+    if not user.role.startswith("partner"):
+        raise HTTPException(status_code=403, detail="This email is not registered as an institutional partner. Use Member Login or submit a partner application.")
+    organization = db.query(PartnerOrganization).filter(PartnerOrganization.owner_user_id == user.id).first()
+    if not organization:
+        raise HTTPException(status_code=403, detail="No partner organization is linked to this account")
+    if organization.approval_status == "suspended":
+        raise HTTPException(status_code=403, detail="This partner account is suspended. Contact ValorBuddy support.")
+    token = create_access_token(user)
+    db.add(AuthToken(user_id=user.id, token=token)); db.add(AdminAuditLog(user_id=user.id, action="partner.login", details=organization.organization_name)); db.commit()
     return LoginResponse(token=token, user=profile_out(user))
 
 
@@ -1998,13 +2063,53 @@ async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db))
 
 @app.get("/admin/overview")
 def admin_overview(_: User = Depends(admin_required), db: Session = Depends(get_db)):
-    return {"users": db.query(User).count(), "veterans": db.query(User).filter(User.role == "veteran").count(), "admins": db.query(User).filter(User.role == "admin").count(), "reminders": db.query(Reminder).count(), "memories": db.query(Memory).count(), "conversations": db.query(Conversation).count(), "messages": db.query(Message).count(), "documents": db.query(Document).count(), "activity_searches": db.query(ActivitySearch).count()}
+    return {"users": db.query(User).count(), "veterans": db.query(User).filter(User.role == "veteran").count(), "admins": db.query(User).filter(User.role == "admin").count(), "partners": db.query(PartnerOrganization).count(), "pending_partners": db.query(PartnerOrganization).filter(PartnerOrganization.approval_status == "pending_review").count(), "reminders": db.query(Reminder).count(), "memories": db.query(Memory).count(), "conversations": db.query(Conversation).count(), "messages": db.query(Message).count(), "documents": db.query(Document).count(), "activity_searches": db.query(ActivitySearch).count()}
 
 
 @app.get("/admin/users")
 def admin_users(_: User = Depends(admin_required), db: Session = Depends(get_db)):
     rows = db.query(User).order_by(User.id.desc()).all()
-    return [{"id": u.id, "email": u.email, "role": u.role, "active": u.is_active, "first_name": u.profile.first_name if u.profile else "", "last_name": u.profile.last_name if u.profile else "", "rank": u.profile.rank if u.profile else "", "branch": u.profile.branch if u.profile else "", "service_status": u.profile.service_status if u.profile else "", "va_rating": u.profile.va_rating if u.profile else "", "city": u.profile.city if u.profile else "", "state": u.profile.state if u.profile else ""} for u in rows]
+    return [{"id": u.id, "email": u.email, "role": u.role, "active": u.is_active, "verified": u.is_verified, "verified_at": u.verified_at.isoformat() if u.verified_at else None, "first_name": u.profile.first_name if u.profile else "", "last_name": u.profile.last_name if u.profile else "", "rank": u.profile.rank if u.profile else "", "branch": u.profile.branch if u.profile else "", "service_status": u.profile.service_status if u.profile else "", "va_rating": u.profile.va_rating if u.profile else "", "city": u.profile.city if u.profile else "", "state": u.profile.state if u.profile else ""} for u in rows]
+
+
+@app.patch("/admin/users/{user_id}/verification")
+def admin_user_verification(user_id: int, payload: UserVerificationUpdate, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
+    target = db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.id == admin.id and payload.is_active is False:
+        raise HTTPException(status_code=400, detail="You cannot deactivate your own admin account")
+    if payload.is_verified is not None:
+        target.is_verified = payload.is_verified
+        target.verified_at = datetime.now(timezone.utc) if payload.is_verified else None
+        target.verified_by = admin.id if payload.is_verified else None
+    if payload.is_active is not None:
+        target.is_active = payload.is_active
+    db.add(AdminAuditLog(user_id=admin.id, action="user.verification_updated", details=f"target={target.email}; verified={target.is_verified}; active={target.is_active}"))
+    db.commit(); db.refresh(target)
+    return {"id": target.id, "email": target.email, "verified": target.is_verified, "active": target.is_active}
+
+
+@app.get("/admin/partners")
+def admin_partners(_: User = Depends(admin_required), db: Session = Depends(get_db)):
+    rows = db.query(PartnerOrganization).order_by(PartnerOrganization.id.desc()).all()
+    return [{**partner_payload(row), "owner_user_id": row.owner_user_id, "email": row.owner.email if row.owner else "", "created_at": row.created_at.isoformat() if row.created_at else None} for row in rows]
+
+
+@app.patch("/admin/partners/{partner_id}/status")
+def admin_partner_status(partner_id: int, payload: PartnerStatusUpdate, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
+    organization = db.get(PartnerOrganization, partner_id)
+    if not organization:
+        raise HTTPException(status_code=404, detail="Partner organization not found")
+    organization.approval_status = payload.approval_status
+    organization.updated_at = datetime.now(timezone.utc)
+    owner = db.get(User, organization.owner_user_id)
+    if owner:
+        owner.role = "partner_active" if payload.approval_status == "approved" else "partner_pending"
+        owner.is_active = payload.approval_status != "suspended"
+    db.add(AdminAuditLog(user_id=admin.id, action=f"partner.{payload.approval_status}", details=organization.organization_name))
+    db.commit(); db.refresh(organization)
+    return partner_payload(organization)
 
 
 @app.get("/admin/activity")
