@@ -2177,6 +2177,29 @@ def admin_partners(_: User = Depends(admin_required), db: Session = Depends(get_
     return result
 
 
+@app.get("/admin/partner-preview")
+def admin_default_partner_preview(admin: User = Depends(admin_required), db: Session = Depends(get_db)):
+    organization = db.query(PartnerOrganization).order_by(PartnerOrganization.id.asc()).first()
+    if organization:
+        db.add(AdminAuditLog(user_id=admin.id, action="partner.admin_preview", details=organization.organization_name)); db.commit()
+        return partner_overview_payload(organization, db)
+    return {
+        "organization": {
+            "id": 0, "organization_name": "ValorBuddy Partner Demo Workspace",
+            "organization_type": "Institutional partner demonstration", "website": "", "phone": "",
+            "contact_name": "Demo Partner Administrator", "contact_title": "Organization Owner",
+            "estimated_veterans": 250, "plan_code": "community", "plan_name": "Community Partner",
+            "monthly_price_cents": 49900, "included_veterans": 250,
+            "approval_status": "preview", "billing_status": "not activated", "onboarding_goal": "Preview the institutional partner experience.",
+        },
+        "metrics": {"enrolled_veterans": 128, "monthly_engagements": 846, "resource_connections": 214, "active_campaigns": 3},
+        "team": [{"membership_id": 0, "user_id": admin.id, "email": admin.email, "first_name": admin.profile.first_name if admin.profile else "Platform", "last_name": admin.profile.last_name if admin.profile else "Administrator", "organization_role": "owner", "active": True}],
+        "privacy_note": "This is a read-only demonstration. Partner reporting remains aggregate and never exposes private Veteran conversations, documents, medical information, or reminders.",
+        "next_steps": ["Review the partner workspace", "Approve a submitted organization", "Assign organization owners and administrators", "Activate contracting and billing after verification"],
+        "is_demo": True,
+    }
+
+
 @app.get("/admin/partners/{partner_id}/preview")
 def admin_partner_preview(partner_id: int, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
     organization = db.get(PartnerOrganization, partner_id)
