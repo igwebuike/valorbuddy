@@ -55,6 +55,11 @@ GOOGLE_CALENDAR_ENABLED = os.getenv("GOOGLE_CALENDAR_ENABLED", "false").lower() 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
 REMINDER_FROM_EMAIL = os.getenv("REMINDER_FROM_EMAIL", "ValorBuddy <reminders@valorbuddy.com>").strip()
 REMINDER_POLL_SECONDS = max(15, int(os.getenv("REMINDER_POLL_SECONDS", "30")))
+PARTNER_PLANS = {
+    "community": {"name": "Community Partner", "monthly_price_cents": 49900, "included_veterans": 250},
+    "professional": {"name": "Professional", "monthly_price_cents": 149900, "included_veterans": 1500},
+    "enterprise": {"name": "Enterprise", "monthly_price_cents": 0, "included_veterans": 0},
+}
 DATA_DIR = Path(os.getenv("DATA_DIR", "/tmp/valorbuddy"))
 UPLOAD_DIR = DATA_DIR / "uploads"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -112,6 +117,27 @@ class UserProfile(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     user = relationship("User", back_populates="profile")
+
+
+class PartnerOrganization(Base):
+    __tablename__ = "partner_organizations"
+    id = Column(Integer, primary_key=True)
+    owner_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    organization_name = Column(String(255), nullable=False)
+    organization_type = Column(String(100), nullable=False, default="Veteran service organization")
+    website = Column(String(500), nullable=True, default="")
+    phone = Column(String(80), nullable=True, default="")
+    contact_name = Column(String(255), nullable=False)
+    contact_title = Column(String(180), nullable=True, default="")
+    estimated_veterans = Column(Integer, nullable=False, default=0)
+    plan_code = Column(String(50), nullable=False, default="community")
+    monthly_price_cents = Column(Integer, nullable=False, default=49900)
+    approval_status = Column(String(50), nullable=False, default="pending_review")
+    billing_status = Column(String(50), nullable=False, default="activation_required")
+    onboarding_goal = Column(Text, nullable=True, default="")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    owner = relationship("User")
 
 
 class AuthToken(Base):
@@ -309,12 +335,9 @@ class RegisterRequest(BaseModel):
     va_rating: str = ""
     city: str = ""
     state: str = ""
-    interests: List[str] = Field(default_factory=list)
-    accessibility_needs: List[str] = Field(default_factory=list)
-    preferred_music_genres: List[str] = Field(default_factory=list)
-    # Optional registration metadata. The frontend does not have to send this;
-    # registration must still succeed with an empty profile_data object.
-    profile_data: dict[str, Any] = Field(default_factory=dict)
+    interests: List[str] = []
+    accessibility_needs: List[str] = []
+    preferred_music_genres: List[str] = []
 
 
 class ProfileUpdate(BaseModel):
@@ -349,6 +372,24 @@ class ProfileUpdate(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+class PartnerRegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8)
+    contact_name: str = Field(min_length=2, max_length=255)
+    contact_title: str = Field(default="", max_length=180)
+    organization_name: str = Field(min_length=2, max_length=255)
+    organization_type: str = Field(default="Veteran service organization", max_length=100)
+    website: str = Field(default="", max_length=500)
+    phone: str = Field(default="", max_length=80)
+    estimated_veterans: int = Field(default=0, ge=0, le=10000000)
+    plan_code: str = Field(default="community", pattern="^(community|professional|enterprise)$")
+    onboarding_goal: str = Field(default="", max_length=3000)
+
+
+class PartnerPlanUpdate(BaseModel):
+    plan_code: str = Field(pattern="^(community|professional|enterprise)$")
 
 
 class ProfileOut(BaseModel):
@@ -1311,8 +1352,35 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=409, detail="Email already exists")
     user = User(email=str(payload.email).lower(), password_hash=hash_password(payload.password), role="veteran")
     db.add(user); db.flush()
-    db.add(UserProfile(user_id=user.id, first_name=payload.first_name, last_name=payload.last_name, rank=payload.rank, branch=payload.branch, service_status=payload.service_status, service_start_year=payload.service_start_year, service_end_year=payload.service_end_year, deployment_history=payload.deployment_history, va_rating=payload.va_rating, city=payload.city, state=payload.state, interests=payload.interests, accessibility_needs=payload.accessibility_needs, preferred_music_genres=payload.preferred_music_genres, profile_data=dict(getattr(payload, "profile_data", {}) or {})))
+    db.add(UserProfile(user_id=user.id, first_name=payload.first_name, last_name=payload.last_name, rank=payload.rank, branch=payload.branch, service_status=payload.service_status, service_start_year=payload.service_start_year, service_end_year=payload.service_end_year, deployment_history=payload.deployment_history, va_rating=payload.va_rating, city=payload.city, state=payload.state, interests=payload.interests, accessibility_needs=payload.accessibility_needs, preferred_music_genres=payload.preferred_music_genres, profile_data=payload.profile_data))
     db.add(AdminAuditLog(user_id=user.id, action="user.registered", details=user.email))
+    db.commit(); db.refresh(user)
+    token = create_access_token(user)
+    return LoginResponse(token=token, user=profile_out(user))
+
+
+@app.post("/auth/partner/register", response_model=LoginResponse)
+def register_partner(payload: PartnerRegisterRequest, db: Session = Depends(get_db)):
+    email = str(payload.email).lower()
+    if db.query(User).filter(User.email == email).first():
+        raise HTTPException(status_code=409, detail="Email already exists")
+    plan = PARTNER_PLANS[payload.plan_code]
+    name_parts = payload.contact_name.strip().split(maxsplit=1)
+    user = User(email=email, password_hash=hash_password(payload.password), role="partner_pending")
+    db.add(user); db.flush()
+    db.add(UserProfile(
+        user_id=user.id, first_name=name_parts[0], last_name=name_parts[1] if len(name_parts) > 1 else "",
+        branch="Army", service_status="Institutional Partner", city="", state="",
+        interests=["veteran engagement", "institutional partnership"],
+    ))
+    db.add(PartnerOrganization(
+        owner_user_id=user.id, organization_name=payload.organization_name.strip(),
+        organization_type=payload.organization_type.strip(), website=payload.website.strip(), phone=payload.phone.strip(),
+        contact_name=payload.contact_name.strip(), contact_title=payload.contact_title.strip(),
+        estimated_veterans=payload.estimated_veterans, plan_code=payload.plan_code,
+        monthly_price_cents=plan["monthly_price_cents"], onboarding_goal=payload.onboarding_goal.strip(),
+    ))
+    db.add(AdminAuditLog(user_id=user.id, action="partner.application_submitted", details=payload.organization_name.strip()))
     db.commit(); db.refresh(user)
     token = create_access_token(user)
     return LoginResponse(token=token, user=profile_out(user))
@@ -1326,6 +1394,56 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     token = create_access_token(user)
     db.add(AuthToken(user_id=user.id, token=token)); db.add(AdminAuditLog(user_id=user.id, action="user.login", details=user.email)); db.commit()
     return LoginResponse(token=token, user=profile_out(user))
+
+
+def require_partner(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> tuple[User, PartnerOrganization]:
+    if not user.role.startswith("partner"):
+        raise HTTPException(status_code=403, detail="Institutional partner access required")
+    organization = db.query(PartnerOrganization).filter(PartnerOrganization.owner_user_id == user.id).first()
+    if not organization:
+        raise HTTPException(status_code=404, detail="Partner organization not found")
+    return user, organization
+
+
+def partner_payload(organization: PartnerOrganization) -> dict:
+    plan = PARTNER_PLANS.get(organization.plan_code, PARTNER_PLANS["community"])
+    return {
+        "id": organization.id, "organization_name": organization.organization_name,
+        "organization_type": organization.organization_type, "website": organization.website or "",
+        "phone": organization.phone or "", "contact_name": organization.contact_name,
+        "contact_title": organization.contact_title or "", "estimated_veterans": organization.estimated_veterans,
+        "plan_code": organization.plan_code, "plan_name": plan["name"],
+        "monthly_price_cents": organization.monthly_price_cents,
+        "included_veterans": plan["included_veterans"], "approval_status": organization.approval_status,
+        "billing_status": organization.billing_status, "onboarding_goal": organization.onboarding_goal or "",
+    }
+
+
+@app.get("/api/partner/overview")
+def partner_overview(context: tuple[User, PartnerOrganization] = Depends(require_partner)):
+    _, organization = context
+    return {
+        "organization": partner_payload(organization),
+        "metrics": {"enrolled_veterans": 0, "monthly_engagements": 0, "resource_connections": 0, "active_campaigns": 0},
+        "privacy_note": "Partner reporting is aggregate and does not expose a Veteran's private conversations or documents.",
+        "next_steps": [
+            "Complete organization verification", "Confirm a paid plan and billing contact",
+            "Define the Veteran population and pilot outcomes", "Launch a privacy-reviewed onboarding campaign",
+        ],
+    }
+
+
+@app.post("/api/partner/plan")
+def update_partner_plan(payload: PartnerPlanUpdate, context: tuple[User, PartnerOrganization] = Depends(require_partner), db: Session = Depends(get_db)):
+    user, organization = context
+    plan = PARTNER_PLANS[payload.plan_code]
+    organization.plan_code = payload.plan_code
+    organization.monthly_price_cents = plan["monthly_price_cents"]
+    organization.billing_status = "activation_required"
+    organization.updated_at = datetime.now(timezone.utc)
+    db.add(AdminAuditLog(user_id=user.id, action="partner.plan_selected", details=payload.plan_code))
+    db.commit(); db.refresh(organization)
+    return partner_payload(organization)
 
 
 @app.get("/auth/me", response_model=ProfileOut)
