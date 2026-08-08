@@ -689,3 +689,57 @@ html[data-branch="navy"],body[data-branch="navy"],.app.navy,.loginPage.navy{
 .reminderNotice svg{color:var(--accent)}
 .reminderCard{position:relative}.reminderCard.reminder-overdue{border-color:#ff6b4a!important;box-shadow:inset 4px 0 #ff6b4a}.reminderCard.reminder-due-now{border-color:#ffd54a!important;box-shadow:inset 4px 0 #ffd54a}.reminderCard.reminder-completed{opacity:.72}
 .reminderActions{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.reminderActions button{min-height:38px;padding:8px 12px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-weight:800;cursor:pointer}.reminderActions .dangerButton{color:#fff!important;background:#8b1e1e!important;border-color:#c33!important}
+
+/* v5.3.5 mobile shell: true foreground drawer, reliable close controls, and phone-safe layout. */
+.mobileNavBackdrop,.mobileDrawerHeader{display:none}
+@media(max-width:900px){
+  .app.mobileNavOpen{isolation:isolate}
+  .app .mobileNavBackdrop{
+    display:block!important;position:fixed!important;inset:0!important;margin:0!important;padding:0!important;
+    width:100vw!important;height:100dvh!important;border:0!important;border-radius:0!important;
+    background:rgba(0,0,0,.68)!important;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);
+    opacity:0;visibility:hidden;pointer-events:none;z-index:2147483645!important;transition:opacity .2s ease,visibility .2s ease;
+  }
+  .app .mobileNavBackdrop.visible{opacity:1;visibility:visible;pointer-events:auto}
+  .app>aside{
+    position:fixed!important;top:0!important;right:auto!important;bottom:0!important;left:0!important;
+    width:min(340px,88vw)!important;height:100dvh!important;max-height:100dvh!important;margin:0!important;
+    padding:0 16px calc(28px + env(safe-area-inset-bottom))!important;overflow-y:auto!important;overscroll-behavior:contain;
+    transform:translate3d(-105%,0,0)!important;transition:transform .24s ease!important;
+    z-index:2147483646!important;box-shadow:18px 0 55px rgba(0,0,0,.55)!important;
+    visibility:hidden;pointer-events:none;
+  }
+  .app>aside.mobileOpen{transform:translate3d(0,0,0)!important;visibility:visible;pointer-events:auto}
+  .mobileDrawerHeader{
+    position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;
+    min-height:64px;margin:0 -16px 16px;padding:calc(10px + env(safe-area-inset-top)) 16px 10px;
+    background:var(--bg);border-bottom:1px solid var(--border);color:var(--accent2);font-weight:900;text-transform:uppercase;letter-spacing:.08em;
+  }
+  .app aside .mobileDrawerClose{display:grid!important;place-items:center!important;width:44px!important;height:44px!important;margin:0!important;padding:0!important;border-radius:50%!important;background:color-mix(in srgb,var(--panel) 84%,#000 16%)!important}
+  .app aside .mobileDrawerClose svg{width:24px;height:24px}
+  .app>main{position:relative!important;z-index:1!important;min-width:0!important;width:100%!important;overflow-x:hidden!important}
+  .app header{z-index:100!important;min-height:68px;padding:8px 10px!important;padding-top:calc(8px + env(safe-area-inset-top))!important}
+  .app header .mobileMenu{width:46px!important;height:46px!important;padding:0!important;flex:0 0 46px!important}
+  .app header .commandIdentity{gap:7px!important}
+  .app header .commandIdentity>img{width:38px!important;height:38px!important}
+  .app header .commandIdentity b{font-size:clamp(.82rem,3.7vw,1rem)!important;line-height:1.15!important;text-transform:none!important}
+  .app header>button:not(.mobileMenu){width:46px!important;height:46px!important;padding:0!important;justify-content:center!important}
+  .app header>button:not(.mobileMenu) span{display:none!important}
+  .app .globalSearch{display:grid!important;grid-template-columns:34px minmax(0,1fr)!important;gap:8px!important;margin:10px 12px 0!important;padding:12px!important}
+  .app .globalSearch input{width:100%!important;min-width:0!important;font-size:16px!important}
+  .app .globalSearch button{grid-column:1/-1!important;width:100%!important;min-height:46px!important;justify-content:center!important}
+  .app .hero,.app .page,.app .glance{margin:12px!important;padding:18px!important}
+  .app .hero h1{font-size:clamp(1.75rem,9vw,2.5rem)!important;line-height:1.12!important;letter-spacing:.08em!important;overflow-wrap:anywhere}
+  .app .hero p{font-size:1rem!important;line-height:1.55!important}
+  .app .voiceBox{padding:16px!important}
+  .app .quickCards,.app .grid{margin:12px!important;gap:12px!important}
+  .app .card{min-height:0!important;padding:18px!important}
+  .app .missionComposer textarea{min-height:150px!important;font-size:16px!important}
+}
+
+@media(max-width:420px){
+  .app header .commandIdentity>img{display:none!important}
+  .app header .commandIdentity b{font-size:.86rem!important}
+  .app header>button:not(.mobileMenu),.app header .mobileMenu{width:42px!important;height:42px!important;flex-basis:42px!important}
+  .app .hero,.app .page,.app .glance{margin:10px!important;padding:15px!important}
+}
