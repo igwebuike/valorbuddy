@@ -353,6 +353,7 @@ class RegisterRequest(BaseModel):
     interests: List[str] = []
     accessibility_needs: List[str] = []
     preferred_music_genres: List[str] = []
+    profile_data: dict[str, Any] = Field(default_factory=dict)
 
 
 class ProfileUpdate(BaseModel):
@@ -1415,7 +1416,7 @@ def startup():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": APP_NAME, "version": "5.5.0", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
+    return {"status": "ok", "app": APP_NAME, "version": "5.5.2", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
 
 
 @app.get("/db/tables")
@@ -1425,9 +1426,10 @@ def db_tables():
 
 @app.post("/auth/register", response_model=LoginResponse)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == payload.email).first():
+    email = str(payload.email).lower().strip()
+    if db.query(User).filter(User.email == email).first():
         raise HTTPException(status_code=409, detail="Email already exists")
-    user = User(email=str(payload.email).lower(), password_hash=hash_password(payload.password), role="veteran")
+    user = User(email=email, password_hash=hash_password(payload.password), role="veteran")
     db.add(user); db.flush()
     db.add(UserProfile(user_id=user.id, first_name=payload.first_name, last_name=payload.last_name, rank=payload.rank, branch=payload.branch, service_status=payload.service_status, service_start_year=payload.service_start_year, service_end_year=payload.service_end_year, deployment_history=payload.deployment_history, va_rating=payload.va_rating, city=payload.city, state=payload.state, interests=payload.interests, accessibility_needs=payload.accessibility_needs, preferred_music_genres=payload.preferred_music_genres, profile_data=payload.profile_data))
     db.add(AdminAuditLog(user_id=user.id, action="user.registered", details=user.email))
