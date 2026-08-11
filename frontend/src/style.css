@@ -768,8 +768,8 @@ html[data-branch="navy"],body[data-branch="navy"],.app.navy,.loginPage.navy{
   background:linear-gradient(135deg,#fff8dc,#fffdf4);color:#342700;box-shadow:0 8px 24px rgba(71,53,0,.12)
 }
 .healthSafetyNotice>svg{width:30px;height:30px;color:#8a6500;flex:none}
-.healthSafetyNotice strong{display:block;margin-bottom:4px;color:#5d4300;font-size:1rem;text-transform:uppercase;letter-spacing:.04em}
-.healthSafetyNotice p{margin:0;color:#3f350f;font-size:.92rem;line-height:1.5;font-weight:650}
+.app .healthSafetyNotice strong{display:block;margin-bottom:4px;color:#5d4300!important;-webkit-text-fill-color:#5d4300!important;font-size:1rem;text-transform:uppercase;letter-spacing:.04em}
+.app .healthSafetyNotice p{margin:0;color:#2f290d!important;-webkit-text-fill-color:#2f290d!important;font-size:.92rem;line-height:1.5;font-weight:750!important;opacity:1!important}
 .healthSafetyActions{display:grid;gap:7px;min-width:235px}
 .healthSafetyActions a{display:flex;align-items:center;justify-content:center;min-height:40px;padding:8px 10px;border:1px solid #9d7600;border-radius:9px;background:#fff;color:#4c3800;text-decoration:none;font-size:.82rem;font-weight:900;text-align:center}
 .healthSafetyActions a:first-child{border-color:#b42318;background:#fff1f0;color:#8f1710}
