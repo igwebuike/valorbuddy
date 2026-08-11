@@ -760,3 +760,27 @@ html[data-branch="navy"],body[data-branch="navy"],.app.navy,.loginPage.navy{
 .adminPreviewBadge{padding:8px 12px;border-radius:999px;background:#f8d66d;color:#392a00;font-weight:950}.partnerTeamList{display:grid;gap:10px;margin:18px 0}.partnerTeamList article{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:14px;border:1px solid #d5e1eb;border-radius:12px;background:#f7fafc}.partnerTeamList b,.partnerTeamList span{display:block}.partnerTeamList span{color:#607488;margin-top:3px}.partnerTeamList em{text-transform:capitalize;color:#0a669f;font-style:normal;font-weight:900}.partnerAddMember{display:flex;align-items:center;gap:8px;padding:12px 16px;border:0;border-radius:10px;background:#0a669f;color:#fff;font-weight:900}.partnerTeamForm{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:16px;padding:18px;border-radius:14px;background:#eaf2f8}.partnerTeamForm input,.partnerTeamForm select{min-height:45px;padding:10px;border:1px solid #9bb5ca;border-radius:8px;background:#fff;color:#10213d}.partnerTeamForm button{min-height:45px;border:0;border-radius:8px;background:#0a669f;color:#fff;font-weight:900}.partnerAdminTeam{display:grid;gap:7px;margin:12px 0}.partnerAdminTeam label,.adminRoleControl label{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--text);font-weight:800}.partnerAdminTeam span,.partnerAdminTeam small{display:block}.partnerAdminTeam small{color:var(--muted);font-weight:500}.partnerAdminTeam select,.adminRoleControl select{min-height:38px;padding:7px;background:var(--panel);border:1px solid var(--border);color:var(--text)}.adminRoleControl{margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
 @media(max-width:800px){.partnerHeader,.partnerHeaderActions{align-items:flex-start}.partnerHeader{flex-direction:column}.partnerHeaderActions{width:100%;flex-wrap:wrap}.partnerTeamForm{grid-template-columns:1fr}.partnerTeamList article{align-items:flex-start;flex-direction:column}.partnerAdminTeam label,.adminRoleControl label{align-items:flex-start;flex-direction:column}.partnerAdminTeam select,.adminRoleControl select{width:100%}}
 @media(max-width:800px){.adminUserGrid{grid-template-columns:1fr}}
+
+/* Global health-policy notice: visible on authenticated web and Capacitor mobile screens. */
+.healthSafetyNotice{
+  display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:14px;
+  margin:14px 24px 0;padding:14px 16px;border:2px solid #e5b84b;border-radius:14px;
+  background:linear-gradient(135deg,#fff8dc,#fffdf4);color:#342700;box-shadow:0 8px 24px rgba(71,53,0,.12)
+}
+.healthSafetyNotice>svg{width:30px;height:30px;color:#8a6500;flex:none}
+.healthSafetyNotice strong{display:block;margin-bottom:4px;color:#5d4300;font-size:1rem;text-transform:uppercase;letter-spacing:.04em}
+.healthSafetyNotice p{margin:0;color:#3f350f;font-size:.92rem;line-height:1.5;font-weight:650}
+.healthSafetyActions{display:grid;gap:7px;min-width:235px}
+.healthSafetyActions a{display:flex;align-items:center;justify-content:center;min-height:40px;padding:8px 10px;border:1px solid #9d7600;border-radius:9px;background:#fff;color:#4c3800;text-decoration:none;font-size:.82rem;font-weight:900;text-align:center}
+.healthSafetyActions a:first-child{border-color:#b42318;background:#fff1f0;color:#8f1710}
+
+@media(max-width:900px){
+  .healthSafetyNotice{grid-template-columns:auto minmax(0,1fr);margin:10px 12px 0;padding:13px;align-items:start}
+  .healthSafetyActions{grid-column:1/-1;grid-template-columns:1fr 1fr;width:100%;min-width:0}
+}
+@media(max-width:520px){
+  .healthSafetyNotice{grid-template-columns:1fr}
+  .healthSafetyNotice>svg{display:none}
+  .healthSafetyActions{grid-column:auto;grid-template-columns:1fr}
+  .healthSafetyNotice p{font-size:.88rem}
+}
