@@ -23,7 +23,6 @@ import jwt
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, create_engine, func, inspect, text
@@ -56,11 +55,6 @@ GOOGLE_CALENDAR_ENABLED = os.getenv("GOOGLE_CALENDAR_ENABLED", "false").lower() 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
 REMINDER_FROM_EMAIL = os.getenv("REMINDER_FROM_EMAIL", "ValorBuddy <reminders@valorbuddy.com>").strip()
 REMINDER_POLL_SECONDS = max(15, int(os.getenv("REMINDER_POLL_SECONDS", "30")))
-PARTNER_PLANS = {
-    "community": {"name": "Community Partner", "monthly_price_cents": 49900, "included_veterans": 250},
-    "professional": {"name": "Professional", "monthly_price_cents": 149900, "included_veterans": 1500},
-    "enterprise": {"name": "Enterprise", "monthly_price_cents": 0, "included_veterans": 0},
-}
 DATA_DIR = Path(os.getenv("DATA_DIR", "/tmp/valorbuddy"))
 UPLOAD_DIR = DATA_DIR / "uploads"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -79,9 +73,6 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False, default="veteran")
     is_active = Column(Boolean, nullable=False, default=True)
-    is_verified = Column(Boolean, nullable=False, default=False)
-    verified_at = Column(DateTime(timezone=True), nullable=True)
-    verified_by = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     profile = relationship("UserProfile", back_populates="user", uselist=False)
 
@@ -121,38 +112,6 @@ class UserProfile(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     user = relationship("User", back_populates="profile")
-
-
-class PartnerOrganization(Base):
-    __tablename__ = "partner_organizations"
-    id = Column(Integer, primary_key=True)
-    owner_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
-    organization_name = Column(String(255), nullable=False)
-    organization_type = Column(String(100), nullable=False, default="Veteran service organization")
-    website = Column(String(500), nullable=True, default="")
-    phone = Column(String(80), nullable=True, default="")
-    contact_name = Column(String(255), nullable=False)
-    contact_title = Column(String(180), nullable=True, default="")
-    estimated_veterans = Column(Integer, nullable=False, default=0)
-    plan_code = Column(String(50), nullable=False, default="community")
-    monthly_price_cents = Column(Integer, nullable=False, default=49900)
-    approval_status = Column(String(50), nullable=False, default="pending_review")
-    billing_status = Column(String(50), nullable=False, default="activation_required")
-    onboarding_goal = Column(Text, nullable=True, default="")
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    owner = relationship("User")
-
-
-class PartnerMembership(Base):
-    __tablename__ = "partner_memberships"
-    id = Column(Integer, primary_key=True)
-    organization_id = Column(Integer, ForeignKey("partner_organizations.id"), nullable=False, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
-    organization_role = Column(String(50), nullable=False, default="viewer")
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    organization = relationship("PartnerOrganization")
-    user = relationship("User")
 
 
 class AuthToken(Base):
@@ -353,7 +312,6 @@ class RegisterRequest(BaseModel):
     interests: List[str] = []
     accessibility_needs: List[str] = []
     preferred_music_genres: List[str] = []
-    profile_data: dict[str, Any] = Field(default_factory=dict)
 
 
 class ProfileUpdate(BaseModel):
@@ -388,49 +346,6 @@ class ProfileUpdate(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
-
-
-class PartnerRegisterRequest(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=8)
-    contact_name: str = Field(min_length=2, max_length=255)
-    contact_title: str = Field(default="", max_length=180)
-    organization_name: str = Field(min_length=2, max_length=255)
-    organization_type: str = Field(default="Veteran service organization", max_length=100)
-    website: str = Field(default="", max_length=500)
-    phone: str = Field(default="", max_length=80)
-    estimated_veterans: int = Field(default=0, ge=0, le=10000000)
-    plan_code: str = Field(default="community", pattern="^(community|professional|enterprise)$")
-    onboarding_goal: str = Field(default="", max_length=3000)
-
-
-class PartnerPlanUpdate(BaseModel):
-    plan_code: str = Field(pattern="^(community|professional|enterprise)$")
-
-
-class PartnerStatusUpdate(BaseModel):
-    approval_status: str = Field(pattern="^(pending_review|approved|rejected|suspended)$")
-
-
-class UserVerificationUpdate(BaseModel):
-    is_verified: bool | None = None
-    is_active: bool | None = None
-
-
-class PlatformRoleUpdate(BaseModel):
-    role: str = Field(pattern="^(veteran|admin)$")
-
-
-class PartnerMemberCreate(BaseModel):
-    email: EmailStr
-    password: str = Field(min_length=8)
-    first_name: str = Field(min_length=1, max_length=120)
-    last_name: str = Field(default="", max_length=120)
-    organization_role: str = Field(default="viewer", pattern="^(organization_admin|manager|viewer)$")
-
-
-class PartnerMemberRoleUpdate(BaseModel):
-    organization_role: str = Field(pattern="^(owner|organization_admin|manager|viewer)$")
 
 
 class ProfileOut(BaseModel):
@@ -1328,24 +1243,6 @@ app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credent
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 
-@app.middleware("http")
-async def isolate_partner_accounts(request, call_next):
-    """Keep institutional tokens out of Veteran and admin APIs, even if called directly."""
-    authorization = request.headers.get("authorization", "")
-    if authorization.lower().startswith("bearer "):
-        try:
-            token = authorization.split(" ", 1)[1].strip()
-            claims = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            role = str(claims.get("role") or "")
-            path = request.url.path
-            partner_allowed = path.startswith("/api/partner/") or path in {"/api/partner/overview", "/auth/me", "/health"}
-            if role.startswith("partner") and (path.startswith("/api/") or path.startswith("/admin/")) and not partner_allowed:
-                return JSONResponse(status_code=403, content={"detail": "This account is restricted to the institutional Partner Portal."})
-        except Exception:
-            pass
-    return await call_next(request)
-
-
 @app.on_event("startup")
 def startup():
     Base.metadata.create_all(bind=engine)
@@ -1357,18 +1254,6 @@ def startup():
         "accessibility_needs": "JSON", "preferred_music_genres": "JSON", "profile_data": "JSON"
     }
     with engine.begin() as conn:
-        user_additions = {
-            "is_verified": "BOOLEAN DEFAULT FALSE",
-            "verified_at": "TIMESTAMP",
-            "verified_by": "INTEGER",
-        }
-        user_existing = {c["name"] for c in inspect(engine).get_columns("users")}
-        for name, sql_type in user_additions.items():
-            if name not in user_existing:
-                try:
-                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {sql_type}"))
-                except Exception as exc:
-                    logger.warning("User verification migration skipped for %s: %s", name, exc)
         existing = {c["name"] for c in inspect(engine).get_columns("user_profiles")}
         for name, sql_type in additions.items():
             if name not in existing:
@@ -1399,13 +1284,6 @@ def startup():
             db.add(UserProfile(user_id=admin.id, first_name="Eugene", last_name="Ebem", branch="Army", service_status="Veteran", city="Dallas", state="TX", interests=["administration", "veteran support"]))
         elif admin and admin.role != "admin":
             admin.role = "admin"
-        if admin:
-            admin.is_verified = True
-            admin.verified_at = admin.verified_at or datetime.now(timezone.utc)
-        for organization in db.query(PartnerOrganization).all():
-            membership = db.query(PartnerMembership).filter(PartnerMembership.user_id == organization.owner_user_id).first()
-            if not membership:
-                db.add(PartnerMembership(organization_id=organization.id, user_id=organization.owner_user_id, organization_role="owner"))
         db.commit()
     finally:
         db.close()
@@ -1416,7 +1294,7 @@ def startup():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": APP_NAME, "version": "5.5.2", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
+    return {"status": "ok", "app": APP_NAME, "version": "4.9.1", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
 
 
 @app.get("/db/tables")
@@ -1426,45 +1304,12 @@ def db_tables():
 
 @app.post("/auth/register", response_model=LoginResponse)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
-    email = str(payload.email).lower().strip()
-    if db.query(User).filter(User.email == email).first():
+    if db.query(User).filter(User.email == payload.email).first():
         raise HTTPException(status_code=409, detail="Email already exists")
-    user = User(email=email, password_hash=hash_password(payload.password), role="veteran")
+    user = User(email=str(payload.email).lower(), password_hash=hash_password(payload.password), role="veteran")
     db.add(user); db.flush()
     db.add(UserProfile(user_id=user.id, first_name=payload.first_name, last_name=payload.last_name, rank=payload.rank, branch=payload.branch, service_status=payload.service_status, service_start_year=payload.service_start_year, service_end_year=payload.service_end_year, deployment_history=payload.deployment_history, va_rating=payload.va_rating, city=payload.city, state=payload.state, interests=payload.interests, accessibility_needs=payload.accessibility_needs, preferred_music_genres=payload.preferred_music_genres, profile_data=payload.profile_data))
     db.add(AdminAuditLog(user_id=user.id, action="user.registered", details=user.email))
-    db.commit(); db.refresh(user)
-    token = create_access_token(user)
-    return LoginResponse(token=token, user=profile_out(user))
-
-
-@app.post("/auth/partner/register", response_model=LoginResponse)
-def register_partner(payload: PartnerRegisterRequest, db: Session = Depends(get_db)):
-    email = str(payload.email).lower()
-    if db.query(User).filter(User.email == email).first():
-        raise HTTPException(status_code=409, detail="Email already exists")
-    plan = PARTNER_PLANS[payload.plan_code]
-    name_parts = payload.contact_name.strip().split(maxsplit=1)
-    user = User(email=email, password_hash=hash_password(payload.password), role="partner_pending")
-    db.add(user); db.flush()
-    db.add(UserProfile(
-        user_id=user.id, first_name=name_parts[0], last_name=name_parts[1] if len(name_parts) > 1 else "",
-        branch="Army", service_status="Institutional Partner", city="", state="",
-        interests=["veteran engagement", "institutional partnership"],
-    ))
-    db.add(PartnerOrganization(
-        owner_user_id=user.id, organization_name=payload.organization_name.strip(),
-        organization_type=payload.organization_type.strip(), website=payload.website.strip(), phone=payload.phone.strip(),
-        contact_name=payload.contact_name.strip(), contact_title=payload.contact_title.strip(),
-        estimated_veterans=payload.estimated_veterans, plan_code=payload.plan_code,
-        monthly_price_cents=plan["monthly_price_cents"], onboarding_goal=payload.onboarding_goal.strip(),
-    ))
-    db.flush()
-    membership = db.query(PartnerMembership).filter(PartnerMembership.user_id == user.id).first()
-    organization = membership.organization if membership else db.query(PartnerOrganization).filter(PartnerOrganization.owner_user_id == user.id).first()
-    if organization:
-        db.add(PartnerMembership(organization_id=organization.id, user_id=user.id, organization_role="owner"))
-    db.add(AdminAuditLog(user_id=user.id, action="partner.application_submitted", details=payload.organization_name.strip()))
     db.commit(); db.refresh(user)
     token = create_access_token(user)
     return LoginResponse(token=token, user=profile_out(user))
@@ -1478,98 +1323,6 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     token = create_access_token(user)
     db.add(AuthToken(user_id=user.id, token=token)); db.add(AdminAuditLog(user_id=user.id, action="user.login", details=user.email)); db.commit()
     return LoginResponse(token=token, user=profile_out(user))
-
-
-@app.post("/auth/partner/login", response_model=LoginResponse)
-def partner_login(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == str(payload.email).lower()).first()
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    if not user.is_active:
-        raise HTTPException(status_code=403, detail="This partner account is inactive. Contact ValorBuddy support.")
-    if not user.role.startswith("partner"):
-        raise HTTPException(status_code=403, detail="This email is not registered as an institutional partner. Use Member Login or submit a partner application.")
-    membership = db.query(PartnerMembership).filter(PartnerMembership.user_id == user.id).first()
-    organization = membership.organization if membership else db.query(PartnerOrganization).filter(PartnerOrganization.owner_user_id == user.id).first()
-    if not organization:
-        raise HTTPException(status_code=403, detail="No partner organization is linked to this account")
-    if organization.approval_status == "suspended":
-        raise HTTPException(status_code=403, detail="This partner account is suspended. Contact ValorBuddy support.")
-    token = create_access_token(user)
-    db.add(AuthToken(user_id=user.id, token=token)); db.add(AdminAuditLog(user_id=user.id, action="partner.login", details=organization.organization_name)); db.commit()
-    return LoginResponse(token=token, user=profile_out(user))
-
-
-def require_partner(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> tuple[User, PartnerOrganization]:
-    if not user.role.startswith("partner"):
-        raise HTTPException(status_code=403, detail="Institutional partner access required")
-    membership = db.query(PartnerMembership).filter(PartnerMembership.user_id == user.id).first()
-    organization = membership.organization if membership else db.query(PartnerOrganization).filter(PartnerOrganization.owner_user_id == user.id).first()
-    if not organization:
-        raise HTTPException(status_code=404, detail="Partner organization not found")
-    return user, organization
-
-
-def partner_payload(organization: PartnerOrganization) -> dict:
-    plan = PARTNER_PLANS.get(organization.plan_code, PARTNER_PLANS["community"])
-    return {
-        "id": organization.id, "organization_name": organization.organization_name,
-        "organization_type": organization.organization_type, "website": organization.website or "",
-        "phone": organization.phone or "", "contact_name": organization.contact_name,
-        "contact_title": organization.contact_title or "", "estimated_veterans": organization.estimated_veterans,
-        "plan_code": organization.plan_code, "plan_name": plan["name"],
-        "monthly_price_cents": organization.monthly_price_cents,
-        "included_veterans": plan["included_veterans"], "approval_status": organization.approval_status,
-        "billing_status": organization.billing_status, "onboarding_goal": organization.onboarding_goal or "",
-    }
-
-
-def partner_overview_payload(organization: PartnerOrganization, db: Session) -> dict:
-    team = db.query(PartnerMembership).filter(PartnerMembership.organization_id == organization.id).all()
-    return {
-        "organization": partner_payload(organization),
-        "metrics": {"enrolled_veterans": 0, "monthly_engagements": 0, "resource_connections": 0, "active_campaigns": 0},
-        "team": [{"membership_id": m.id, "user_id": m.user_id, "email": m.user.email, "first_name": m.user.profile.first_name if m.user.profile else "", "last_name": m.user.profile.last_name if m.user.profile else "", "organization_role": m.organization_role, "active": m.user.is_active} for m in team],
-        "privacy_note": "Partner reporting is aggregate and does not expose a Veteran's private conversations or documents.",
-        "next_steps": ["Complete organization verification", "Confirm a paid plan and billing contact", "Define the Veteran population and pilot outcomes", "Launch a privacy-reviewed onboarding campaign"],
-    }
-
-
-@app.get("/api/partner/overview")
-def partner_overview(context: tuple[User, PartnerOrganization] = Depends(require_partner), db: Session = Depends(get_db)):
-    _, organization = context
-    return partner_overview_payload(organization, db)
-
-
-@app.post("/api/partner/team")
-def partner_add_team_member(payload: PartnerMemberCreate, context: tuple[User, PartnerOrganization] = Depends(require_partner), db: Session = Depends(get_db)):
-    actor, organization = context
-    actor_membership = db.query(PartnerMembership).filter(PartnerMembership.user_id == actor.id, PartnerMembership.organization_id == organization.id).first()
-    if organization.owner_user_id != actor.id and (not actor_membership or actor_membership.organization_role != "organization_admin"):
-        raise HTTPException(status_code=403, detail="Only the organization owner or organization admin can add team members")
-    email = payload.email.lower().strip()
-    if db.query(User).filter(User.email == email).first():
-        raise HTTPException(status_code=409, detail="An account with this email already exists")
-    user = User(email=email, password_hash=hash_password(payload.password), role="partner_active", is_verified=organization.approval_status == "approved")
-    db.add(user); db.flush()
-    db.add(UserProfile(user_id=user.id, first_name=payload.first_name.strip(), last_name=payload.last_name.strip(), branch="Army", service_status="Institutional Partner", city="", state="", interests=["institutional partnership"]))
-    db.add(PartnerMembership(organization_id=organization.id, user_id=user.id, organization_role=payload.organization_role))
-    db.add(AdminAuditLog(user_id=actor.id, action="partner.team_member_created", details=f"organization={organization.id}; email={email}; role={payload.organization_role}"))
-    db.commit()
-    return {"created": True, "email": email, "organization_role": payload.organization_role}
-
-
-@app.post("/api/partner/plan")
-def update_partner_plan(payload: PartnerPlanUpdate, context: tuple[User, PartnerOrganization] = Depends(require_partner), db: Session = Depends(get_db)):
-    user, organization = context
-    plan = PARTNER_PLANS[payload.plan_code]
-    organization.plan_code = payload.plan_code
-    organization.monthly_price_cents = plan["monthly_price_cents"]
-    organization.billing_status = "activation_required"
-    organization.updated_at = datetime.now(timezone.utc)
-    db.add(AdminAuditLog(user_id=user.id, action="partner.plan_selected", details=payload.plan_code))
-    db.commit(); db.refresh(organization)
-    return partner_payload(organization)
 
 
 @app.get("/auth/me", response_model=ProfileOut)
@@ -2124,124 +1877,40 @@ async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db))
 
 @app.get("/admin/overview")
 def admin_overview(_: User = Depends(admin_required), db: Session = Depends(get_db)):
-    return {"users": db.query(User).count(), "veterans": db.query(User).filter(User.role == "veteran").count(), "admins": db.query(User).filter(User.role == "admin").count(), "partners": db.query(PartnerOrganization).count(), "pending_partners": db.query(PartnerOrganization).filter(PartnerOrganization.approval_status == "pending_review").count(), "reminders": db.query(Reminder).count(), "memories": db.query(Memory).count(), "conversations": db.query(Conversation).count(), "messages": db.query(Message).count(), "documents": db.query(Document).count(), "activity_searches": db.query(ActivitySearch).count()}
+    return {"users": db.query(User).count(), "veterans": db.query(User).filter(User.role == "veteran").count(), "admins": db.query(User).filter(User.role == "admin").count(), "reminders": db.query(Reminder).count(), "memories": db.query(Memory).count(), "conversations": db.query(Conversation).count(), "messages": db.query(Message).count(), "documents": db.query(Document).count(), "activity_searches": db.query(ActivitySearch).count()}
 
 
 @app.get("/admin/users")
 def admin_users(_: User = Depends(admin_required), db: Session = Depends(get_db)):
     rows = db.query(User).order_by(User.id.desc()).all()
-    return [{"id": u.id, "email": u.email, "role": u.role, "active": u.is_active, "verified": u.is_verified, "verified_at": u.verified_at.isoformat() if u.verified_at else None, "first_name": u.profile.first_name if u.profile else "", "last_name": u.profile.last_name if u.profile else "", "rank": u.profile.rank if u.profile else "", "branch": u.profile.branch if u.profile else "", "service_status": u.profile.service_status if u.profile else "", "va_rating": u.profile.va_rating if u.profile else "", "city": u.profile.city if u.profile else "", "state": u.profile.state if u.profile else ""} for u in rows]
+    return [{"id": u.id, "email": u.email, "role": u.role, "active": u.is_active, "first_name": u.profile.first_name if u.profile else "", "last_name": u.profile.last_name if u.profile else "", "rank": u.profile.rank if u.profile else "", "branch": u.profile.branch if u.profile else "", "service_status": u.profile.service_status if u.profile else "", "va_rating": u.profile.va_rating if u.profile else "", "city": u.profile.city if u.profile else "", "state": u.profile.state if u.profile else ""} for u in rows]
 
 
-@app.patch("/admin/users/{user_id}/verification")
-def admin_user_verification(user_id: int, payload: UserVerificationUpdate, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-    target = db.get(User, user_id)
+class AdminUserUpdate(BaseModel):
+    role: Optional[str] = None
+    active: Optional[bool] = None
+
+
+@app.patch("/admin/users/{user_id}")
+def admin_update_user(user_id: int, payload: AdminUserUpdate, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
+    target = db.query(User).filter(User.id == user_id).first()
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
-    if target.id == admin.id and payload.is_active is False:
-        raise HTTPException(status_code=400, detail="You cannot deactivate your own admin account")
-    if payload.is_verified is not None:
-        target.is_verified = payload.is_verified
-        target.verified_at = datetime.now(timezone.utc) if payload.is_verified else None
-        target.verified_by = admin.id if payload.is_verified else None
-    if payload.is_active is not None:
-        target.is_active = payload.is_active
-    db.add(AdminAuditLog(user_id=admin.id, action="user.verification_updated", details=f"target={target.email}; verified={target.is_verified}; active={target.is_active}"))
-    db.commit(); db.refresh(target)
-    return {"id": target.id, "email": target.email, "verified": target.is_verified, "active": target.is_active}
-
-
-@app.patch("/admin/users/{user_id}/role")
-def admin_user_role(user_id: int, payload: PlatformRoleUpdate, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-    target = db.get(User, user_id)
-    if not target:
-        raise HTTPException(status_code=404, detail="User not found")
-    if target.role.startswith("partner"):
-        raise HTTPException(status_code=400, detail="Use organization roles for partner accounts")
-    if target.id == admin.id and payload.role != "admin":
-        raise HTTPException(status_code=400, detail="You cannot remove your own administrator access")
-    if target.role == "admin" and payload.role != "admin" and db.query(User).filter(User.role == "admin", User.is_active.is_(True)).count() <= 1:
-        raise HTTPException(status_code=400, detail="At least one active platform administrator is required")
-    old_role = target.role
-    target.role = payload.role
-    db.add(AdminAuditLog(user_id=admin.id, action="user.role_updated", details=f"target={target.email}; {old_role}->{payload.role}"))
+    allowed_roles = {"veteran", "member", "partner", "admin"}
+    if payload.role is not None:
+        role = payload.role.strip().lower()
+        if role not in allowed_roles:
+            raise HTTPException(status_code=400, detail="Unsupported role")
+        if target.id == admin.id and role != "admin":
+            raise HTTPException(status_code=400, detail="You cannot remove your own admin access")
+        target.role = role
+    if payload.active is not None:
+        if target.id == admin.id and payload.active is False:
+            raise HTTPException(status_code=400, detail="You cannot deactivate your own account")
+        target.is_active = payload.active
     db.commit()
-    return {"id": target.id, "email": target.email, "role": target.role}
-
-
-@app.get("/admin/partners")
-def admin_partners(_: User = Depends(admin_required), db: Session = Depends(get_db)):
-    rows = db.query(PartnerOrganization).order_by(PartnerOrganization.id.desc()).all()
-    result = []
-    for row in rows:
-        members = db.query(PartnerMembership).filter(PartnerMembership.organization_id == row.id).all()
-        result.append({**partner_payload(row), "owner_user_id": row.owner_user_id, "email": row.owner.email if row.owner else "", "created_at": row.created_at.isoformat() if row.created_at else None, "team": [{"membership_id": m.id, "user_id": m.user_id, "email": m.user.email, "first_name": m.user.profile.first_name if m.user.profile else "", "last_name": m.user.profile.last_name if m.user.profile else "", "organization_role": m.organization_role, "active": m.user.is_active} for m in members]})
-    return result
-
-
-@app.get("/admin/partner-preview")
-def admin_default_partner_preview(admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-    organization = db.query(PartnerOrganization).order_by(PartnerOrganization.id.asc()).first()
-    if organization:
-        db.add(AdminAuditLog(user_id=admin.id, action="partner.admin_preview", details=organization.organization_name)); db.commit()
-        return partner_overview_payload(organization, db)
-    return {
-        "organization": {
-            "id": 0, "organization_name": "ValorBuddy Partner Demo Workspace",
-            "organization_type": "Institutional partner demonstration", "website": "", "phone": "",
-            "contact_name": "Demo Partner Administrator", "contact_title": "Organization Owner",
-            "estimated_veterans": 250, "plan_code": "community", "plan_name": "Community Partner",
-            "monthly_price_cents": 49900, "included_veterans": 250,
-            "approval_status": "preview", "billing_status": "not activated", "onboarding_goal": "Preview the institutional partner experience.",
-        },
-        "metrics": {"enrolled_veterans": 128, "monthly_engagements": 846, "resource_connections": 214, "active_campaigns": 3},
-        "team": [{"membership_id": 0, "user_id": admin.id, "email": admin.email, "first_name": admin.profile.first_name if admin.profile else "Platform", "last_name": admin.profile.last_name if admin.profile else "Administrator", "organization_role": "owner", "active": True}],
-        "privacy_note": "This is a read-only demonstration. Partner reporting remains aggregate and never exposes private Veteran conversations, documents, medical information, or reminders.",
-        "next_steps": ["Review the partner workspace", "Approve a submitted organization", "Assign organization owners and administrators", "Activate contracting and billing after verification"],
-        "is_demo": True,
-    }
-
-
-@app.get("/admin/partners/{partner_id}/preview")
-def admin_partner_preview(partner_id: int, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-    organization = db.get(PartnerOrganization, partner_id)
-    if not organization:
-        raise HTTPException(status_code=404, detail="Partner organization not found")
-    db.add(AdminAuditLog(user_id=admin.id, action="partner.admin_preview", details=organization.organization_name)); db.commit()
-    return partner_overview_payload(organization, db)
-
-
-@app.patch("/admin/partners/{partner_id}/members/{membership_id}/role")
-def admin_partner_member_role(partner_id: int, membership_id: int, payload: PartnerMemberRoleUpdate, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-    organization = db.get(PartnerOrganization, partner_id)
-    membership = db.get(PartnerMembership, membership_id)
-    if not organization or not membership or membership.organization_id != partner_id:
-        raise HTTPException(status_code=404, detail="Partner team member not found")
-    if payload.organization_role == "owner":
-        old_owner = db.query(PartnerMembership).filter(PartnerMembership.organization_id == partner_id, PartnerMembership.organization_role == "owner").first()
-        if old_owner and old_owner.id != membership.id:
-            old_owner.organization_role = "organization_admin"
-        organization.owner_user_id = membership.user_id
-    membership.organization_role = payload.organization_role
-    db.add(AdminAuditLog(user_id=admin.id, action="partner.member_role_updated", details=f"organization={partner_id}; user={membership.user.email}; role={payload.organization_role}"))
-    db.commit()
-    return {"membership_id": membership.id, "organization_role": membership.organization_role}
-
-
-@app.patch("/admin/partners/{partner_id}/status")
-def admin_partner_status(partner_id: int, payload: PartnerStatusUpdate, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-    organization = db.get(PartnerOrganization, partner_id)
-    if not organization:
-        raise HTTPException(status_code=404, detail="Partner organization not found")
-    organization.approval_status = payload.approval_status
-    organization.updated_at = datetime.now(timezone.utc)
-    owner = db.get(User, organization.owner_user_id)
-    if owner:
-        owner.role = "partner_active" if payload.approval_status == "approved" else "partner_pending"
-        owner.is_active = payload.approval_status != "suspended"
-    db.add(AdminAuditLog(user_id=admin.id, action=f"partner.{payload.approval_status}", details=organization.organization_name))
-    db.commit(); db.refresh(organization)
-    return partner_payload(organization)
+    db.refresh(target)
+    return {"id": target.id, "email": target.email, "role": target.role, "active": target.is_active}
 
 
 @app.get("/admin/activity")
