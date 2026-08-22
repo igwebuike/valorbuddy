@@ -351,10 +351,133 @@ function App(){
   return <ValorBuddyApplication/>;
 }
 
-function ValorBuddyApplication(){const[token,setToken]=useState(localStorage.getItem('valor_token'));const[user,setUser]=useState(null);const[screen,setScreen]=useState('dashboard');const[mobileNav,setMobileNav]=useState(false);const[loading,setLoading]=useState(true);const[branchTheme,setBranchTheme]=useState(()=>normalizeBranch(localStorage.getItem('valor_branch_theme')||'Army'));useEffect(()=>{applyBranchTheme(branchTheme)},[branchTheme]);useEffect(()=>{if(!token){setLoading(false);return}api('/auth/me').then(u=>{const normalized=normalizeBranch(localStorage.getItem('valor_branch_theme')||u.branch);setUser({...u,branch:normalized});setBranchTheme(normalized)}).catch(()=>{localStorage.removeItem('valor_token');setToken(null)}).finally(()=>setLoading(false))},[token]);if(loading)return <div className="boot"><Shield/>ValorBuddy loading...</div>;if(!token||!user)return <Auth onLogin={(t,u)=>{const normalized=normalizeBranch(u.branch);localStorage.setItem('valor_token',t);applyBranchTheme(normalized);setBranchTheme(normalized);setToken(t);setUser({...u,branch:normalized})}}/>;const safeBranch=normalizeBranch(branchTheme||user.branch);const b=branches[safeBranch]||branches.Army;return <div className={`app ${b.cls}`} data-branch={b.cls} style={b.style}><Sidebar user={{...user,branch:safeBranch}} screen={screen} setScreen={(x)=>{setScreen(x);setMobileNav(false)}} mobileOpen={mobileNav}/><main><Topbar user={{...user,branch:safeBranch}} b={b} setScreen={setScreen} setUser={setUser} setBranchTheme={setBranchTheme} onMenu={()=>setMobileNav(v=>!v)} onLogout={()=>{localStorage.removeItem('valor_token');setToken(null);setUser(null)}}/><GlobalSearch user={{...user,branch:safeBranch}} setScreen={setScreen}/>{screen==='dashboard'&&<Dashboard user={{...user,branch:safeBranch}} setScreen={setScreen}/>} {screen==='companion'&&<Companion user={{...user,branch:safeBranch}}/>} {screen==='events'&&<Events user={{...user,branch:safeBranch}}/>} {screen==='memories'&&<Memories/>} {screen==='reminders'&&<Reminders/>} {screen==='documents'&&<Documents/>} {screen==='benefits'&&<Benefits user={{...user,branch:safeBranch}}/>} {screen==='wellness'&&<Wellness user={{...user,branch:safeBranch}} setScreen={setScreen}/>} {screen==='music'&&<MusicPage user={{...user,branch:safeBranch}} setUser={setUser}/>} {screen==='tutorial'&&<Tutorial setScreen={setScreen}/>} {screen==='missions'&&<MissionControl user={{...user,branch:safeBranch}}/>} {screen==='career'&&<CareerBusiness user={{...user,branch:safeBranch}}/>} {screen==='admin'&&<Admin/>} {screen==='profile'&&<Profile user={{...user,branch:safeBranch}} setUser={setUser}/>}</main></div>}
+function ValorBuddyApplication(){
+  const[token,setToken]=useState(localStorage.getItem('valor_token'));
+  const[user,setUser]=useState(null);
+  const[screen,setScreen]=useState('dashboard');
+  const[mobileNav,setMobileNav]=useState(false);
+  const[loading,setLoading]=useState(true);
+  const[branchTheme,setBranchTheme]=useState(()=>normalizeBranch(localStorage.getItem('valor_branch_theme')||'Army'));
+
+  useEffect(()=>{saveBrowserLocation()},[]);
+  useEffect(()=>{applyBranchTheme(branchTheme)},[branchTheme]);
+
+  useEffect(()=>{
+    if(!token){setLoading(false);return}
+    api('/auth/me').then(u=>{
+      const normalized=normalizeBranch(localStorage.getItem('valor_branch_theme')||u.branch);
+      setUser({...u,branch:normalized});
+      setBranchTheme(normalized);
+    }).catch(()=>{
+      localStorage.removeItem('valor_token');
+      setToken(null);
+      setUser(null);
+    }).finally(()=>setLoading(false));
+  },[token]);
+
+  useEffect(()=>{
+    if(!mobileNav)return;
+    const previousOverflow=document.body.style.overflow;
+    document.body.style.overflow='hidden';
+    const closeOnEscape=e=>{if(e.key==='Escape')setMobileNav(false)};
+    const closeOnDesktop=()=>{if(window.innerWidth>900)setMobileNav(false)};
+    window.addEventListener('keydown',closeOnEscape);
+    window.addEventListener('resize',closeOnDesktop);
+    return()=>{
+      document.body.style.overflow=previousOverflow;
+      window.removeEventListener('keydown',closeOnEscape);
+      window.removeEventListener('resize',closeOnDesktop);
+    };
+  },[mobileNav]);
+
+  if(loading)return <div className="boot"><Shield/>ValorBuddy loading...</div>;
+  if(!token||!user)return <Auth onLogin={(t,u)=>{
+    const normalized=normalizeBranch(u.branch);
+    localStorage.setItem('valor_token',t);
+    applyBranchTheme(normalized);
+    setBranchTheme(normalized);
+    setToken(t);
+    setUser({...u,branch:normalized});
+  }}/>;
+
+  const logout=()=>{
+    localStorage.removeItem('valor_token');
+    setToken(null);
+    setUser(null);
+    setMobileNav(false);
+  };
+
+
+
+  const safeBranch=normalizeBranch(branchTheme||user.branch);
+  const b=branches[safeBranch]||branches.Army;
+  const closeMobileNav=()=>setMobileNav(false);
+
+
+
+  return <div className={`app ${b.cls} ${mobileNav?'mobileNavOpen':''}`} data-branch={b.cls} style={b.style}>
+    <button type="button" className={`mobileNavBackdrop ${mobileNav?'visible':''}`} onClick={closeMobileNav} aria-label="Close navigation" tabIndex={mobileNav?0:-1}/>
+    <Sidebar user={{...user,branch:safeBranch}} screen={screen} setScreen={(x)=>{setScreen(x);closeMobileNav()}} mobileOpen={mobileNav} onClose={closeMobileNav}/>
+    <main>
+      <Topbar user={{...user,branch:safeBranch}} b={b} setScreen={setScreen} setUser={setUser} setBranchTheme={setBranchTheme} menuOpen={mobileNav} onMenu={()=>setMobileNav(v=>!v)} onLogout={logout}/>
+      <GlobalSearch user={{...user,branch:safeBranch}} setScreen={setScreen}/>
+      <HealthSafetyNotice/>
+      {screen==='dashboard'&&<Dashboard user={{...user,branch:safeBranch}} setScreen={setScreen}/>}
+      {screen==='companion'&&<Companion user={{...user,branch:safeBranch}}/>}
+      {screen==='events'&&<Events user={{...user,branch:safeBranch}}/>}
+      {screen==='benefits'&&<Benefits user={{...user,branch:safeBranch}}/>}
+      {screen==='wellness'&&<Wellness user={{...user,branch:safeBranch}} setScreen={setScreen}/>}
+      {screen==='memories'&&<Memories/>}
+      {screen==='reminders'&&<Reminders/>}
+      {screen==='documents'&&<Documents/>}
+      {screen==='missions'&&<MissionControl user={{...user,branch:safeBranch}}/>}
+      {screen==='career'&&<CareerBusiness user={{...user,branch:safeBranch}}/>}
+      {screen==='music'&&<MusicPage user={{...user,branch:safeBranch}} setUser={setUser}/>}
+      {screen==='tutorial'&&<Tutorial setScreen={setScreen}/>}
+      {screen==='admin'&&<Admin/>}
+      {screen==='profile'&&<Profile user={{...user,branch:safeBranch}} setUser={setUser}/>}
+    </main>
+  </div>;
+}
 function Auth({onLogin}){const[tab,setTab]=useState('login');const[show,setShow]=useState(false);const[err,setErr]=useState('');const[form,setForm]=useState({email:'',password:'',first_name:'',last_name:'',branch:'Army',city:'',state:'',rank:'',service_status:'Veteran',service_start_year:'',service_end_year:'',deployment_history:'',va_rating:''});async function submit(e){e.preventDefault();setErr('');try{const endpoint=tab==='login'?'/auth/login':'/auth/register';const d=await api(endpoint,{method:'POST',body:JSON.stringify(form)});onLogin(d.token,d.user)}catch(ex){setErr(ex.message)}}const currentTheme=branches[normalizeBranch(form.branch)]||branches.Army;return <div className={`loginPage ${currentTheme.cls}`} data-branch={currentTheme.cls} style={currentTheme.style}><div className="loginCard"><div className="brand"><Shield/><h1>ValorBuddy</h1><p>Your digital battle buddy</p></div><div className="tabs"><button className={tab==='login'?'active':''}onClick={()=>setTab('login')}>Login</button><button className={tab==='register'?'active':''}onClick={()=>setTab('register')}>Create Account</button></div><form onSubmit={submit}>{tab==='register'&&<><label>Service Branch<select value={form.branch}onChange={e=>setForm({...form,branch:e.target.value})}>{Object.keys(branches).map(x=><option key={x}>{x}</option>)}</select></label><div className="row"><label>First Name<input value={form.first_name}onChange={e=>setForm({...form,first_name:e.target.value})}/></label><label>Last Name<input value={form.last_name}onChange={e=>setForm({...form,last_name:e.target.value})}/></label></div><div className="row"><label>Rank<input value={form.rank}onChange={e=>setForm({...form,rank:e.target.value})} placeholder="Optional"/></label><label>Status<select value={form.service_status} onChange={e=>setForm({...form,service_status:e.target.value})}><option>Veteran</option><option>Retired</option><option>Active Duty</option><option>Reserve</option><option>National Guard</option><option>Spouse</option><option>Dependent</option><option>Caregiver</option></select></label></div><div className="row"><label>City<input value={form.city}onChange={e=>setForm({...form,city:e.target.value})}/></label><label>State<input value={form.state}onChange={e=>setForm({...form,state:e.target.value})}/></label></div></>}<label>Email<input type="email" value={form.email}onChange={e=>setForm({...form,email:e.target.value})}/></label><label>Password<div className="password"><input type={show?'text':'password'} value={form.password}onChange={e=>setForm({...form,password:e.target.value})}/><button type="button"onClick={()=>setShow(!show)}>{show?<EyeOff/>:<Eye/>}</button></div></label>{err&&<p className="err">{err}</p>}<button className="primary">{tab==='login'?'Enter Mission Control':'Create Account'}</button></form></div></div>}
-function Sidebar({user,screen,setScreen,mobileOpen}){const nav=[['dashboard','Dashboard',Shield],['companion','AI Assistant',Brain],['events','Activities',MapPin],['benefits','Benefits',Search],['wellness','Fitness & Wellness',Dumbbell],['memories','Memories',Heart],['reminders','Reminders',Bell],['documents','Document Intelligence',Folder],['missions','Mission Control',Brain],['career','Career & Business',Briefcase],['music','Music & Media',Music],['tutorial','User Tutorial',BookOpen],['profile','Profile',User]];if(user.role==='admin')nav.push(['admin','Admin Dashboard',BarChart3]);return <aside className={mobileOpen?"mobileOpen":""}><div className="logo"><div className="logoStack"><img src={valorLogo} alt="ValorBuddy logo"/><img className="branchMini" src={(branches[normalizeBranch(user.branch)]||branches.Army).emblem} alt={`${user.branch} service emblem`}/></div><div><b>VALORBUDDY</b><span>Your Digital Battle Buddy</span></div></div><div className="miniProfile"><User/><div><b>{user.rank?`${user.rank} `:""}{user.first_name} {user.last_name||""}</b><span>{user.branch} • {user.service_status||"Veteran"}</span><small>{user.city}, {user.state}</small></div></div>{nav.map(([id,label,Icon])=><button className={screen===id?'active':''}key={id}onClick={()=>setScreen(id)}><Icon/>{label}</button>)}<div className="pledge">COMMITMENT<br/><span>Supporting those who served. Always.</span></div></aside>}
-function Topbar({user,b,setScreen,setUser,setBranchTheme,onLogout,onMenu}){async function changeBranch(branch){const normalized=applyBranchTheme(branch);setBranchTheme(normalized);setUser(u=>({...u,branch:normalized}));requestAnimationFrame(()=>applyBranchTheme(normalized));setTimeout(()=>applyBranchTheme(normalized),80);try{await api('/api/profile/branch',{method:'POST',body:JSON.stringify({branch:normalized})})}catch(e){console.warn('Branch theme save failed; keeping local theme',e)}}return <header><button className="mobileMenu" onClick={onMenu} aria-label="Open navigation"><Menu/></button><div className="commandIdentity"><img src={b.emblem} alt={`${user.branch} service emblem`}/><div><b>{b.label}</b><span>{b.motto}</span></div></div><div className="status">// PRIVATE //</div><nav className="branchSwitcher" aria-label="Switch service branch theme">{Object.keys(branches).map(x=><button type="button" title={`Switch to ${x} theme`} className={normalizeBranch(user.branch)===x?'active':''} key={x} onClick={()=>changeBranch(x)}>{x}</button>)}</nav><label className="mobileBranchControl"><span>Service theme</span><select aria-label="Switch service branch theme" value={normalizeBranch(user.branch)} onChange={e=>changeBranch(e.target.value)}>{Object.keys(branches).map(x=><option value={x} key={x}>{x}</option>)}</select></label><button className="voiceTopButton" onClick={()=>setScreen('companion')}><Mic/><span>Voice</span></button><button onClick={onLogout} className="logout"><LogOut/><span>Logout</span></button></header>}
+function Sidebar({user,screen,setScreen,mobileOpen,onClose}){
+  const nav=[['dashboard','Dashboard',Shield],['companion','AI Assistant',Brain],['events','Activities',MapPin],['benefits','Benefits',Search],['wellness','Fitness & Wellness',Dumbbell],['memories','Memories',Heart],['reminders','Reminders',Bell],['documents','Document Intelligence',Folder],['missions','Mission Control',Brain],['career','Career & Business',Briefcase],['music','Music & Media',Music],['tutorial','User Tutorial',BookOpen],['profile','Profile',User]];
+  if(user.role==='admin'){
+    nav.push(['admin','Admin Dashboard',BarChart3]);
+
+  }
+  return <aside id="mobile-navigation" className={mobileOpen?"mobileOpen":""} aria-hidden={mobileOpen?false:undefined}>
+    <div className="mobileDrawerHeader"><span>Navigation</span><button type="button" className="mobileDrawerClose" onClick={onClose} aria-label="Close navigation"><X/></button></div>
+    <div className="logo"><div className="logoStack"><img src={valorLogo} alt="ValorBuddy logo"/><img className="branchMini" src={(branches[normalizeBranch(user.branch)]||branches.Army).emblem} alt={`${user.branch} service emblem`}/></div><div><b>VALORBUDDY</b><span>Your Digital Battle Buddy</span></div></div>
+    <div className="miniProfile"><User/><div><b>{user.rank?`${user.rank} `:""}{user.first_name} {user.last_name||""}</b><span>{user.branch} • {user.service_status||"Veteran"}</span><small>{user.city}, {user.state}</small></div></div>
+    {nav.map(([id,label,Icon])=><button className={screen===id?'active':''} key={id} onClick={()=>setScreen(id)}><Icon/>{label}</button>)}
+    <div className="pledge">COMMITMENT<br/><span>Supporting those who served. Always.</span></div>
+  </aside>;
+}
+function Topbar({user,b,setScreen,setUser,setBranchTheme,onLogout,onMenu,menuOpen}){
+  async function changeBranch(branch){
+    const normalized=applyBranchTheme(branch);
+    setBranchTheme(normalized);
+    setUser(u=>({...u,branch:normalized}));
+    requestAnimationFrame(()=>applyBranchTheme(normalized));
+    setTimeout(()=>applyBranchTheme(normalized),80);
+    try{await api('/api/profile/branch',{method:'POST',body:JSON.stringify({branch:normalized})})}
+    catch(e){console.warn('Branch theme save failed; keeping local theme',e)}
+  }
+  return <header>
+    <button className="mobileMenu" onClick={onMenu} aria-label={menuOpen?'Close navigation':'Open navigation'} aria-expanded={menuOpen} aria-controls="mobile-navigation">{menuOpen?<X/>:<Menu/>}</button>
+    <div className="commandIdentity"><img src={b.emblem} alt={`${user.branch} service emblem`}/><div><b>{b.label}</b><span>{b.motto}</span></div></div>
+    <div className="status">// PRIVATE //</div>
+    <nav className="branchSwitcher" aria-label="Switch service branch theme">{Object.keys(branches).map(x=><button type="button" title={`Switch to ${x} theme`} className={normalizeBranch(user.branch)===x?'active':''} key={x} onClick={()=>changeBranch(x)}>{x}</button>)}</nav>
+    <label className="mobileBranchControl"><span>Service theme</span><select aria-label="Switch service branch theme" value={normalizeBranch(user.branch)} onChange={e=>changeBranch(e.target.value)}>{Object.keys(branches).map(x=><option value={x} key={x}>{x}</option>)}</select></label>
+    <button className="voiceHeaderButton voiceTopButton" onClick={()=>setScreen('companion')}><Mic/><span>Voice</span></button>
+    <button onClick={onLogout} className="logout"><LogOut/><span>Logout</span></button>
+  </header>;
+}
+function HealthSafetyNotice(){
+  return <section className="healthSafetyNotice" aria-label="Important health and safety notice"><Shield/><div><strong>Important Health Notice</strong><p>ValorBuddy provides general informational and organizational support only. It is not a medical device and does not diagnose, treat, cure, or prevent any medical condition. Always consult a qualified healthcare professional for medical advice, diagnosis, medications, or treatment.</p></div><div className="healthSafetyActions"><a href="tel:911">Emergency: Call 911</a><a href="tel:988">Veterans Crisis Line: Call 988, then press 1</a></div></section>;
+}
+
 function Hero({user}){return <section className="hero"><div><h1>{new Date().getHours()<12?"GOOD MORNING":new Date().getHours()<18?"GOOD AFTERNOON":"GOOD EVENING"}, {user.first_name.toUpperCase()}</h1><b>{user.branch.toUpperCase()} COMMUNITY</b><p>I’m ValorBuddy. How can I help you today?</p><div className="heroStatus"><span>● READY</span><small>Honor • Courage • Commitment</small></div></div><VoicePanel user={user}/></section>}
 
 function SmartResultPopup({open,onClose,title,subtitle,items,onChoose,kind='event'}){if(!open)return null;return <div className="smartModalBackdrop" onClick={onClose}><section className="smartModal" role="dialog" aria-modal="true" onClick={e=>e.stopPropagation()}><button className="modalClose" onClick={onClose} aria-label="Close">×</button><div className="modalHeader"><span className="modalEyebrow">VALORBUDDY RECOMMENDATIONS</span><h2>{cleanVisibleText(title)}</h2>{subtitle&&<p>{cleanVisibleText(subtitle)}</p>}</div><div className="smartResultWrap">{items.map((x,i)=><article className="smartResultCard" key={`${x.title}-${i}`}><div className="resultRank">{i+1}</div><div className="resultMain"><div className="resultTitleRow"><h3>{cleanVisibleText(x.title)}</h3>{x.rating&&<span className="ratingPill">★ {x.rating}{x.review_count?` · ${x.review_count}`:''}</span>}</div>{x.location&&<p className="resultLocation">📍 {cleanVisibleText(x.location)}</p>}<p className="assistantExplains"><b>Why ValorBuddy suggests it:</b> {cleanVisibleText(x.assistant_explanation||x.description||x.summary)}</p>{x.open_now!==undefined&&x.open_now!==null&&<span className={`openPill ${x.open_now?'open':'closed'}`}>{x.open_now?'Open now':'Currently closed'}</span>}{x.next_step&&<div className="nextStep"><b>Best next step</b><span>{cleanVisibleText(x.next_step)}</span></div>}{x.community_note&&<div className="communityVoice"><b>What veterans commonly say</b><p>{cleanVisibleText(x.community_note)}</p></div>}{x.reviews?.length>0&&<div className="reviewPanel"><b>What Google reviewers are saying</b>{x.reviews.map((r,j)=><blockquote key={j}><span>“{cleanVisibleText(r.text)}”</span><small>{r.author}{r.rating?` · ${r.rating}/5`:''}{r.time_description?` · ${r.time_description}`:''}</small></blockquote>)}</div>}<div className="resultActions">{onChoose&&<button className="primaryAction" onClick={()=>onChoose(x,i)}>Choose this</button>}{x.maps_url&&<a href={x.maps_url} target="_blank" rel="noreferrer">Directions</a>}{x.website&&<a href={x.website} target="_blank" rel="noreferrer">Website</a>}{x.phone&&<a href={`tel:${x.phone}`}>Call</a>}</div></div></article>)}</div><div className="modalFooter"><span>Not seeing the right fit?</span><button onClick={onClose}>Refine the search</button></div></section></div>}
