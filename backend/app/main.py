@@ -312,6 +312,7 @@ class RegisterRequest(BaseModel):
     interests: List[str] = []
     accessibility_needs: List[str] = []
     preferred_music_genres: List[str] = []
+    profile_data: dict[str, Any] = {}
 
 
 class ProfileUpdate(BaseModel):
@@ -1237,7 +1238,7 @@ def reminder_dispatcher_loop():
         time.sleep(REMINDER_POLL_SECONDS)
 
 
-app = FastAPI(title=APP_NAME, version="5.0.0")
+app = FastAPI(title=APP_NAME, version="5.3.6")
 origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
@@ -1294,7 +1295,7 @@ def startup():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": APP_NAME, "version": "4.9.1", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
+    return {"status": "ok", "app": APP_NAME, "version": "5.3.6", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
 
 
 @app.get("/db/tables")
@@ -1304,13 +1305,39 @@ def db_tables():
 
 @app.post("/auth/register", response_model=LoginResponse)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
-    if db.query(User).filter(User.email == payload.email).first():
+    email = str(payload.email).strip().lower()
+    if db.query(User).filter(func.lower(User.email) == email).first():
         raise HTTPException(status_code=409, detail="Email already exists")
-    user = User(email=str(payload.email).lower(), password_hash=hash_password(payload.password), role="veteran")
-    db.add(user); db.flush()
-    db.add(UserProfile(user_id=user.id, first_name=payload.first_name, last_name=payload.last_name, rank=payload.rank, branch=payload.branch, service_status=payload.service_status, service_start_year=payload.service_start_year, service_end_year=payload.service_end_year, deployment_history=payload.deployment_history, va_rating=payload.va_rating, city=payload.city, state=payload.state, interests=payload.interests, accessibility_needs=payload.accessibility_needs, preferred_music_genres=payload.preferred_music_genres, profile_data=payload.profile_data))
-    db.add(AdminAuditLog(user_id=user.id, action="user.registered", details=user.email))
-    db.commit(); db.refresh(user)
+    try:
+        user = User(email=email, password_hash=hash_password(payload.password), role="veteran")
+        db.add(user); db.flush()
+        db.add(UserProfile(
+            user_id=user.id,
+            first_name=payload.first_name.strip(),
+            last_name=payload.last_name.strip(),
+            rank=payload.rank,
+            branch=payload.branch,
+            service_status=payload.service_status,
+            service_start_year=payload.service_start_year,
+            service_end_year=payload.service_end_year,
+            deployment_history=payload.deployment_history,
+            va_rating=payload.va_rating,
+            city=payload.city.strip(),
+            state=payload.state.strip(),
+            interests=payload.interests,
+            accessibility_needs=payload.accessibility_needs,
+            preferred_music_genres=payload.preferred_music_genres,
+            profile_data=payload.profile_data,
+        ))
+        db.add(AdminAuditLog(user_id=user.id, action="user.registered", details=user.email))
+        db.commit(); db.refresh(user)
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception:
+        db.rollback()
+        logger.exception("User registration failed for %s", email)
+        raise HTTPException(status_code=500, detail="Account creation failed. Please try again.")
     token = create_access_token(user)
     return LoginResponse(token=token, user=profile_out(user))
 
@@ -1884,33 +1911,6 @@ def admin_overview(_: User = Depends(admin_required), db: Session = Depends(get_
 def admin_users(_: User = Depends(admin_required), db: Session = Depends(get_db)):
     rows = db.query(User).order_by(User.id.desc()).all()
     return [{"id": u.id, "email": u.email, "role": u.role, "active": u.is_active, "first_name": u.profile.first_name if u.profile else "", "last_name": u.profile.last_name if u.profile else "", "rank": u.profile.rank if u.profile else "", "branch": u.profile.branch if u.profile else "", "service_status": u.profile.service_status if u.profile else "", "va_rating": u.profile.va_rating if u.profile else "", "city": u.profile.city if u.profile else "", "state": u.profile.state if u.profile else ""} for u in rows]
-
-
-class AdminUserUpdate(BaseModel):
-    role: Optional[str] = None
-    active: Optional[bool] = None
-
-
-@app.patch("/admin/users/{user_id}")
-def admin_update_user(user_id: int, payload: AdminUserUpdate, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
-    target = db.query(User).filter(User.id == user_id).first()
-    if not target:
-        raise HTTPException(status_code=404, detail="User not found")
-    allowed_roles = {"veteran", "member", "partner", "admin"}
-    if payload.role is not None:
-        role = payload.role.strip().lower()
-        if role not in allowed_roles:
-            raise HTTPException(status_code=400, detail="Unsupported role")
-        if target.id == admin.id and role != "admin":
-            raise HTTPException(status_code=400, detail="You cannot remove your own admin access")
-        target.role = role
-    if payload.active is not None:
-        if target.id == admin.id and payload.active is False:
-            raise HTTPException(status_code=400, detail="You cannot deactivate your own account")
-        target.is_active = payload.active
-    db.commit()
-    db.refresh(target)
-    return {"id": target.id, "email": target.email, "role": target.role, "active": target.is_active}
 
 
 @app.get("/admin/activity")

@@ -1,25 +1,37 @@
-ValorBuddy v5.3.5 Registration Hotfix
+ValorBuddy v5.3.1 — Action Buttons & Readability Fix
 
-Problem fixed:
-POST /auth/register was returning HTTP 500 because the registration handler referenced payload.profile_data but RegisterRequest did not define profile_data.
+FIXED
+- Career & Business now has a large visible "Send to Career Agent and generate draft" button.
+- Reminder now has a large visible "Create and save reminder" button.
+- Memory now has a visible "Upload and save memory" button.
+- Benefits now has a visible "Explain benefits" button.
+- Activities now has a visible "Search activities" button.
+- AI Assistant now has a prominent "Send to ValorBuddy" button.
+- Mission Control now has a clear "Send mission to Supervisor Agent" button.
+- Profile labels, instructions, help text, inputs, and values are larger and bolder.
+- Recommendation modal text is changed from faint purple/white to high-contrast navy and charcoal.
+- Mobile buttons expand to full width.
 
-Changes are intentionally narrow:
-1. Added optional profile_data to RegisterRequest with a safe empty-dict default.
-2. Changed registration list defaults to default_factory so requests do not share mutable list objects.
-3. Made registration profile_data assignment defensive with getattr(..., {}).
+IMPORTANT
+Buttons remain visible even before required information is entered. Clicking them now explains exactly what information is missing instead of appearing inactive.
 
-No frontend, reminder, AI, profile-edit, theme, document, benefits, media, mission, or other feature code was changed.
+INSTALL
+1. Extract this ZIP.
+2. Copy the included frontend folder into:
+   C:\Users\eugen\Desktop\valorbuddy-prod
+3. Replace the existing files.
 
-Install:
-Copy backend/app/main.py into your existing ValorBuddy repo at:
-  C:\Users\eugen\Desktop\valorbuddy-prod\backend\app\main.py
+BUILD
+cd C:\Users\eugen\Desktop\valorbuddy-prod\frontend
+npm run build
 
-Then run:
-  cd C:\Users\eugen\Desktop\valorbuddy-prod
-  python -m py_compile backend\app\main.py
-  git status
-  git add backend\app\main.py
-  git commit -m "Fix registration profile_data crash"
-  git push origin main
+COMMIT
+cd ..
+git add frontend\src\App.jsx frontend\src\style.css
+git commit -m "Fix action buttons and platform readability"
+git push origin main
 
-After Render deploys, create a NEW test user. The Render log should show a successful POST /auth/register instead of 500.
+DEPLOY
+Render frontend -> Manual Deploy -> Clear build cache & deploy
+
+After deployment, press Ctrl+F5.

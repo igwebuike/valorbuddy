@@ -1,0 +1,26 @@
+VALORBUDDY v5.3.6 STABLE COMPLETE - DEPLOY
+
+Recommended: keep your current Git repository (.git) and copy this package's files over it.
+
+From C:\Users\eugen\Desktop\valorbuddy-prod:
+
+1) Make sure you are on current main:
+   git fetch origin
+   git reset --hard origin/main
+
+2) Copy the contents of this package into the valorbuddy-prod folder, allowing files to replace existing files.
+   This ZIP intentionally does NOT contain a .git folder, so your existing Git connection is preserved.
+
+3) Test locally:
+   cd frontend
+   npm ci
+   npm run build
+
+4) If build succeeds:
+   cd ..
+   git status
+   git add frontend/src/App.jsx frontend/src/style.css VALORBUDDY_V5_3_6_STABLE_COMPLETE.md DEPLOY_STABLE_COMPLETE.txt
+   git commit -m "Restore stable ValorBuddy and add wellness mobile themes voice and GPS"
+   git push origin main
+
+Do not add node_modules or dist to Git.
