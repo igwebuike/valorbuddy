@@ -752,3 +752,24 @@ html[data-branch="navy"],body[data-branch="navy"],.app.navy,.loginPage.navy{
 .loginCard .primary:disabled{opacity:.7!important;cursor:wait!important;transform:none!important}
 .loginCard .err{padding:10px 12px;border:1px solid #d84a4a;border-radius:8px;background:rgba(120,0,0,.28);line-height:1.4}
 @media(max-width:600px){.loginCard{width:min(560px,94vw)!important;padding:20px!important}.loginCard .row{grid-template-columns:1fr!important}.loginCard input,.loginCard select{font-size:16px!important;min-height:48px!important}}
+
+/* =========================================================
+   ValorBuddy v5.3.7 — admin dashboard overflow / readability
+   ========================================================= */
+.adminPage{min-width:0;overflow-x:hidden}
+.adminUsersHeading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:24px}
+.adminUsersHeading h2{margin:0}.adminUsersHeading>span{font-size:.86rem;font-weight:900;color:var(--muted)}
+.adminUsersGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:16px;margin-top:16px;min-width:0}
+.adminUserCard{min-width:0;overflow:hidden;border:1px solid color-mix(in srgb,var(--border) 65%,transparent);background:linear-gradient(145deg,color-mix(in srgb,var(--panel) 94%,#fff 6%),color-mix(in srgb,var(--panel2) 94%,#000 6%));padding:18px;min-height:150px}
+.adminUserTop{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0}
+.adminUserIdentity{min-width:0;flex:1}.adminUserIdentity h3{margin:0 0 7px;color:var(--accent2)!important;font-size:1.04rem;line-height:1.3;overflow-wrap:anywhere;word-break:break-word}
+.adminUserEmail{display:block;max-width:100%;color:var(--text)!important;text-decoration:none;font-size:.91rem;font-weight:800;line-height:1.35;overflow-wrap:anywhere;word-break:break-word;white-space:normal}
+.adminUserEmail:hover{text-decoration:underline;color:var(--accent)!important}
+.adminStatus{flex:0 0 auto;padding:5px 8px;border-radius:999px;font-size:.7rem;font-weight:950;text-transform:uppercase;letter-spacing:.04em;border:1px solid var(--border)}
+.adminStatus.active{background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}.adminStatus.inactive{background:rgba(180,40,40,.15);color:#ff9b9b}
+.adminUserMeta{display:flex;flex-wrap:wrap;gap:7px;margin:16px 0 10px}.adminUserMeta span{display:inline-flex;padding:5px 8px;border:1px solid color-mix(in srgb,var(--border) 55%,transparent);border-radius:999px;background:rgba(255,255,255,.045);font-size:.76rem;font-weight:850;color:var(--text)}
+.adminUserLocation{display:block;color:var(--muted)!important;overflow-wrap:anywhere}
+/* Generic cards can never spill text outside their grid cell. */
+.grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))!important;min-width:0}.card{min-width:0;overflow:hidden}.card h3,.card p,.card small,.card a{max-width:100%;overflow-wrap:anywhere;word-break:break-word}
+@media(max-width:1200px){.adminUsersGrid{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}}
+@media(max-width:700px){.adminUsersGrid{grid-template-columns:1fr}.adminUserTop{gap:8px}.adminUserCard{padding:15px}.adminUserEmail{font-size:.88rem}.adminUsersHeading{align-items:flex-end}}
