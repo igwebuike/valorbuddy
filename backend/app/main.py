@@ -2485,9 +2485,22 @@ async def _run_mission(mission: AgentMission, user: User, db: Session) -> AgentM
         step.status = "running"; step.started_at = datetime.now(timezone.utc)
         tool_run = AgentToolRun(mission_id=mission.id, step_id=step.id, agent_key=step.agent_key, tool_name=step.tool_name, status="running", input_summary={"keys": list((step.input_json or {}).keys())})
         db.add(tool_run); db.commit()
+        # Keep scalar identifiers before tool execution.  If a later flush fails,
+        # SQLAlchemy expires ORM instances and accessing their attributes before
+        # rolling the session back can raise PendingRollbackError.
+        mission_id = mission.id
+        step_id = step.id
+        tool_run_id = tool_run.id
+        step_title = step.title
         started_perf = time.perf_counter()
         try:
-            output = await _execute_agent_tool(step.tool_name, step.input_json or {}, mission, user, db)
+            # Agent tools may return ORM/Pydantic values containing datetime,
+            # UUID, Decimal, or other Python types.  JSON columns require plain
+            # JSON-compatible values, so normalize the entire nested result
+            # before assigning it to output_json.
+            output = jsonable_encoder(
+                await _execute_agent_tool(step.tool_name, step.input_json or {}, mission, user, db)
+            )
             tool_run.status = "completed"
             tool_run.latency_ms = int((time.perf_counter() - started_perf) * 1000)
             tool_run.source = output.get("source", "internal")
@@ -2503,11 +2516,45 @@ async def _run_mission(mission: AgentMission, user: User, db: Session) -> AgentM
             db.commit()
         except Exception as exc:
             logger.exception("Agent tool failed: %s", exc)
-            tool_run.status = "failed"; tool_run.latency_ms = int((time.perf_counter() - started_perf) * 1000); tool_run.error_message = str(exc)[:1000]
-            db.add(AgentFailure(mission_id=mission.id, step_id=step.id, failure_type="tool_execution", message=str(exc)[:2000], retryable=True))
-            step.status = "failed"; step.error_message = str(exc)[:1000]; step.completed_at = datetime.now(timezone.utc)
-            mission.status = "needs_attention"; mission.next_action = f"Retry or revise: {step.title}"
-            _mission_event(db, mission, user.id, "step_failed", f"The step could not be completed: {step.title}", {"error": str(exc)[:500]})
+            error_message = str(exc)
+
+            # A flush/commit exception leaves the session unusable until it is
+            # rolled back.  Roll back first, then reload clean ORM instances so
+            # the failure itself can be recorded reliably.
+            db.rollback()
+            mission = db.get(AgentMission, mission_id)
+            step = db.get(AgentMissionStep, step_id)
+            tool_run = db.get(AgentToolRun, tool_run_id)
+
+            if tool_run:
+                tool_run.status = "failed"
+                tool_run.latency_ms = int((time.perf_counter() - started_perf) * 1000)
+                tool_run.error_message = error_message[:1000]
+
+            db.add(AgentFailure(
+                mission_id=mission_id,
+                step_id=step_id,
+                failure_type="tool_execution",
+                message=error_message[:2000],
+                retryable=True,
+            ))
+
+            if step:
+                step.status = "failed"
+                step.error_message = error_message[:1000]
+                step.completed_at = datetime.now(timezone.utc)
+
+            if mission:
+                mission.status = "needs_attention"
+                mission.next_action = f"Retry or revise: {step_title}"
+                _mission_event(
+                    db,
+                    mission,
+                    user.id,
+                    "step_failed",
+                    f"The step could not be completed: {step_title}",
+                    {"error": error_message[:500]},
+                )
             db.commit(); break
 
     steps = db.query(AgentMissionStep).filter(AgentMissionStep.mission_id == mission.id).order_by(AgentMissionStep.sequence).all()
