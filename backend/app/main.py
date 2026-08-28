@@ -51,6 +51,11 @@ ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "eugene.ebem@gmail.com").lower().strip()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 logger = logging.getLogger("valorbuddy.ai")
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY") or os.getenv("GOOGLE_MAPS_API_KEY")
+VA_FACILITIES_API_KEY = os.getenv("VA_FACILITIES_API_KEY", "").strip()
+VA_FACILITIES_BASE_URL = os.getenv(
+    "VA_FACILITIES_BASE_URL",
+    "https://sandbox-api.va.gov/services/va_facilities/v1",
+).rstrip("/")
 GOOGLE_CALENDAR_ENABLED = os.getenv("GOOGLE_CALENDAR_ENABLED", "false").lower() == "true"
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
 REMINDER_FROM_EMAIL = os.getenv("REMINDER_FROM_EMAIL", "ValorBuddy <reminders@valorbuddy.com>").strip()
@@ -663,6 +668,144 @@ async def reverse_geocode_location(lat: float | None, lng: float | None) -> dict
         return {"city": "", "state": ""}
 
 
+def is_va_facility_query(query: str) -> bool:
+    """Route only explicit VA-location requests to Lighthouse."""
+    q = clean_text(query).lower()
+    phrases = (
+        "va facility", "va facilities", "va clinic", "va clinics",
+        "va hospital", "va hospitals", "va medical", "va health center",
+        "vet center", "vet centers", "va benefits office", "va regional office",
+        "va cemetery", "va cemeteries", "nearest va", "closest va",
+    )
+    return any(phrase in q for phrase in phrases)
+
+
+def _va_facility_type_label(value: str) -> str:
+    labels = {
+        "health": "VA health facility",
+        "benefits": "VA benefits facility",
+        "cemetery": "VA cemetery",
+        "vet_center": "Vet Center",
+        "vha": "VA health facility",
+        "vba": "VA benefits facility",
+        "nca": "VA cemetery",
+        "vc": "Vet Center",
+    }
+    normalized = clean_text(value).lower()
+    return labels.get(normalized, normalized.replace("_", " ").title() or "VA facility")
+
+
+def _format_va_hours(hours: Any) -> str:
+    if not isinstance(hours, dict):
+        return ""
+    parts = []
+    for day, value in hours.items():
+        text_value = clean_text(value)
+        if text_value:
+            parts.append(f"{str(day).title()}: {text_value}")
+    return "; ".join(parts[:7])
+
+
+async def va_facilities_search(
+    city: str = "",
+    state: str = "",
+    query: str = "",
+    lat: float | None = None,
+    lng: float | None = None,
+) -> tuple[bool, list[dict[str, Any]], dict[str, Any]]:
+    """Search the official VA Lighthouse Facilities API from the backend."""
+    resolved_city = clean_text(city)
+    resolved_state = clean_text(state).upper()
+    source = "profile" if resolved_city or resolved_state else "missing"
+    if lat is not None and lng is not None:
+        rg = await reverse_geocode_location(lat, lng)
+        resolved_city = rg.get("city") or resolved_city
+        resolved_state = (rg.get("state") or resolved_state).upper()
+        source = "browser_location"
+
+    location_meta: dict[str, Any] = {
+        "city": resolved_city,
+        "state": resolved_state,
+        "lat": lat,
+        "lng": lng,
+        "source": source,
+        "provider": "VA Lighthouse Facilities API",
+        "environment": "production" if VA_FACILITIES_BASE_URL.startswith("https://api.va.gov") else "sandbox",
+    }
+    if not VA_FACILITIES_API_KEY:
+        return False, [], {**location_meta, "error": "VA_FACILITIES_API_KEY not configured"}
+    if lat is None and lng is None and not resolved_state:
+        return False, [], {**location_meta, "error": "location_required"}
+
+    params: dict[str, Any] = {"per_page": 50 if lat is None else 12}
+    if lat is not None and lng is not None:
+        params.update({"lat": lat, "long": lng, "radius": 50})
+    else:
+        params["state"] = resolved_state
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.get(
+                f"{VA_FACILITIES_BASE_URL}/facilities",
+                params=params,
+                headers={"apikey": VA_FACILITIES_API_KEY, "Accept": "application/json"},
+            )
+            response.raise_for_status()
+            payload = response.json()
+
+        parsed: list[dict[str, Any]] = []
+        for row in payload.get("data", []):
+            attributes = row.get("attributes") or {}
+            address = ((attributes.get("address") or {}).get("physical") or {})
+            row_city = clean_text(address.get("city"))
+            row_state = clean_text(address.get("state")).upper()
+            address_text = ", ".join(filter(None, [
+                clean_text(address.get("address1")),
+                clean_text(address.get("address2")),
+                row_city,
+                row_state,
+                clean_text(address.get("zip")),
+            ]))
+            facility_type = _va_facility_type_label(attributes.get("facilityType") or row.get("type"))
+            phone_data = attributes.get("phone") or {}
+            phone = clean_text(phone_data.get("main") if isinstance(phone_data, dict) else phone_data)
+            website = clean_text(attributes.get("website"))
+            hours = _format_va_hours(attributes.get("hours"))
+            name = clean_text(attributes.get("name")) or "VA facility"
+            description = f"Official {facility_type} information provided by the VA Lighthouse Facilities API."
+            if hours:
+                description += f" Published hours: {hours}."
+            parsed.append({
+                "title": name,
+                "location": address_text,
+                "type": facility_type,
+                "description": description,
+                "assistant_explanation": "This is an official VA facility result matching your requested location. Call the facility to confirm availability before traveling.",
+                "next_step": "Call to confirm the service and current hours, or open directions.",
+                "phone": phone,
+                "website": website,
+                "hours": hours,
+                "facility_id": row.get("id"),
+                "latitude": attributes.get("lat"),
+                "longitude": attributes.get("long"),
+                "maps_url": f"https://www.google.com/maps/search/?api=1&query={quote_plus(name + ' ' + address_text)}",
+                "source": "VA Lighthouse Facilities API",
+            })
+
+        if resolved_city and lat is None:
+            city_matches = [item for item in parsed if resolved_city.lower() in item.get("location", "").lower()]
+            other_matches = [item for item in parsed if item not in city_matches]
+            parsed = city_matches + other_matches
+        return bool(parsed), parsed[:8], location_meta
+    except httpx.HTTPStatusError as exc:
+        status_code = exc.response.status_code
+        logger.warning("VA Facilities API returned HTTP %s", status_code)
+        return False, [], {**location_meta, "error": f"VA Facilities API HTTP {status_code}"}
+    except Exception as exc:
+        logger.exception("VA Facilities API request failed")
+        return False, [], {**location_meta, "error": type(exc).__name__}
+
+
 def _fallback_local_cards(city: str, state: str, query: str) -> list[dict[str, Any]]:
     location_label = f"{city}, {state}" if city and state else "your area"
     maps_location = quote_plus(f"{city} {state}".strip() or "near me")
@@ -999,14 +1142,22 @@ async def route_valorbuddy_message(
                 "intent": "ask_location",
                 "data": {"location_required": True}
             }
-        live, items, location_meta = await google_places(city=city, state=state, query=message, lat=lat, lng=lng)
+        official_va = is_va_facility_query(message)
+        if official_va:
+            live, items, location_meta = await va_facilities_search(city=city, state=state, query=message, lat=lat, lng=lng)
+            if not live:
+                va_error = location_meta.get("error")
+                live, items, google_meta = await google_places(city=city, state=state, query=message, lat=lat, lng=lng)
+                location_meta = {**google_meta, "va_api_error": va_error, "provider": "Google Places fallback"}
+        else:
+            live, items, location_meta = await google_places(city=city, state=state, query=message, lat=lat, lng=lng)
         if location_meta.get("error") == "location_required":
             return {
                 "response": f"Absolutely {first_name}. What city and state should I search, and are you looking for today, this weekend, or specific dates?",
                 "intent": "ask_location",
                 "data": {"location_required": True}
             }
-        mode = "live Google Places" if live else "fallback map suggestions"
+        mode = location_meta.get("provider") or ("live Google Places" if live else "fallback map suggestions")
         place_label = f"near {location_meta.get('city')}, {location_meta.get('state')}" if location_meta.get('city') else "near your current location"
         verified_note = "live options" if live else "search starting points"
         top = items[:3]
@@ -1026,13 +1177,14 @@ async def route_valorbuddy_message(
 User type: {user_type}
 Exact request: {message}
 Primary intent: {intent}
-Live local results: live={live}, source={location_meta.get('source')}, results={json.dumps(items[:5])}
+Live local results: live={live}, provider={mode}, source={location_meta.get('source')}, results={json.dumps(items[:5])}
 
 COMPLETION CONTRACT:
 - Do not repeat, quote, paraphrase, or announce the user's request.
 - Do not say “I heard you,” “best starting point,” “tell me more,” or “tell me the one detail that matters.”
 - Complete the useful work before stopping.
 - If live results exist, give the three best options immediately and recommend one.
+- When provider is VA Lighthouse Facilities API, identify the results as official VA facility data and do not describe them as Google results.
 - If live results are unavailable, clearly say that these are map/search starting points and still give the best three next actions.
 - Make the choice easy: number the options and tell the user they can say a number.
 
@@ -1295,7 +1447,7 @@ def startup():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": APP_NAME, "version": "5.3.6", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY)}
+    return {"status": "ok", "app": APP_NAME, "version": "5.3.6", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY), "va_facilities": bool(VA_FACILITIES_API_KEY)}
 
 
 @app.get("/db/tables")
@@ -1396,6 +1548,20 @@ async def events_search(city: str = "", state: str = "", keyword: str = "veteran
     live, items, location_meta = await google_places(city=city, state=state, query=keyword, lat=lat, lng=lng)
     db.add(ActivitySearch(user_id=user.id if user else None, city=location_meta.get("city") or city or "", state=location_meta.get("state") or state or "", query=keyword, live=live, results=items)); db.commit()
     return {"live": live, "provider": "Google Places" if live else "Fallback", "items": items, "location": location_meta}
+
+
+@app.get("/api/va/facilities/search")
+async def va_facilities_endpoint(city: str = "", state: str = "", lat: float | None = None, lng: float | None = None, user: Optional[User] = Depends(get_optional_user)):
+    """Return official VA facility results without exposing the API key."""
+    if user and user.profile:
+        city = city or user.profile.city or ""
+        state = state or user.profile.state or ""
+    live, items, location_meta = await va_facilities_search(city=city, state=state, query="VA facilities", lat=lat, lng=lng)
+    if location_meta.get("error") == "location_required":
+        raise HTTPException(status_code=400, detail="Provide a state or current latitude and longitude")
+    if not VA_FACILITIES_API_KEY:
+        raise HTTPException(status_code=503, detail="VA Facilities API is not configured")
+    return {"live": live, "provider": "VA Lighthouse Facilities API", "items": items, "location": location_meta}
 
 
 @app.post("/api/reminders")
@@ -2397,8 +2563,17 @@ async def _execute_agent_tool(tool_name: str, payload: dict[str, Any], mission: 
         return {"verified": True, "facts": [{"category": f.category, "key": f.key, "value": f.value, "confidence": f.confidence} for f in facts], "source": "member_controlled_memory"}
     if tool_name == "resources.search":
         category = payload.get("category", "events")
-        live, items, location = await google_places(city=getattr(p, "city", ""), state=getattr(p, "state", ""), query=payload.get("query") or category, lat=mission.context_snapshot.get("lat"), lng=mission.context_snapshot.get("lng"))
-        return {"verified": bool(items), "live": live, "items": items[:6], "location": location, "source": "google_places" if live else "fallback_search"}
+        resource_query = payload.get("query") or category
+        if is_va_facility_query(resource_query):
+            live, items, location = await va_facilities_search(city=getattr(p, "city", ""), state=getattr(p, "state", ""), query=resource_query, lat=mission.context_snapshot.get("lat"), lng=mission.context_snapshot.get("lng"))
+            source = "va_lighthouse_facilities" if live else "fallback_search"
+            if not live:
+                live, items, location = await google_places(city=getattr(p, "city", ""), state=getattr(p, "state", ""), query=resource_query, lat=mission.context_snapshot.get("lat"), lng=mission.context_snapshot.get("lng"))
+                source = "google_places" if live else "fallback_search"
+        else:
+            live, items, location = await google_places(city=getattr(p, "city", ""), state=getattr(p, "state", ""), query=resource_query, lat=mission.context_snapshot.get("lat"), lng=mission.context_snapshot.get("lng"))
+            source = "google_places" if live else "fallback_search"
+        return {"verified": bool(items), "live": live, "items": items[:6], "location": location, "source": source}
     if tool_name == "benefits.guide":
         data = benefits_lookup(payload.get("query", mission.goal), getattr(p, "state", ""), getattr(p, "branch", ""))
         return {"verified": True, **data, "source": "valorbuddy_benefits_guide", "notice": "Educational guidance; verify eligibility with VA or an accredited representative."}
@@ -2410,8 +2585,16 @@ async def _execute_agent_tool(tool_name: str, payload: dict[str, Any], mission: 
         category = tool_name.split(".")[0]
         query = payload.get("query") or mission.goal
         search_query = {"travel": f"{query} VA hospitals veteran friendly hotels rest stops fuel safety", "housing": f"{query} veteran friendly housing accessible apartments VA loan resources", "employment": f"{query} veteran hiring jobs apprenticeships federal remote", "discounts": f"{query} verified veteran military discounts", "vehicle": f"{query} veteran vehicle incentives financing insurance EV incentives"}.get(category, query)
-        live, items, location = await google_places(city=getattr(p, "city", ""), state=getattr(p, "state", ""), query=search_query, lat=mission.context_snapshot.get("lat"), lng=mission.context_snapshot.get("lng"))
-        return {"verified": bool(items), "category": category, "live": live, "items": items[:8], "location": location, "source": "google_places" if live else "search_starting_points"}
+        if is_va_facility_query(query):
+            live, items, location = await va_facilities_search(city=getattr(p, "city", ""), state=getattr(p, "state", ""), query=query, lat=mission.context_snapshot.get("lat"), lng=mission.context_snapshot.get("lng"))
+            source = "va_lighthouse_facilities" if live else "search_starting_points"
+            if not live:
+                live, items, location = await google_places(city=getattr(p, "city", ""), state=getattr(p, "state", ""), query=search_query, lat=mission.context_snapshot.get("lat"), lng=mission.context_snapshot.get("lng"))
+                source = "google_places" if live else "search_starting_points"
+        else:
+            live, items, location = await google_places(city=getattr(p, "city", ""), state=getattr(p, "state", ""), query=search_query, lat=mission.context_snapshot.get("lat"), lng=mission.context_snapshot.get("lng"))
+            source = "google_places" if live else "search_starting_points"
+        return {"verified": bool(items), "category": category, "live": live, "items": items[:8], "location": location, "source": source}
     if tool_name == "career.generate":
         p = user.profile
         mos = (p.military_mos or (p.profile_data or {}).get("mos","")) if p else ""
@@ -2485,22 +2668,9 @@ async def _run_mission(mission: AgentMission, user: User, db: Session) -> AgentM
         step.status = "running"; step.started_at = datetime.now(timezone.utc)
         tool_run = AgentToolRun(mission_id=mission.id, step_id=step.id, agent_key=step.agent_key, tool_name=step.tool_name, status="running", input_summary={"keys": list((step.input_json or {}).keys())})
         db.add(tool_run); db.commit()
-        # Keep scalar identifiers before tool execution.  If a later flush fails,
-        # SQLAlchemy expires ORM instances and accessing their attributes before
-        # rolling the session back can raise PendingRollbackError.
-        mission_id = mission.id
-        step_id = step.id
-        tool_run_id = tool_run.id
-        step_title = step.title
         started_perf = time.perf_counter()
         try:
-            # Agent tools may return ORM/Pydantic values containing datetime,
-            # UUID, Decimal, or other Python types.  JSON columns require plain
-            # JSON-compatible values, so normalize the entire nested result
-            # before assigning it to output_json.
-            output = jsonable_encoder(
-                await _execute_agent_tool(step.tool_name, step.input_json or {}, mission, user, db)
-            )
+            output = await _execute_agent_tool(step.tool_name, step.input_json or {}, mission, user, db)
             tool_run.status = "completed"
             tool_run.latency_ms = int((time.perf_counter() - started_perf) * 1000)
             tool_run.source = output.get("source", "internal")
@@ -2516,45 +2686,11 @@ async def _run_mission(mission: AgentMission, user: User, db: Session) -> AgentM
             db.commit()
         except Exception as exc:
             logger.exception("Agent tool failed: %s", exc)
-            error_message = str(exc)
-
-            # A flush/commit exception leaves the session unusable until it is
-            # rolled back.  Roll back first, then reload clean ORM instances so
-            # the failure itself can be recorded reliably.
-            db.rollback()
-            mission = db.get(AgentMission, mission_id)
-            step = db.get(AgentMissionStep, step_id)
-            tool_run = db.get(AgentToolRun, tool_run_id)
-
-            if tool_run:
-                tool_run.status = "failed"
-                tool_run.latency_ms = int((time.perf_counter() - started_perf) * 1000)
-                tool_run.error_message = error_message[:1000]
-
-            db.add(AgentFailure(
-                mission_id=mission_id,
-                step_id=step_id,
-                failure_type="tool_execution",
-                message=error_message[:2000],
-                retryable=True,
-            ))
-
-            if step:
-                step.status = "failed"
-                step.error_message = error_message[:1000]
-                step.completed_at = datetime.now(timezone.utc)
-
-            if mission:
-                mission.status = "needs_attention"
-                mission.next_action = f"Retry or revise: {step_title}"
-                _mission_event(
-                    db,
-                    mission,
-                    user.id,
-                    "step_failed",
-                    f"The step could not be completed: {step_title}",
-                    {"error": error_message[:500]},
-                )
+            tool_run.status = "failed"; tool_run.latency_ms = int((time.perf_counter() - started_perf) * 1000); tool_run.error_message = str(exc)[:1000]
+            db.add(AgentFailure(mission_id=mission.id, step_id=step.id, failure_type="tool_execution", message=str(exc)[:2000], retryable=True))
+            step.status = "failed"; step.error_message = str(exc)[:1000]; step.completed_at = datetime.now(timezone.utc)
+            mission.status = "needs_attention"; mission.next_action = f"Retry or revise: {step.title}"
+            _mission_event(db, mission, user.id, "step_failed", f"The step could not be completed: {step.title}", {"error": str(exc)[:500]})
             db.commit(); break
 
     steps = db.query(AgentMissionStep).filter(AgentMissionStep.mission_id == mission.id).order_by(AgentMissionStep.sequence).all()
