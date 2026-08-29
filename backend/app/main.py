@@ -394,6 +394,7 @@ class LoginResponse(BaseModel):
 class CompanionRequest(BaseModel):
     message: str
     conversation_id: int | None = None
+    conversation_history: List[dict[str, Any]] = Field(default_factory=list)
     mode: str = "companion"
     lat: Optional[float] = None
     lng: Optional[float] = None
@@ -437,7 +438,8 @@ class VapiActionRequest(BaseModel):
     memory: str = ""
     mood: str = "calm"
     user_type: str = "Veteran"
-    context_items: List[dict[str, Any]] = []
+    context_items: List[dict[str, Any]] = Field(default_factory=list)
+    conversation_history: List[dict[str, Any]] = Field(default_factory=list)
     timezone: str = "UTC"
 
 
@@ -528,6 +530,9 @@ Use recent conversation naturally. Resolve references such as “it,” “that 
 
 LOCAL RESULTS
 Give no more than three strong options unless the user asks for more. Summarize why each option fits. End with one specific next step such as directions, distance, hours, registration details, or filtering by today/free/family-friendly.
+
+ACTIONABLE LINKS
+When recommending a program, organization, facility, or service, include its verified official direct URL whenever the available tool data contains one. Prefer the specific program page over a general homepage. Present the resource name, official website, and one clear next step. Never invent or guess a URL.
 
 MENTAL WELLNESS AND SAFETY
 You are not a therapist, doctor, psychiatrist, psychologist, crisis counselor, lawyer, or financial advisor. Never diagnose PTSD, depression, anxiety, or another condition. Never provide clinical treatment or promise eligibility or legal outcomes.
@@ -1049,11 +1054,14 @@ async def route_valorbuddy_message(
     lat: float | None = None, lng: float | None = None, user_type: str = "Veteran",
     user: Optional[User] = None, db: Optional[Session] = None, explicit_intent: str = "general",
     title: str = "", date: str = "", time: str = "", memory: str = "", mood: str = "calm",
-    context_items: Optional[list[dict[str, Any]]] = None, timezone_name: str = "UTC"
+    context_items: Optional[list[dict[str, Any]]] = None,
+    conversation_history: Optional[list[dict[str, Any]]] = None,
+    timezone_name: str = "UTC"
 ) -> dict[str, Any]:
     """Agentic router: decides which tool to call, gathers data, then composes a human answer."""
     message = clean_text(text)
     context_items = context_items or []
+    conversation_history = conversation_history or []
     lower_message = message.lower()
     ownership_followup = any(phrase in lower_message for phrase in [
         "veteran owned", "veteran-owned", "are they owned", "why did you choose",
@@ -1100,11 +1108,17 @@ async def route_valorbuddy_message(
         local_now = datetime.now(ZoneInfo(timezone_name or "UTC"))
     except Exception:
         local_now = datetime.now(timezone.utc)
+    supplied_history = []
+    for entry in conversation_history[-12:]:
+        role = clean_text(entry.get("role"))
+        content = clean_text(entry.get("content"))[:1000]
+        if role in {"user", "assistant"} and content:
+            supplied_history.append({"role": role, "content": content})
     context = {
         "first_name": first_name, "branch": branch, "profile_city": city, "profile_state": state,
         "gps_available": lat is not None and lng is not None, "latitude": lat, "longitude": lng, "user_type": user_type,
         "timezone": timezone_name or "UTC", "local_now": local_now.isoformat(),
-        "recent_conversation": [{"role": m.role, "content": m.content[:500]} for m in reversed(recent_messages)],
+        "recent_conversation": supplied_history or [{"role": m.role, "content": m.content[:500]} for m in reversed(recent_messages)],
         "memories": [{"title": m.title, "note": (m.note or "")[:300]} for m in recent_memories],
         "reminders": [{"title": r.title, "when": r.when_text} for r in recent_reminders],
     }
@@ -1748,7 +1762,20 @@ async def companion_chat(
         db.flush()
 
     conversation_id = conv.id
-    selected_agents = route_goal(payload.message)
+    history = [
+        {"role": clean_text(x.get("role")), "content": clean_text(x.get("content"))[:1000]}
+        for x in payload.conversation_history[-12:]
+        if clean_text(x.get("role")) in {"user", "assistant"} and clean_text(x.get("content"))
+    ]
+    contextual_request = payload.message
+    if history:
+        contextual_request = (
+            "Continue the conversation below. Treat short or context-dependent user replies as answers "
+            "to the assistant's most recent question. Do not ask the veteran to repeat information already provided.\n\n"
+            + "\n".join(f"{x['role'].title()}: {x['content']}" for x in history)
+            + f"\nUser: {payload.message}"
+        )
+    selected_agents = route_goal(contextual_request)
     mission = None
 
     outcome_terms = (
@@ -1782,7 +1809,7 @@ async def companion_chat(
     if should_mission:
         mission = await create_agent_mission(
             MissionCreateIn(
-                goal=payload.message,
+                goal=contextual_request,
                 lat=payload.lat,
                 lng=payload.lng,
                 timezone=payload.timezone,
@@ -1801,7 +1828,7 @@ async def companion_chat(
         synth_prompt = build_agent_prompt(
             "supervisor",
             member=profile_out(user).model_dump(),
-            request=payload.message,
+            request=contextual_request,
             context={
                 "mission": mission.get("title"),
                 "agents": mission.get("participating_agents"),
@@ -1837,6 +1864,7 @@ async def companion_chat(
             lng=payload.lng,
             user=user,
             db=db,
+            conversation_history=history,
             timezone_name=payload.timezone or "UTC",
         )
         reply = result.get("response", "")
@@ -2063,6 +2091,7 @@ async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db))
         memory=payload.memory,
         mood=payload.mood,
         context_items=payload.context_items,
+        conversation_history=payload.conversation_history,
         timezone_name=payload.timezone or "UTC",
     )
     return result
