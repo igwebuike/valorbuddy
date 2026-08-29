@@ -119,6 +119,33 @@ class UserProfile(Base):
     user = relationship("User", back_populates="profile")
 
 
+class PartnerOrganization(Base):
+    __tablename__ = "partner_organizations"
+    id = Column(Integer, primary_key=True)
+    organization_name = Column(String(255), nullable=False)
+    organization_type = Column(String(120), nullable=False, default="Business")
+    contact_name = Column(String(255), nullable=False)
+    contact_title = Column(String(180), nullable=True, default="")
+    email = Column(String(255), nullable=False, index=True)
+    phone = Column(String(80), nullable=True, default="")
+    website = Column(String(500), nullable=True, default="")
+    estimated_veterans = Column(Integer, nullable=False, default=0)
+    plan_code = Column(String(50), nullable=False, default="community")
+    approval_status = Column(String(50), nullable=False, default="pending_review")
+    billing_status = Column(String(50), nullable=False, default="not_activated")
+    onboarding_goal = Column(Text, nullable=True, default="")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class PartnerMembership(Base):
+    __tablename__ = "partner_memberships"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("partner_organizations.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    organization_role = Column(String(80), nullable=False, default="viewer")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 class AuthToken(Base):
     __tablename__ = "auth_tokens"
     id = Column(Integer, primary_key=True)
@@ -352,6 +379,36 @@ class ProfileUpdate(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+
+
+class PartnerRegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8)
+    contact_name: str
+    contact_title: str = ""
+    organization_name: str
+    organization_type: str = "Business"
+    website: str = ""
+    phone: str = ""
+    estimated_veterans: int = 0
+    plan_code: str = "community"
+    onboarding_goal: str = ""
+
+
+class PartnerPlanRequest(BaseModel):
+    plan_code: str
+
+
+class PartnerTeamRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=8)
+    first_name: str
+    last_name: str = ""
+    organization_role: str = "viewer"
+
+
+class PartnerStatusRequest(BaseModel):
+    approval_status: str
 
 
 class ProfileOut(BaseModel):
@@ -1518,6 +1575,106 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     return LoginResponse(token=token, user=profile_out(user))
 
 
+PARTNER_PLANS = {
+    "community": {"name": "Community Partner", "monthly_price_cents": 49900},
+    "professional": {"name": "Professional", "monthly_price_cents": 149900},
+    "enterprise": {"name": "Enterprise", "monthly_price_cents": 0},
+}
+
+
+def partner_membership(user: User, db: Session) -> PartnerMembership:
+    membership = db.query(PartnerMembership).filter(PartnerMembership.user_id == user.id).first()
+    if not membership:
+        raise HTTPException(status_code=403, detail="Partner organization access required")
+    return membership
+
+
+def partner_payload(org: PartnerOrganization, db: Session) -> dict[str, Any]:
+    plan = PARTNER_PLANS.get(org.plan_code, PARTNER_PLANS["community"])
+    memberships = db.query(PartnerMembership).filter(PartnerMembership.organization_id == org.id).all()
+    team = []
+    for membership in memberships:
+        member = db.get(User, membership.user_id)
+        if member:
+            profile = member.profile
+            team.append({"membership_id": membership.id, "user_id": member.id, "email": member.email, "first_name": profile.first_name if profile else "", "last_name": profile.last_name if profile else "", "organization_role": membership.organization_role})
+    return {
+        "organization": {"id": org.id, "organization_name": org.organization_name, "organization_type": org.organization_type, "contact_name": org.contact_name, "contact_title": org.contact_title, "email": org.email, "phone": org.phone, "website": org.website, "estimated_veterans": org.estimated_veterans, "plan_code": org.plan_code, "plan_name": plan["name"], "monthly_price_cents": plan["monthly_price_cents"], "approval_status": org.approval_status, "billing_status": org.billing_status, "onboarding_goal": org.onboarding_goal},
+        "metrics": {"veterans_reached": 0, "resource_views": 0, "referrals_started": 0, "offers_redeemed": 0},
+        "team": team,
+        "next_steps": ["Complete organization verification", "Publish the first Veteran offer or resource", "Define pilot audience and success measures", "Launch a privacy-safe Veteran marketplace campaign"],
+        "privacy_note": "Partners receive aggregate engagement and referral outcomes only. Private Veteran conversations, documents, reminders, medical information, and profile details are never exposed.",
+    }
+
+
+@app.post("/auth/partner/register", response_model=LoginResponse)
+def partner_register(payload: PartnerRegisterRequest, db: Session = Depends(get_db)):
+    email = str(payload.email).strip().lower()
+    if db.query(User).filter(func.lower(User.email) == email).first():
+        raise HTTPException(status_code=409, detail="Email already exists")
+    if payload.plan_code not in PARTNER_PLANS:
+        raise HTTPException(status_code=400, detail="Unsupported partner plan")
+    names = payload.contact_name.strip().split(" ", 1)
+    try:
+        user = User(email=email, password_hash=hash_password(payload.password), role="partner_owner")
+        db.add(user); db.flush()
+        db.add(UserProfile(user_id=user.id, first_name=names[0] or "Partner", last_name=names[1] if len(names) > 1 else "", branch="Army", service_status="Partner", city="", state=""))
+        org = PartnerOrganization(organization_name=payload.organization_name.strip(), organization_type=payload.organization_type, contact_name=payload.contact_name.strip(), contact_title=payload.contact_title, email=email, phone=payload.phone, website=payload.website, estimated_veterans=max(0, payload.estimated_veterans), plan_code=payload.plan_code, onboarding_goal=payload.onboarding_goal)
+        db.add(org); db.flush()
+        db.add(PartnerMembership(organization_id=org.id, user_id=user.id, organization_role="owner"))
+        db.add(AdminAuditLog(user_id=user.id, action="partner.application_submitted", details=org.organization_name))
+        db.commit(); db.refresh(user)
+    except HTTPException:
+        db.rollback(); raise
+    except Exception:
+        db.rollback(); logger.exception("Partner registration failed for %s", email); raise HTTPException(status_code=500, detail="Partner application could not be created")
+    return LoginResponse(token=create_access_token(user), user=profile_out(user))
+
+
+@app.post("/auth/partner/login", response_model=LoginResponse)
+def partner_login(payload: LoginRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(func.lower(User.email) == str(payload.email).lower()).first()
+    if not user or not user.role.startswith("partner") or not verify_password(payload.password, user.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid partner email or password")
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Partner account is inactive")
+    db.add(AdminAuditLog(user_id=user.id, action="partner.login", details=user.email)); db.commit()
+    return LoginResponse(token=create_access_token(user), user=profile_out(user))
+
+
+@app.get("/api/partner/overview")
+def partner_overview(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    membership = partner_membership(user, db)
+    org = db.get(PartnerOrganization, membership.organization_id)
+    return partner_payload(org, db)
+
+
+@app.post("/api/partner/plan")
+def partner_plan(payload: PartnerPlanRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    membership = partner_membership(user, db)
+    if membership.organization_role not in {"owner", "organization_admin"}:
+        raise HTTPException(status_code=403, detail="Organization administrator access required")
+    if payload.plan_code not in PARTNER_PLANS:
+        raise HTTPException(status_code=400, detail="Unsupported partner plan")
+    org = db.get(PartnerOrganization, membership.organization_id); org.plan_code = payload.plan_code; db.commit()
+    return {"saved": True, "plan_code": payload.plan_code}
+
+
+@app.post("/api/partner/team")
+def partner_add_team(payload: PartnerTeamRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    membership = partner_membership(user, db)
+    if membership.organization_role not in {"owner", "organization_admin"}:
+        raise HTTPException(status_code=403, detail="Organization administrator access required")
+    if payload.organization_role not in {"organization_admin", "manager", "viewer"}:
+        raise HTTPException(status_code=400, detail="Unsupported organization role")
+    email = str(payload.email).lower().strip()
+    if db.query(User).filter(func.lower(User.email) == email).first():
+        raise HTTPException(status_code=409, detail="Email already exists")
+    member = User(email=email, password_hash=hash_password(payload.password), role="partner_member")
+    db.add(member); db.flush(); db.add(UserProfile(user_id=member.id, first_name=payload.first_name, last_name=payload.last_name, branch="Army", service_status="Partner", city="", state="")); db.add(PartnerMembership(organization_id=membership.organization_id, user_id=member.id, organization_role=payload.organization_role)); db.commit()
+    return {"created": True, "email": email}
+
+
 @app.get("/auth/me", response_model=ProfileOut)
 def me(user: User = Depends(get_current_user)):
     return profile_out(user)
@@ -2106,6 +2263,28 @@ def admin_overview(_: User = Depends(admin_required), db: Session = Depends(get_
 def admin_users(_: User = Depends(admin_required), db: Session = Depends(get_db)):
     rows = db.query(User).order_by(User.id.desc()).all()
     return [{"id": u.id, "email": u.email, "role": u.role, "active": u.is_active, "first_name": u.profile.first_name if u.profile else "", "last_name": u.profile.last_name if u.profile else "", "rank": u.profile.rank if u.profile else "", "branch": u.profile.branch if u.profile else "", "service_status": u.profile.service_status if u.profile else "", "va_rating": u.profile.va_rating if u.profile else "", "city": u.profile.city if u.profile else "", "state": u.profile.state if u.profile else ""} for u in rows]
+
+
+@app.get("/admin/partners")
+def admin_partners(_: User = Depends(admin_required), db: Session = Depends(get_db)):
+    return [partner_payload(org, db)["organization"] | {"team": partner_payload(org, db)["team"]} for org in db.query(PartnerOrganization).order_by(PartnerOrganization.id.desc()).all()]
+
+
+@app.patch("/admin/partners/{partner_id}/status")
+def admin_partner_status(partner_id: int, payload: PartnerStatusRequest, _: User = Depends(admin_required), db: Session = Depends(get_db)):
+    if payload.approval_status not in {"pending_review", "approved", "suspended"}:
+        raise HTTPException(status_code=400, detail="Unsupported approval status")
+    org = db.get(PartnerOrganization, partner_id)
+    if not org: raise HTTPException(status_code=404, detail="Partner not found")
+    org.approval_status = payload.approval_status; db.commit()
+    return {"updated": True, "approval_status": org.approval_status}
+
+
+@app.get("/admin/partners/{partner_id}/preview")
+def admin_partner_preview(partner_id: int, _: User = Depends(admin_required), db: Session = Depends(get_db)):
+    org = db.get(PartnerOrganization, partner_id)
+    if not org: raise HTTPException(status_code=404, detail="Partner not found")
+    return partner_payload(org, db)
 
 
 @app.get("/admin/activity")
