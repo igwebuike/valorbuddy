@@ -788,3 +788,29 @@ html[data-branch="navy"],body[data-branch="navy"],.app.navy,.loginPage.navy{
 .grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr))!important;min-width:0}.card{min-width:0;overflow:hidden}.card h3,.card p,.card small,.card a{max-width:100%;overflow-wrap:anywhere;word-break:break-word}
 @media(max-width:1200px){.adminUsersGrid{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}}
 @media(max-width:700px){.adminUsersGrid{grid-template-columns:1fr}.adminUserTop{gap:8px}.adminUserCard{padding:15px}.adminUserEmail{font-size:.88rem}.adminUsersHeading{align-items:flex-end}}
+
+/* =========================================================
+   ValorBuddy v5.3.8 — compact dashboard and admin portal control
+   ========================================================= */
+.hero{align-items:start!important;padding:32px!important;gap:28px!important}
+.hero>div:first-child{align-self:start;padding:8px 0}
+.hero h1{font-size:clamp(2rem,3.5vw,3.4rem)!important;line-height:1.08!important;margin-bottom:16px!important}
+.hero .voiceBox{padding:18px!important;min-width:0}
+.hero .voiceBox h3{font-size:1.15rem!important;margin:0}
+.hero .voiceIntro{margin:10px 0!important;font-size:.9rem!important;line-height:1.4!important}
+.hero .voiceSettings,.hero .voicePreferenceRow{display:none!important}
+.hero .voiceUtilityRow{display:flex!important;justify-content:center!important;margin:8px 0!important}
+.hero .voiceUtilityRow>button{display:none!important}
+.hero .voiceUtilityRow>.locationButton{display:inline-flex!important;width:auto!important;grid-column:auto!important}
+.hero .mic{width:112px!important;height:112px!important;margin:14px auto!important;border-width:3px!important}
+.hero .mic svg{width:28px!important;height:28px!important}
+.hero .reply{max-height:112px;overflow:auto;margin-top:10px!important;padding:11px!important;font-size:.9rem;line-height:1.4!important}
+.hero .suggestionWrap{display:grid!important;grid-template-columns:1fr 1fr!important;gap:7px!important;margin-top:10px!important}
+.hero .suggestionWrap button{margin:0!important;padding:8px 10px!important;font-size:.78rem!important;min-width:0!important}
+.hero .suggestionWrap button:nth-child(n+5){display:none!important}
+.heroStatus{margin-top:16px!important}
+.adminPartnerActions .portalPreviewButton{background:#0b69a3!important;color:#fff!important;border-color:#42b9ed!important}
+.partnerHeaderActions button{display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+@media(max-width:1100px){.hero{grid-template-columns:minmax(0,1fr) 330px!important}}
+@media(max-width:900px){.hero{grid-template-columns:1fr!important;padding:18px!important;margin:12px!important}.hero .suggestionWrap{grid-template-columns:1fr 1fr!important}.hero>div:first-child{padding:0}.hero h1{font-size:2rem!important;letter-spacing:.08em!important}}
+@media(max-width:480px){.hero .suggestionWrap{grid-template-columns:1fr!important}.hero .suggestionWrap button:nth-child(n+4){display:none!important}}
