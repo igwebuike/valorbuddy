@@ -1461,7 +1461,7 @@ def reminder_dispatcher_loop():
         time.sleep(REMINDER_POLL_SECONDS)
 
 
-app = FastAPI(title=APP_NAME, version="5.3.8")
+app = FastAPI(title=APP_NAME, version="5.3.9")
 origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
 app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
@@ -1518,7 +1518,7 @@ def startup():
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": APP_NAME, "version": "5.3.8", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY), "va_facilities": bool(VA_FACILITIES_API_KEY)}
+    return {"status": "ok", "app": APP_NAME, "version": "5.3.9", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY), "va_facilities": bool(VA_FACILITIES_API_KEY)}
 
 
 @app.get("/db/tables")

@@ -810,6 +810,7 @@ html[data-branch="navy"],body[data-branch="navy"],.app.navy,.loginPage.navy{
 .hero .suggestionWrap button:nth-child(n+5){display:none!important}
 .heroStatus{margin-top:16px!important}
 .adminPartnerActions .portalPreviewButton{background:#0b69a3!important;color:#fff!important;border-color:#42b9ed!important}
+.adminRetryButton{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 16px;border:1px solid var(--accent);background:color-mix(in srgb,var(--accent) 18%,var(--panel));color:var(--text);font-weight:900;cursor:pointer}.adminRetryButton:disabled{opacity:.65;cursor:wait}
 .partnerHeaderActions button{display:inline-flex;align-items:center;gap:7px;cursor:pointer}
 @media(max-width:1100px){.hero{grid-template-columns:minmax(0,1fr) 330px!important}}
 @media(max-width:900px){.hero{grid-template-columns:1fr!important;padding:18px!important;margin:12px!important}.hero .suggestionWrap{grid-template-columns:1fr 1fr!important}.hero>div:first-child{padding:0}.hero h1{font-size:2rem!important;letter-spacing:.08em!important}}
