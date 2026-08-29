@@ -13,11 +13,16 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor-community/text-to-speech": "8.0.2",
+    "@capacitor/android": "8.5.0",
+    "@capacitor/core": "8.5.0",
+    "@capgo/capacitor-speech-recognition": "8.1.10",
     "lucide-react": "0.453.0",
     "react": "18.3.1",
     "react-dom": "18.3.1"
   },
   "devDependencies": {
+    "@capacitor/cli": "8.5.0",
     "@vitejs/plugin-react": "4.3.4",
     "vite": "5.4.21"
   }
