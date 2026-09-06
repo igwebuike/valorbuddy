@@ -31,7 +31,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, create_engine, func, inspect, text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, create_engine, func
 from sqlalchemy.orm import Session, declarative_base, relationship, sessionmaker
 from app.agentic import AGENT_CATALOG as VOS_AGENT_CATALOG, TOOL_CATALOG as VOS_TOOL_CATALOG, CORE_PRINCIPLE as VOS_CORE_PRINCIPLE, route_goal, build_fallback_plan, build_agent_prompt, agent_opening
 from app.security import SecuritySettings, configuration_findings, emit_security_event, hash_password, password_needs_rehash, security_middleware, verify_password
@@ -1546,50 +1546,6 @@ def startup():
     if findings and SECURITY_SETTINGS.enforce_config:
         raise RuntimeError("Unsafe production configuration: " + " ".join(findings))
     Base.metadata.create_all(bind=engine)
-    # Lightweight additive migration for existing PostgreSQL/SQLite deployments.
-    additions = {
-        "rank": "VARCHAR(120) DEFAULT ''", "service_status": "VARCHAR(80) DEFAULT 'Veteran'",
-        "service_start_year": "VARCHAR(10) DEFAULT ''", "service_end_year": "VARCHAR(10) DEFAULT ''",
-        "deployment_history": "TEXT DEFAULT ''", "va_rating": "VARCHAR(30) DEFAULT ''",
-        "accessibility_needs": "JSON", "preferred_music_genres": "JSON", "profile_data": "JSON"
-    }
-    with engine.begin() as conn:
-        user_additions = {
-            "approval_status": "VARCHAR(50) DEFAULT 'approved' NOT NULL",
-            "mfa_secret_encrypted": "TEXT",  # nosec B105
-            "mfa_enabled": "BOOLEAN DEFAULT FALSE NOT NULL",
-            "password_reset_digest": "VARCHAR(64)",  # nosec B105
-            "password_reset_expires_at": "TIMESTAMP",  # nosec B105
-        }
-        user_existing = {c["name"] for c in inspect(engine).get_columns("users")}
-        for name, sql_type in user_additions.items():
-            if name not in user_existing:
-                try:
-                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {sql_type}"))
-                except Exception as exc:
-                    logger.warning("User security migration skipped for %s: %s", name, exc)
-        conn.execute(text("UPDATE users SET approval_status='approved' WHERE approval_status IS NULL OR approval_status=''"))
-        existing = {c["name"] for c in inspect(engine).get_columns("user_profiles")}
-        for name, sql_type in additions.items():
-            if name not in existing:
-                try:
-                    conn.execute(text(f"ALTER TABLE user_profiles ADD COLUMN {name} {sql_type}"))
-                except Exception as exc:
-                    logger.warning("Profile migration skipped for %s: %s", name, exc)
-        reminder_additions = {
-            "timezone_name": "VARCHAR(120) DEFAULT 'UTC'",
-            "due_at": "TIMESTAMP",
-            "notified_at": "TIMESTAMP",
-            "completed_at": "TIMESTAMP",
-            "delivery_state": "VARCHAR(50) DEFAULT 'scheduled'",
-        }
-        reminder_existing = {c["name"] for c in inspect(engine).get_columns("reminders")}
-        for name, sql_type in reminder_additions.items():
-            if name not in reminder_existing:
-                try:
-                    conn.execute(text(f"ALTER TABLE reminders ADD COLUMN {name} {sql_type}"))
-                except Exception as exc:
-                    logger.warning("Reminder migration skipped for %s: %s", name, exc)
     db = SessionLocal()
     try:
         # Encrypt legacy sensitive profile fields, extracted document text, summaries,
