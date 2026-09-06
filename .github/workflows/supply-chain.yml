@@ -1,23 +1,37 @@
 name: Secrets, vulnerabilities and SBOM
+
 on:
   pull_request:
   push:
-    branches: [main]
+    branches:
+      - main
   schedule:
-    - cron: '17 6 * * 1'
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
 permissions:
   contents: read
   security-events: write
+
 jobs:
   scan:
+    name: Secrets, vulnerabilities and SBOM
     runs-on: ubuntu-latest
+    timeout-minutes: 30
+
     steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
-      - uses: gitleaks/gitleaks-action@v2
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan repository for exposed secrets
+        uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: aquasecurity/trivy-action@0.33.1
+
+      - name: Scan dependencies and repository
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -25,17 +39,28 @@ jobs:
           output: trivy-results.sarif
           severity: CRITICAL,HIGH
           ignore-unfixed: true
-          exit-code: '1'
-      - uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with: { sarif_file: trivy-results.sarif }
-      - uses: anchore/sbom-action@v0
+          exit-code: "1"
+          scanners: vuln,secret,misconfig
+          limit-severities-for-sarif: true
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always() && hashFiles('trivy-results.sarif') != ''
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-filesystem
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@v0
         with:
           path: .
           format: spdx-json
           output-file: valorbuddy-sbom.spdx.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: valorbuddy-sbom
-          path: valorbuddy-sbom.spdx.json
 
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: valorbuddy-sbom-${{ github.sha }}
+          path: valorbuddy-sbom.spdx.json
+          if-no-files-found: error
+          retention-days: 90
