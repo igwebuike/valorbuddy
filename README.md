@@ -1,4 +1,30 @@
-# ValorBuddy Production AI Upgrade v4.1
+# ValorBuddy v6.0 Security-Standardized Platform
+
+This release preserves the existing Veteran member platform, AI/agentic missions, benefits and VA facilities navigation, voice controls, disclaimer banner, signed-up-member administration, Vendor Marketplace control, partner application/login, and partner portal.
+
+## Security release additions
+
+- DEV, STAGING and PROD configuration templates with separate database/secret boundaries.
+- Production fail-closed validation for weak secrets, wildcard CORS and wildcard hosts.
+- HTTPS/HSTS, trusted hosts, request IDs, body limits, authentication/general rate limits and defensive response headers.
+- Password hashing upgraded to PBKDF2-SHA256 at 600,000 iterations while retaining existing-account compatibility.
+- Access-token default reduced from seven days to eight hours.
+- Backend dependencies upgraded and audited; production frontend dependency audit is clean.
+- GitHub gates for Gitleaks, Semgrep, Trivy, pip-audit, npm audit, CodeQL, OWASP ZAP staging scans, OpenSSF Scorecard and Syft SBOM artifacts.
+- Structured security events and example Wazuh rules/File Integrity Monitoring configuration.
+- Guarded PostgreSQL/restic backup and isolated restore-test scripts, plus a pgBackRest example for self-managed PostgreSQL.
+
+Read `docs/SECURITY_ARCHITECTURE.md` and `docs/DEPLOYMENT_AND_RECOVERY.md` before deploying. Security controls reduce risk but do not by themselves establish a VA ATO, FISMA compliance, FedRAMP authorization, or approval to process VA/PHI data.
+
+## Required production settings
+
+Use Render's secret configuration for `DATABASE_URL`, `SECRET_KEY`, `ADMIN_PASSWORD`, API keys, and provider credentials. Do not commit populated environment files. Production will intentionally refuse to start if the secret, CORS, or trusted-host configuration is unsafe.
+
+The root `render.yaml` is the production blueprint. `deploy/render.staging.yaml` is a separately named staging blueprint and must receive its own database and credentials. Never reuse the production PostgreSQL URL in staging.
+
+---
+
+# Earlier release history
 
 The existing UI is preserved. This release upgrades the intelligence layer.
 

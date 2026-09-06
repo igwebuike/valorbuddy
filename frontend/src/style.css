@@ -815,3 +815,13 @@ html[data-branch="navy"],body[data-branch="navy"],.app.navy,.loginPage.navy{
 @media(max-width:1100px){.hero{grid-template-columns:minmax(0,1fr) 330px!important}}
 @media(max-width:900px){.hero{grid-template-columns:1fr!important;padding:18px!important;margin:12px!important}.hero .suggestionWrap{grid-template-columns:1fr 1fr!important}.hero>div:first-child{padding:0}.hero h1{font-size:2rem!important;letter-spacing:.08em!important}}
 @media(max-width:480px){.hero .suggestionWrap{grid-template-columns:1fr!important}.hero .suggestionWrap button:nth-child(n+4){display:none!important}}
+
+/* v6.1 account security and member approval controls */
+.textButton{width:100%;margin-top:10px;background:transparent!important;border:0!important;color:var(--accent2)!important;text-decoration:underline;font-weight:850;cursor:pointer}
+.authSuccess{padding:11px 13px;border:1px solid #45c96b;border-radius:8px;background:rgba(25,120,60,.2);line-height:1.45;color:var(--text)}
+.mfaSecret{display:block;margin:12px 0;padding:13px;border:1px solid var(--border);background:#07150c;color:var(--accent2);font-size:1rem;letter-spacing:.08em;overflow-wrap:anywhere;user-select:all}
+.adminUserApproval{display:flex;flex-direction:column;gap:10px;margin-top:14px;padding-top:12px;border-top:1px solid color-mix(in srgb,var(--border) 55%,transparent)}
+.adminUserApproval>.statusPill{align-self:flex-start;text-transform:capitalize}
+.adminUserApproval .adminPartnerActions{display:flex;flex-wrap:wrap;gap:7px}
+.adminUserApproval .adminPartnerActions button{min-height:38px;padding:8px 11px}
+@media(max-width:600px){.adminUserApproval .adminPartnerActions button{flex:1 1 90px}.mfaSecret{font-size:.86rem}}

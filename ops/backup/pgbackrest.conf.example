@@ -1,0 +1,12 @@
+[global]
+repo1-path=/var/lib/pgbackrest
+repo1-retention-full=4
+repo1-cipher-type=aes-256-cbc
+repo1-cipher-pass=LOAD_FROM_SECRET_MANAGER
+process-max=4
+start-fast=y
+
+[valorbuddy]
+pg1-path=/var/lib/postgresql/data
+pg1-port=5432
+

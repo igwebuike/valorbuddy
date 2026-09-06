@@ -297,7 +297,7 @@ function PrivacyPolicy(){
 
       <section className="privacyCard">
         <h2>7. Data retention</h2>
-        <p>We retain information for as long as reasonably necessary to provide the service, maintain your account, meet legal and security obligations, resolve disputes, and enforce agreements. Retention periods vary by data type and purpose. Information may remain in encrypted backups for a limited period after deletion before being overwritten.</p>
+        <p>We retain account data while an account is active, password-reset tokens for up to 30 minutes, security and access logs for 365 days, and encrypted backups under a limited rotation. See our <a href="/data-retention-policy">Data Retention and Deletion Policy</a> for the complete schedule.</p>
       </section>
 
       <section className="privacyCard">
@@ -309,7 +309,7 @@ function PrivacyPolicy(){
           <li>Request access, correction, export, restriction, objection, or deletion where applicable.</li>
           <li>Withdraw consent for optional processing by disabling the relevant permission or contacting us.</li>
         </ul>
-        <div className="privacyCallout"><h3>Account and data deletion</h3><p>To request deletion of your ValorBuddy account and associated personal data, visit our <a href="/delete-account">Account Deletion page</a>. You may also email <a href="mailto:eugene.ebem@datastruma.com?subject=ValorBuddy%20Account%20Deletion%20Request">eugene.ebem@datastruma.com</a>. We may need to verify your identity before completing the request.</p></div>
+        <div className="privacyCallout"><h3>Account and data deletion</h3><p>To request deletion of your ValorBuddy account and associated personal data, visit our <a href="/delete-account">Account Deletion page</a>. You may also email <a href="mailto:privacy@valorbuddy.com?subject=ValorBuddy%20Account%20Deletion%20Request">privacy@valorbuddy.com</a>. We may need to verify your identity before completing the request.</p></div>
       </section>
 
       <section className="privacyCard">
@@ -335,7 +335,7 @@ function PrivacyPolicy(){
       <section className="privacyCard privacyContact">
         <h2>13. Contact us</h2>
         <p>Questions, privacy requests, and complaints may be directed to:</p>
-        <address><b>TAGUS Technologies LLC</b><br/>ValorBuddy Privacy Team<br/><a href="mailto:eugene.ebem@datastruma.com">eugene.ebem@datastruma.com</a><br/><a href="https://valorbuddy.com">https://valorbuddy.com</a></address>
+        <address><b>TAGUS Technologies LLC</b><br/>ValorBuddy Privacy Team<br/><a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a><br/><a href="https://valorbuddy.com">https://valorbuddy.com</a></address>
       </section>
     </main>
     <footer className="privacyFooter"><span>© 2026 TAGUS Technologies LLC. All rights reserved.</span><a href="/">ValorBuddy Home</a></footer>
@@ -345,7 +345,7 @@ function PrivacyPolicy(){
 function AccountDeletion(){
   const updated='August 2, 2026';
   const subject='ValorBuddy Account Deletion Request';
-  const mailto=`mailto:eugene.ebem@datastruma.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent('Please delete my ValorBuddy account and associated data.\n\nAccount email: \nFull name: \nReason (optional): \n')}`;
+  const mailto=`mailto:privacy@valorbuddy.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent('Please delete my ValorBuddy account and associated data.\n\nAccount email: \nFull name: \nReason (optional): \n')}`;
   return <div className="privacyPage deletionPage">
     <header className="privacyHeader">
       <a className="privacyBrand" href="/" aria-label="Return to ValorBuddy home"><img src={valorLogo} alt="ValorBuddy"/><span><b>ValorBuddy</b><small>Your Digital Battle Buddy</small></span></a>
@@ -363,7 +363,7 @@ function AccountDeletion(){
         <h2>Submit a deletion request</h2>
         <p>Send the request from the email address connected to your ValorBuddy account. This helps us verify that you are authorized to delete the account.</p>
         <a className="deletionButton" href={mailto}>Email account deletion request</a>
-        <p className="deletionEmail">Email: <a href="mailto:eugene.ebem@datastruma.com">eugene.ebem@datastruma.com</a><br/>Subject: <b>{subject}</b></p>
+        <p className="deletionEmail">Email: <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a><br/>Subject: <b>{subject}</b></p>
       </section>
 
       <section className="privacyCard">
@@ -403,17 +403,22 @@ function AccountDeletion(){
 
       <section className="privacyCard privacyContact">
         <h2>Contact</h2>
-        <address><b>TAGUS Technologies LLC</b><br/>ValorBuddy Privacy Team<br/><a href="mailto:eugene.ebem@datastruma.com">eugene.ebem@datastruma.com</a><br/><a href="https://valorbuddy.com/privacy-policy">Privacy Policy</a></address>
+        <address><b>TAGUS Technologies LLC</b><br/>ValorBuddy Privacy Team<br/><a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a><br/><a href="https://valorbuddy.com/privacy-policy">Privacy Policy</a></address>
       </section>
     </main>
     <footer className="privacyFooter"><span>© 2026 TAGUS Technologies LLC. All rights reserved.</span><span><a href="/privacy-policy">Privacy Policy</a> · <a href="/">ValorBuddy Home</a></span></footer>
   </div>
 }
 
+function DataRetentionPolicy(){
+  return <div className="privacyPage"><header className="privacyHeader"><a className="privacyBrand" href="/"><img src={valorLogo} alt="ValorBuddy"/><span><b>ValorBuddy</b><small>Your Digital Battle Buddy</small></span></a><nav className="privacyNav"><a href="/privacy-policy">Privacy Policy</a><a href="/delete-account">Delete Account</a></nav></header><main className="privacyShell"><section className="privacyHero"><span className="privacyEyebrow">TAGUS TECHNOLOGIES LLC</span><h1>Data Retention and Deletion Policy</h1><p>How ValorBuddy protects, retains, and removes member information.</p><div className="privacyMeta"><span><b>Effective:</b> September 6, 2026</span></div></section><section className="privacyCard"><h2>Retention schedule</h2><ul><li><b>Account and profile:</b> retained while the account is active and removed after a verified deletion request, subject to limited legal or security holds.</li><li><b>Sensitive service information:</b> deployment history and VA disability-rating fields are encrypted and retained only while supplied by the member.</li><li><b>Uploaded documents:</b> DD214s, VA records, resumes, and certifications are encrypted at rest and retained until the member deletes them or closes the account.</li><li><b>Password-reset tokens:</b> expire after 30 minutes and are automatically purged.</li><li><b>Security and access logs:</b> retained for 365 days unless a documented incident or legal hold requires longer retention.</li><li><b>Encrypted backups:</b> expire through the normal backup rotation, normally within 35 days.</li></ul></section><section className="privacyCard"><h2>Access safeguards</h2><p>Sensitive profile and document access is logged. Administrator access uses role-based controls and mandatory multi-factor authentication. Marketplace vendors cannot access private conversations, documents, medical information, reminders, or sensitive profile fields.</p></section><section className="privacyCard"><h2>Your choices</h2><p>Delete individual documents, reminders, memories, and preferences inside ValorBuddy where controls are available. For complete account deletion, use the <a href="/delete-account">account-deletion page</a> or email <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a> from your registered address.</p></section></main><footer className="privacyFooter"><span>© 2026 TAGUS Technologies LLC.</span><a href="/">ValorBuddy Home</a></footer></div>
+}
+
 function App(){
   const path=window.location.pathname.replace(/\/+$/,'')||'/';
   if(path==='/privacy'||path==='/privacy-policy') return <PrivacyPolicy/>;
   if(path==='/delete-account'||path==='/account-deletion'||path==='/delete-my-account') return <AccountDeletion/>;
+  if(path==='/data-retention-policy') return <DataRetentionPolicy/>;
   return <ValorBuddyApplication/>;
 }
 
@@ -426,6 +431,22 @@ function ValorBuddyApplication(){
   const[branchTheme,setBranchTheme]=useState(()=>normalizeBranch(localStorage.getItem('valor_branch_theme')||'Army'));
   const[adminPartnerPreview,setAdminPartnerPreview]=useState(null);
   useEffect(()=>{applyBranchTheme(branchTheme)},[branchTheme]);
+  useEffect(()=>{
+    const downloadSecureDocument=async event=>{
+      const link=event.target.closest?.('a[href*="/api/documents/"][href$="/file"]');
+      if(!link)return;
+      event.preventDefault();
+      try{
+        const response=await fetch(link.href,{headers:authHeaders()});
+        if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.detail||'Secure document download failed')}
+        const blob=await response.blob(),url=URL.createObjectURL(blob),download=document.createElement('a');
+        download.href=url;download.download=link.closest('article')?.querySelector('h3')?.textContent||'ValorBuddy-document';download.click();
+        setTimeout(()=>URL.revokeObjectURL(url),1000);
+      }catch(error){window.alert(error.message)}
+    };
+    document.addEventListener('click',downloadSecureDocument,true);
+    return()=>document.removeEventListener('click',downloadSecureDocument,true);
+  },[token]);
   useEffect(()=>{
     if(!token){setLoading(false);return}
     api('/auth/me').then(u=>{
@@ -496,10 +517,18 @@ function Auth({onLogin}){
   const[partnerMode,setPartnerMode]=useState('login');
   const[show,setShow]=useState(false);
   const[err,setErr]=useState('');
+  const[message,setMessage]=useState('');
   const[busy,setBusy]=useState(false);
-  const[form,setForm]=useState({email:'',password:'',first_name:'',last_name:'',branch:'Army',city:'',state:'',rank:'',service_status:'Veteran',service_start_year:'',service_end_year:'',deployment_history:'',va_rating:'',contact_name:'',contact_title:'',organization_name:'',organization_type:'Business',website:'',phone:'',estimated_veterans:250,plan_code:'community',onboarding_goal:''});
+  const initialResetToken=new URLSearchParams(window.location.search).get('reset_token')||'';
+  const[recoveryMode,setRecoveryMode]=useState(initialResetToken?'reset':'');
+  const[mfaNeeded,setMfaNeeded]=useState(false);
+  const[mfaSetup,setMfaSetup]=useState(null);
+  const[mfaSetupToken,setMfaSetupToken]=useState('');
+  const[form,setForm]=useState({email:'',password:'',new_password:'',mfa_code:'',reset_token:initialResetToken,first_name:'',last_name:'',branch:'Army',city:'',state:'',rank:'',service_status:'Veteran',service_start_year:'',service_end_year:'',deployment_history:'',va_rating:'',contact_name:'',contact_title:'',organization_name:'',organization_type:'Business',website:'',phone:'',estimated_veterans:250,plan_code:'community',onboarding_goal:''});
+  async function recoverySubmit(e){e.preventDefault();setErr('');setMessage('');setBusy(true);try{if(recoveryMode==='forgot'){const d=await api('/auth/forgot-password',{method:'POST',body:JSON.stringify({email:form.email.trim().toLowerCase()})});setMessage(d.message)}else{const d=await api('/auth/reset-password',{method:'POST',body:JSON.stringify({token:form.reset_token,new_password:form.new_password})});setMessage(d.message);window.history.replaceState({},'',window.location.pathname);setRecoveryMode('')}}catch(ex){setErr(ex.message)}finally{setBusy(false)}}
+  async function confirmMfa(e){e.preventDefault();setBusy(true);setErr('');try{const d=await api('/auth/mfa/confirm',{method:'POST',headers:{Authorization:`Bearer ${mfaSetupToken}`},body:JSON.stringify({code:form.mfa_code})});onLogin(d.token,d.user)}catch(ex){setErr(ex.message)}finally{setBusy(false)}}
   async function submit(e){
-    e.preventDefault();if(busy)return;setErr('');
+    e.preventDefault();if(busy)return;setErr('');setMessage('');
     const email=form.email.trim().toLowerCase();
     if(!email){setErr('Enter your email address.');return}
     if(form.password.length<(tab==='partner'?8:6)){setErr(`Password must be at least ${tab==='partner'?8:6} characters.`);return}
@@ -509,11 +538,15 @@ function Auth({onLogin}){
       const endpoint=tab==='partner'?(partnerMode==='apply'?'/auth/partner/register':'/auth/partner/login'):tab==='login'?'/auth/login':'/auth/register';
       const payload={...form,email,first_name:form.first_name.trim(),last_name:form.last_name.trim(),city:form.city.trim(),state:form.state.trim()};
       const d=await api(endpoint,{method:'POST',body:JSON.stringify(payload)});
+      if(d.pending_approval){setMessage(d.message);setTab('login');return}
+      if(d.mfa_setup_required){setMfaSetupToken(d.token);const setup=await api('/auth/mfa/setup',{method:'POST',headers:{Authorization:`Bearer ${d.token}`}});setMfaSetup(setup);return}
       onLogin(d.token,d.user)
-    }catch(ex){setErr(ex.message)}
+    }catch(ex){if(tab==='login'&&String(ex.message).toLowerCase().includes('verification code'))setMfaNeeded(true);setErr(ex.message)}
     finally{setBusy(false)}
   }
   const currentTheme=branches[normalizeBranch(form.branch)]||branches.Army;
+  if(mfaSetup)return <div className={`loginPage ${currentTheme.cls}`} style={currentTheme.style}><div className="loginCard"><div className="brand"><Shield/><h1>Protect administrator access</h1><p>Required multi-factor authentication</p></div><form onSubmit={confirmMfa}><p>In your authenticator app, add an account using this setup key:</p><code className="mfaSecret">{mfaSetup.secret}</code><small>Issuer: ValorBuddy · Account: {form.email}</small><label>6-digit verification code<input required inputMode="numeric" autoComplete="one-time-code" value={form.mfa_code} onChange={e=>setForm({...form,mfa_code:e.target.value.replace(/\D/g,'').slice(0,6)})}/></label>{err&&<p className="err" role="alert">{err}</p>}<button className="primary" disabled={busy}>{busy?'Verifying…':'Enable MFA and continue'}</button></form></div></div>;
+  if(recoveryMode)return <div className={`loginPage ${currentTheme.cls}`} style={currentTheme.style}><div className="loginCard"><div className="brand"><Shield/><h1>ValorBuddy</h1><p>{recoveryMode==='forgot'?'Reset your password':'Choose a new password'}</p></div><form onSubmit={recoverySubmit}>{recoveryMode==='forgot'?<label>Email<input required type="email" autoComplete="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></label>:<label>New password<div className="password"><input required minLength="10" autoComplete="new-password" type={show?'text':'password'} value={form.new_password} onChange={e=>setForm({...form,new_password:e.target.value})}/><button type="button" onClick={()=>setShow(!show)}>{show?<EyeOff/>:<Eye/>}</button></div></label>}{err&&<p className="err" role="alert">{err}</p>}{message&&<p className="authSuccess" role="status">{message}</p>}<button className="primary" disabled={busy}>{busy?'Please wait…':recoveryMode==='forgot'?'Send secure reset link':'Update password'}</button><button className="textButton" type="button" onClick={()=>{setRecoveryMode('');setErr('');setMessage('')}}>Back to sign in</button></form></div></div>;
   return <div className={`loginPage ${tab==='partner'?'partnerLoginPage':currentTheme.cls}`} data-branch={tab==='partner'?'partner':currentTheme.cls} style={tab==='partner'?{}:currentTheme.style}>
     <div className={`loginCard ${tab==='partner'?'partnerLoginCard':''}`}>
       <div className="brand"><Shield/><h1>ValorBuddy</h1><p>{tab==='partner'?'Veteran Marketplace Partner Portal':'Your digital battle buddy'}</p><small>A product of Tagus Technologies LLC</small></div>
@@ -529,8 +562,11 @@ function Auth({onLogin}){
         </>}
         <label>Email<input required type="email" autoComplete="email" inputMode="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></label>
         <label>Password<div className="password"><input required minLength="6" autoComplete={tab==='login'?'current-password':'new-password'} type={show?'text':'password'} value={form.password} onChange={e=>setForm({...form,password:e.target.value})}/><button type="button" aria-label={show?'Hide password':'Show password'} onClick={()=>setShow(!show)}>{show?<EyeOff/>:<Eye/>}</button></div></label>
+        {tab==='login'&&mfaNeeded&&<label>Authenticator code<input required inputMode="numeric" autoComplete="one-time-code" placeholder="6-digit code" value={form.mfa_code} onChange={e=>setForm({...form,mfa_code:e.target.value.replace(/\D/g,'').slice(0,6)})}/></label>}
         {err&&<p className="err" role="alert">{err}</p>}
+        {message&&<p className="authSuccess" role="status">{message}</p>}
         <button className="primary" disabled={busy}>{busy?'Please wait…':tab==='partner'?(partnerMode==='apply'?'Submit partner application':'Enter Partner Portal'):tab==='login'?'Enter Mission Control':'Create Account'}</button>
+        {tab==='login'&&<button className="textButton" type="button" onClick={()=>{setRecoveryMode('forgot');setErr('');setMessage('')}}>Forgot password?</button>}
         {tab==='partner'&&<small className="partnerLegal">Applications require verification. Submitting does not activate billing or grant access to private Veteran information.</small>}
       </form>
       <div className="tagusProductLine">ValorBuddy is a product of <b>Tagus Technologies LLC</b></div>
@@ -872,20 +908,18 @@ function CareerBusiness({user}){
 }
 
 function Admin({onPreview,vendorOnly=false}){
-  const[o,setO]=useState(null);const[users,setUsers]=useState([]);const[partners,setPartners]=useState([]);const[notice,setNotice]=useState('');const[loading,setLoading]=useState(true);
-  async function load(){
-    setLoading(true);setNotice('');
-    const[overviewResult,usersResult,partnersResult]=await Promise.allSettled([api('/admin/overview'),api('/admin/users'),api('/admin/partners')]);
-    if(overviewResult.status==='fulfilled')setO(overviewResult.value);
-    if(usersResult.status==='fulfilled')setUsers(usersResult.value);
-    if(partnersResult.status==='fulfilled')setPartners(partnersResult.value);
-    const failures=[overviewResult,usersResult,partnersResult].filter(x=>x.status==='rejected');
-    if(failures.length)setNotice(`${failures.length} admin section${failures.length>1?'s':''} could not refresh. Existing sections remain visible. Press Retry.`);
-    setLoading(false);
-  }
+  const[o,setO]=useState(null),[users,setUsers]=useState([]),[partners,setPartners]=useState([]),[notice,setNotice]=useState(''),[loading,setLoading]=useState(true);
+  async function load(){setLoading(true);setNotice('');const results=await Promise.allSettled([api('/admin/overview'),api('/admin/users'),api('/admin/partners')]);if(results[0].status==='fulfilled')setO(results[0].value);if(results[1].status==='fulfilled')setUsers(results[1].value);if(results[2].status==='fulfilled')setPartners(results[2].value);const failures=results.filter(x=>x.status==='rejected');if(failures.length)setNotice(`${failures.length} admin section${failures.length>1?'s':''} could not refresh. Existing sections remain visible. Press Retry.`);setLoading(false)}
   useEffect(()=>{load()},[]);
   async function setPartnerStatus(id,status){try{await api(`/admin/partners/${id}/status`,{method:'PATCH',body:JSON.stringify({approval_status:status})});setNotice(`Partner ${status.replaceAll('_',' ')}.`);await load()}catch(e){setNotice(e.message)}}
-  return <section className="page adminPage"><div className="adminUsersHeading"><div><h1>{vendorOnly?'Vendor Marketplace Control':'Admin Dashboard'}</h1><p className="pageLead">{vendorOnly?'Review vendors, open their portal, assign plans and control marketplace access.':'Control signed-up members, partner approvals, marketplace plans and vendor portal access.'}</p></div><button className="adminRetryButton" onClick={load} disabled={loading}>{loading?'Refreshing…':'Retry refresh'}</button></div>{notice&&<div className="partnerMessage">{notice}</div>}{!vendorOnly&&o&&<div className="stats">{Object.entries(o).map(([k,v])=><div key={k}><b>{v}</b><span>{k}</span></div>)}</div>}<div className="adminUsersHeading"><h2>Vendor and partner applications</h2><span>{partners.length} total</span></div><div className="adminPartnerGrid">{partners.length===0&&<div className="emptyState"><Briefcase/><h3>{loading?'Loading applications…':'No vendor applications available'}</h3><p>The Vendor Marketplace link stays available here. Approved applications will include an Open vendor portal button.</p></div>}{partners.map(p=><article key={p.id}><div className="cardTop"><div><small>{p.organization_type}</small><h3>{p.organization_name}</h3></div><span className="statusPill">{p.approval_status.replaceAll('_',' ')}</span></div><p><b>{p.contact_name}</b>{p.contact_title?` · ${p.contact_title}`:''}<br/><a href={`mailto:${p.email}`}>{p.email}</a></p><p>{p.plan_name} · {p.monthly_price_cents?`$${(p.monthly_price_cents/100).toLocaleString()}/month`:'Custom'} · {Number(p.estimated_veterans||0).toLocaleString()} Veterans</p><div className="adminPartnerActions"><button className="portalPreviewButton" onClick={()=>onPreview?.(p.id)}>Open vendor portal</button><button onClick={()=>setPartnerStatus(p.id,'approved')}>Verify and approve</button><button onClick={()=>setPartnerStatus(p.id,'pending_review')}>Return to review</button><button className="dangerButton" onClick={()=>setPartnerStatus(p.id,'suspended')}>Suspend</button></div></article>)}</div>{!vendorOnly&&<><div className="adminUsersHeading"><h2>Signed-up members</h2><span>{users.length} total</span></div><div className="adminUsersGrid">{users.length===0&&!loading&&<div className="emptyState"><User/><h3>Member list could not be loaded</h3><p>Your accounts have not been deleted. Press Retry refresh.</p></div>}{users.map(u=><article className="adminUserCard" key={u.id}><div className="adminUserTop"><div className="adminUserIdentity"><h3>{u.first_name||'Member'}{u.last_name?` ${u.last_name}`:''}</h3><a className="adminUserEmail" href={`mailto:${u.email}`}>{u.email}</a></div><span className={`adminStatus ${u.active?'active':'inactive'}`}>{u.active?'Active':'Inactive'}</span></div><div className="adminUserMeta"><span>{u.role||'member'}</span><span>{u.branch||'Branch not set'}</span></div><small className="adminUserLocation">{[u.city,u.state].filter(Boolean).join(', ')||'Location not set'}</small></article>)}</div></>}</section>
+  async function setMemberStatus(id,status){try{await api(`/admin/users/${id}/approval`,{method:'PATCH',body:JSON.stringify({approval_status:status})});setNotice(`Member ${status}.`);await load()}catch(e){setNotice(e.message)}}
+  return <section className="page adminPage">
+    <div className="adminUsersHeading"><div><h1>{vendorOnly?'Vendor Marketplace Control':'Admin Dashboard'}</h1><p className="pageLead">{vendorOnly?'Review vendors, open their portal, assign plans and control marketplace access.':'Control signed-up members, approvals, marketplace plans and vendor portal access.'}</p></div><button className="adminRetryButton" onClick={load} disabled={loading}>{loading?'Refreshing…':'Retry refresh'}</button></div>
+    {notice&&<div className="partnerMessage">{notice}</div>}{!vendorOnly&&o&&<div className="stats">{Object.entries(o).map(([k,v])=><div key={k}><b>{v}</b><span>{k.replaceAll('_',' ')}</span></div>)}</div>}
+    <div className="adminUsersHeading"><h2>Vendor and partner applications</h2><span>{partners.length} total</span></div>
+    <div className="adminPartnerGrid">{partners.length===0&&<div className="emptyState"><Briefcase/><h3>{loading?'Loading applications…':'No vendor applications available'}</h3><p>The Vendor Marketplace link stays available here.</p></div>}{partners.map(p=><article key={p.id}><div className="cardTop"><div><small>{p.organization_type}</small><h3>{p.organization_name}</h3></div><span className="statusPill">{p.approval_status.replaceAll('_',' ')}</span></div><p><b>{p.contact_name}</b>{p.contact_title?` · ${p.contact_title}`:''}<br/><a href={`mailto:${p.email}`}>{p.email}</a></p><p>{p.plan_name} · {p.monthly_price_cents?`$${(p.monthly_price_cents/100).toLocaleString()}/month`:'Custom'} · {Number(p.estimated_veterans||0).toLocaleString()} Veterans</p><div className="adminPartnerActions"><button className="portalPreviewButton" onClick={()=>onPreview?.(p.id)}>Open vendor portal</button><button onClick={()=>setPartnerStatus(p.id,'approved')}>Verify and approve</button><button onClick={()=>setPartnerStatus(p.id,'pending_review')}>Return to review</button><button className="dangerButton" onClick={()=>setPartnerStatus(p.id,'suspended')}>Suspend</button></div></article>)}</div>
+    {!vendorOnly&&<><div className="adminUsersHeading"><h2>Signed-up members</h2><span>{users.length} total</span></div><div className="adminUsersGrid">{users.length===0&&!loading&&<div className="emptyState"><User/><h3>Member list could not be loaded</h3><p>Your accounts have not been deleted. Press Retry refresh.</p></div>}{users.map(u=><article className="adminUserCard" key={u.id}><div className="adminUserTop"><div className="adminUserIdentity"><h3>{u.first_name||'Member'}{u.last_name?` ${u.last_name}`:''}</h3><a className="adminUserEmail" href={`mailto:${u.email}`}>{u.email}</a></div><span className={`adminStatus ${u.active?'active':'inactive'}`}>{u.active?'Active':'Inactive'}</span></div><div className="adminUserMeta"><span>{u.role||'member'}</span><span>{u.branch||'Branch not set'}</span></div><small className="adminUserLocation">{[u.city,u.state].filter(Boolean).join(', ')||'Location not set'}</small><div className="adminUserApproval"><span className={`statusPill ${u.approval_status||'approved'}`}>{(u.approval_status||'approved').replaceAll('_',' ')}</span>{u.role==='admin'?<small>{u.mfa_enabled?'MFA enabled':'MFA enrollment required'}</small>:<div className="adminPartnerActions"><button onClick={()=>setMemberStatus(u.id,'approved')}>Approve</button><button onClick={()=>setMemberStatus(u.id,'pending')}>Pending</button><button className="dangerButton" onClick={()=>setMemberStatus(u.id,'suspended')}>Suspend</button></div>}</div></article>)}</div></>}
+  </section>
 }
 function Grid({items=[]}){return <div className="grid">{items.map((x,i)=><div className="card"key={i}><h3>{x.title||x.name}</h3><p>{x.description||x.note||x.summary||''}</p><small>{x.location||x.type||x.when_text||''}</small>{x.next_step&&<p><b>Next step:</b> {x.next_step}</p>}{(x.website||x.url||x.maps_url)&&<a target="_blank" rel="noopener noreferrer" href={x.website||x.url||x.maps_url}>{x.website||x.url?'Official website':'Open directions'} ↗</a>}</div>)}</div>}
 export default App;

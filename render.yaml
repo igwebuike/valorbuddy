@@ -9,9 +9,31 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: CORS_ORIGINS
-        value: '*'
+        value: https://valorbuddy.com,https://www.valorbuddy.com,capacitor://localhost,https://localhost,http://localhost
+      - key: ALLOWED_HOSTS
+        value: valorbuddy.onrender.com,valorbuddy.com,www.valorbuddy.com
       - key: ENVIRONMENT
         value: production
+      - key: SECURITY_ENFORCE_CONFIG
+        value: 'true'
+      - key: FORCE_HTTPS
+        value: 'true'
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: '480'
+      - key: DATABASE_URL
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: DATA_ENCRYPTION_KEY
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_MFA_REQUIRED
+        value: 'true'
+      - key: PASSWORD_RESET_BASE_URL
+        value: https://valorbuddy.com
+      - key: RESEND_API_KEY
+        sync: false
   - type: static
     name: valorbuddy-frontend
     rootDir: frontend

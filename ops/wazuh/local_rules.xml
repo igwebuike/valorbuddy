@@ -1,0 +1,13 @@
+<group name="valorbuddy,application,">
+  <rule id="100500" level="5">
+    <decoded_as>json</decoded_as>
+    <field name="event_type">valorbuddy_security</field>
+    <description>ValorBuddy application security event: $(event)</description>
+  </rule>
+  <rule id="100501" level="10">
+    <if_sid>100500</if_sid>
+    <field name="event">authentication_rejected|rate_limit_exceeded|unsafe_configuration</field>
+    <description>ValorBuddy high-priority security event: $(event)</description>
+  </rule>
+</group>
+
