@@ -1,0 +1,14 @@
+<!-- Merge into an authorized Wazuh agent configuration. Validate before restart. -->
+<ossec_config>
+  <localfile>
+    <log_format>json</log_format>
+    <location>/var/log/valorbuddy/security.json.log</location>
+  </localfile>
+  <syscheck>
+    <disabled>no</disabled>
+    <frequency>43200</frequency>
+    <directories check_all="yes" realtime="yes">/opt/valorbuddy/backend/app</directories>
+    <ignore>/opt/valorbuddy/backend/app/__pycache__</ignore>
+  </syscheck>
+</ossec_config>
+

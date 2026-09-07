@@ -1,41 +1,49 @@
 from __future__ import annotations
 
-import hashlib
 import io
+import base64
+import hashlib
 import json
 import os
 import re
-import secrets
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import threading
+import tempfile
 from pathlib import Path
 from urllib.parse import quote_plus
 from typing import Any, List, Optional
 import asyncio
 import logging
+import secrets
 import time
 
 import httpx
 from google import genai
 from google.genai import types
 import jwt
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, UploadFile
+import pyotp
+from cryptography.fernet import Fernet, InvalidToken
+from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import Response
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, create_engine, func, inspect, text
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, create_engine, func
 from sqlalchemy.orm import Session, declarative_base, relationship, sessionmaker
 from app.agentic import AGENT_CATALOG as VOS_AGENT_CATALOG, TOOL_CATALOG as VOS_TOOL_CATALOG, CORE_PRINCIPLE as VOS_CORE_PRINCIPLE, route_goal, build_fallback_plan, build_agent_prompt, agent_opening
+from app.security import SecuritySettings, configuration_findings, emit_security_event, hash_password, password_needs_rehash, security_middleware, verify_password
+from app.data_protection import PREFIX as ENCRYPTED_PREFIX, protect_bytes, protect_text, unprotect_bytes, unprotect_text
 
 APP_NAME = os.getenv("APP_NAME", "ValorBuddy Enterprise API")
-ENVIRONMENT = os.getenv("ENVIRONMENT", "production")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./valorbuddy.db")
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-change-me-valorbuddy")
+SECRET_KEY = os.getenv("SECRET_KEY", "")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "10080"))
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
 # Prefer the dedicated ValorBuddy Gemini key.
 # GOOGLE_API_KEY remains a backward-compatible fallback only.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -49,6 +57,11 @@ ENABLE_GOOGLE_SEARCH_GROUNDING = os.getenv("ENABLE_GOOGLE_SEARCH_GROUNDING", "tr
 AI_TIMEOUT_SECONDS = int(os.getenv("AI_TIMEOUT_SECONDS", "35"))
 ADMIN_EMAIL = os.getenv("ADMIN_EMAIL", "eugene.ebem@gmail.com").lower().strip()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
+ADMIN_MFA_REQUIRED = os.getenv("ADMIN_MFA_REQUIRED", "true").lower() == "true"
+PASSWORD_RESET_BASE_URL = os.getenv("PASSWORD_RESET_BASE_URL", "https://valorbuddy.com").rstrip("/")
+PASSWORD_RESET_EXPIRE_MINUTES = max(10, int(os.getenv("PASSWORD_RESET_EXPIRE_MINUTES", "30")))
+AUTH_FROM_EMAIL = os.getenv("AUTH_FROM_EMAIL", "ValorBuddy Security <security@valorbuddy.com>").strip()
+AUDIT_RETENTION_DAYS = max(90, int(os.getenv("AUDIT_RETENTION_DAYS", "365")))
 logger = logging.getLogger("valorbuddy.ai")
 GOOGLE_MAPS_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY") or os.getenv("GOOGLE_MAPS_API_KEY")
 VA_FACILITIES_API_KEY = os.getenv("VA_FACILITIES_API_KEY", "").strip()
@@ -60,7 +73,7 @@ GOOGLE_CALENDAR_ENABLED = os.getenv("GOOGLE_CALENDAR_ENABLED", "false").lower() 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "").strip()
 REMINDER_FROM_EMAIL = os.getenv("REMINDER_FROM_EMAIL", "ValorBuddy <reminders@valorbuddy.com>").strip()
 REMINDER_POLL_SECONDS = max(15, int(os.getenv("REMINDER_POLL_SECONDS", "30")))
-DATA_DIR = Path(os.getenv("DATA_DIR", "/tmp/valorbuddy"))
+DATA_DIR = Path(os.getenv("DATA_DIR", str(Path(tempfile.gettempdir()) / "valorbuddy")))
 UPLOAD_DIR = DATA_DIR / "uploads"
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -78,6 +91,11 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     role = Column(String(50), nullable=False, default="veteran")
     is_active = Column(Boolean, nullable=False, default=True)
+    approval_status = Column(String(50), nullable=False, default="pending")
+    mfa_secret_encrypted = Column(Text, nullable=True)
+    mfa_enabled = Column(Boolean, nullable=False, default=False)
+    password_reset_digest = Column(String(64), nullable=True, index=True)
+    password_reset_expires_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     profile = relationship("UserProfile", back_populates="user", uselist=False)
 
@@ -276,40 +294,48 @@ def get_db():
         db.close()
 
 
-def hash_password(password: str) -> str:
-    salt = secrets.token_hex(16)
-    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 120_000).hex()
-    return f"pbkdf2_sha256${salt}${digest}"
+def create_access_token(user: User, purpose: str = "access", minutes: int | None = None) -> str:
+    exp = datetime.now(timezone.utc) + timedelta(minutes=minutes or ACCESS_TOKEN_EXPIRE_MINUTES)
+    return jwt.encode({"sub": str(user.id), "email": user.email, "role": user.role, "purpose": purpose, "exp": exp}, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def verify_password(password: str, stored: str) -> bool:
+def decode_user_token(token: str, db: Session, purposes: set[str]) -> tuple[User, dict[str, Any]]:
     try:
-        algo, salt, digest = stored.split("$", 2)
-        if algo != "pbkdf2_sha256":
-            return False
-        candidate = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 120_000).hex()
-        return secrets.compare_digest(candidate, digest)
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        if payload.get("purpose", "access") not in purposes:
+            raise ValueError("wrong token purpose")
+        user = db.get(User, int(payload["sub"]))
     except Exception:
-        return False
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Invalid user")
+    return user, payload
 
 
-def create_access_token(user: User) -> str:
-    exp = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    return jwt.encode({"sub": str(user.id), "email": user.email, "role": user.role, "exp": exp}, SECRET_KEY, algorithm=ALGORITHM)
+def _fernet() -> Fernet:
+    material = os.getenv("DATA_ENCRYPTION_KEY", "") or SECRET_KEY
+    key = base64.urlsafe_b64encode(hashlib.sha256(material.encode()).digest())
+    return Fernet(key)
+
+
+def encrypt_secret(secret: str) -> str:
+    return _fernet().encrypt(secret.encode()).decode()
+
+
+def decrypt_secret(value: str | None) -> str:
+    if not value:
+        raise HTTPException(status_code=400, detail="MFA setup has not started")
+    try:
+        return _fernet().decrypt(value.encode()).decode()
+    except InvalidToken:
+        raise HTTPException(status_code=400, detail="MFA configuration cannot be read; start setup again")
 
 
 def get_current_user(authorization: str | None = Header(default=None), db: Session = Depends(get_db)) -> User:
     if not authorization or not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Authentication required")
     token = authorization.split(" ", 1)[1].strip()
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = int(payload["sub"])
-    except Exception:
-        raise HTTPException(status_code=401, detail="Invalid token")
-    user = db.get(User, user_id)
-    if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="Invalid user")
+    user, _ = decode_user_token(token, db, {"access"})
     return user
 
 
@@ -379,6 +405,24 @@ class ProfileUpdate(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
+    mfa_code: str = ""
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(min_length=20)
+    new_password: str = Field(min_length=10)
+
+
+class MfaCodeRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=8)
+
+
+class UserApprovalRequest(BaseModel):
+    approval_status: str
 
 
 class PartnerRegisterRequest(BaseModel):
@@ -444,8 +488,11 @@ class ProfileOut(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    token: str
-    user: ProfileOut
+    token: str = ""
+    user: ProfileOut | None = None
+    pending_approval: bool = False
+    mfa_setup_required: bool = False
+    message: str = ""
 
 
 class CompanionRequest(BaseModel):
@@ -523,7 +570,7 @@ def profile_out(user: User) -> ProfileOut:
         rank=p.rank if p else "", branch=p.branch if p else "Army",
         service_status=p.service_status if p else "Veteran",
         service_start_year=p.service_start_year if p else "", service_end_year=p.service_end_year if p else "",
-        deployment_history=p.deployment_history if p else "", va_rating=p.va_rating if p else "",
+        deployment_history=unprotect_text(p.deployment_history) if p else "", va_rating=unprotect_text(p.va_rating) if p else "",
         city=p.city if p else "", state=p.state if p else "", interests=p.interests if p else [],
         accessibility_needs=(p.accessibility_needs or []) if p else [], preferred_music_genres=(p.preferred_music_genres or []) if p else [],
         profile_data=p.profile_data if p and p.profile_data else {},
@@ -1343,7 +1390,7 @@ Answer naturally and specifically. Include spouse, child, dependent, caregiver, 
         "first_name": first_name, "last_name": getattr(profile, "last_name", ""), "rank": getattr(profile, "rank", ""),
         "branch": branch, "service_status": getattr(profile, "service_status", user_type),
         "service_years": f"{getattr(profile, 'service_start_year', '')}-{getattr(profile, 'service_end_year', '')}",
-        "deployment_history": getattr(profile, "deployment_history", ""), "va_rating": getattr(profile, "va_rating", ""),
+        "deployment_history": unprotect_text(getattr(profile, "deployment_history", "")), "va_rating": unprotect_text(getattr(profile, "va_rating", "")),
         "current_city": city, "current_state": state, "interests": getattr(profile, "interests", []),
         "accessibility_needs": getattr(profile, "accessibility_needs", [])
     }
@@ -1461,64 +1508,101 @@ def reminder_dispatcher_loop():
         time.sleep(REMINDER_POLL_SECONDS)
 
 
-app = FastAPI(title=APP_NAME, version="5.3.9")
+app = FastAPI(
+    title=APP_NAME,
+    version="6.0.0",
+    docs_url=None if ENVIRONMENT == "production" else "/docs",
+    redoc_url=None if ENVIRONMENT == "production" else "/redoc",
+    openapi_url=None if ENVIRONMENT == "production" else "/openapi.json",
+)
+SECURITY_SETTINGS = SecuritySettings.from_env()
+
+
+@app.middleware("http")
+async def apply_security_controls(request: Request, call_next):
+    return await security_middleware(request, call_next, SECURITY_SETTINGS)
+
+
 origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
-app.add_middleware(CORSMiddleware, allow_origins=origins or ["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+allowed_origins = origins or ["http://localhost:5173", "http://127.0.0.1:5173"]
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(SECURITY_SETTINGS.allowed_hosts))
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials="*" not in allowed_origins,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+)
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 
 @app.on_event("startup")
 def startup():
+    if not SECRET_KEY:
+        raise RuntimeError("SECRET_KEY is required; ValorBuddy will not start with a built-in signing secret")
+    findings = configuration_findings(SECURITY_SETTINGS, SECRET_KEY, CORS_ORIGINS)
+    for finding in findings:
+        emit_security_event("unsafe_configuration", finding=finding)
+    if findings and SECURITY_SETTINGS.enforce_config:
+        raise RuntimeError("Unsafe production configuration: " + " ".join(findings))
     Base.metadata.create_all(bind=engine)
-    # Lightweight additive migration for existing PostgreSQL/SQLite deployments.
-    additions = {
-        "rank": "VARCHAR(120) DEFAULT ''", "service_status": "VARCHAR(80) DEFAULT 'Veteran'",
-        "service_start_year": "VARCHAR(10) DEFAULT ''", "service_end_year": "VARCHAR(10) DEFAULT ''",
-        "deployment_history": "TEXT DEFAULT ''", "va_rating": "VARCHAR(30) DEFAULT ''",
-        "accessibility_needs": "JSON", "preferred_music_genres": "JSON", "profile_data": "JSON"
-    }
-    with engine.begin() as conn:
-        existing = {c["name"] for c in inspect(engine).get_columns("user_profiles")}
-        for name, sql_type in additions.items():
-            if name not in existing:
-                try:
-                    conn.execute(text(f"ALTER TABLE user_profiles ADD COLUMN {name} {sql_type}"))
-                except Exception as exc:
-                    logger.warning("Profile migration skipped for %s: %s", name, exc)
-        reminder_additions = {
-            "timezone_name": "VARCHAR(120) DEFAULT 'UTC'",
-            "due_at": "TIMESTAMP",
-            "notified_at": "TIMESTAMP",
-            "completed_at": "TIMESTAMP",
-            "delivery_state": "VARCHAR(50) DEFAULT 'scheduled'",
-        }
-        reminder_existing = {c["name"] for c in inspect(engine).get_columns("reminders")}
-        for name, sql_type in reminder_additions.items():
-            if name not in reminder_existing:
-                try:
-                    conn.execute(text(f"ALTER TABLE reminders ADD COLUMN {name} {sql_type}"))
-                except Exception as exc:
-                    logger.warning("Reminder migration skipped for %s: %s", name, exc)
     db = SessionLocal()
     try:
+        # Encrypt legacy sensitive profile fields, extracted document text, summaries,
+        # and non-photo uploaded files in place. The prefix makes this migration idempotent.
+        for profile in db.query(UserProfile).all():
+            profile.deployment_history = protect_text(profile.deployment_history)
+            profile.va_rating = protect_text(profile.va_rating)
+        for document in db.query(Document).all():
+            if document.doc_type != "memory_photo":
+                document.extracted_text = protect_text(document.extracted_text)
+                document.ai_summary = protect_text(document.ai_summary)
+                if document.file_url and document.file_url.startswith("/uploads/"):
+                    stored = (UPLOAD_DIR / Path(document.file_url).name).resolve()
+                    if stored.parent == UPLOAD_DIR.resolve() and stored.exists():
+                        current = stored.read_bytes()
+                        if not current.startswith(ENCRYPTED_PREFIX.encode()):
+                            stored.write_bytes(protect_bytes(current))
         admin = db.query(User).filter(User.email == ADMIN_EMAIL).first()
         if not admin and ADMIN_PASSWORD:
-            admin = User(email=ADMIN_EMAIL, password_hash=hash_password(ADMIN_PASSWORD), role="admin")
+            admin = User(email=ADMIN_EMAIL, password_hash=hash_password(ADMIN_PASSWORD), role="admin", approval_status="approved")
             db.add(admin); db.flush()
             db.add(UserProfile(user_id=admin.id, first_name="Eugene", last_name="Ebem", branch="Army", service_status="Veteran", city="Dallas", state="TX", interests=["administration", "veteran support"]))
         elif admin and admin.role != "admin":
             admin.role = "admin"
+        if admin:
+            admin.approval_status = "approved"
+            admin.is_active = True
         db.commit()
     finally:
         db.close()
+    run_retention_cleanup()
     if os.getenv("REMINDER_DISPATCHER_ENABLED", "true").lower() == "true":
         thread = threading.Thread(target=reminder_dispatcher_loop, name="valorbuddy-reminders", daemon=True)
         thread.start()
 
 
+def run_retention_cleanup() -> None:
+    """Remove expired recovery material and security logs beyond documented retention."""
+    db = SessionLocal()
+    try:
+        now = datetime.now(timezone.utc)
+        expired = db.query(User).filter(User.password_reset_expires_at.is_not(None), User.password_reset_expires_at < now).all()
+        for user in expired:
+            user.password_reset_digest = None
+            user.password_reset_expires_at = None
+        db.query(AdminAuditLog).filter(AdminAuditLog.created_at < now - timedelta(days=AUDIT_RETENTION_DAYS)).delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        db.rollback(); logger.exception("Retention cleanup failed")
+    finally:
+        db.close()
+
+
 @app.get("/health")
 def health():
-    return {"status": "ok", "app": APP_NAME, "version": "5.3.9", "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY), "va_facilities": bool(VA_FACILITIES_API_KEY)}
+    findings = configuration_findings(SECURITY_SETTINGS, SECRET_KEY, CORS_ORIGINS)
+    return {"status": "ok", "app": APP_NAME, "version": "6.2.0", "environment": ENVIRONMENT, "security_ready": not findings, "database": "postgres" if DATABASE_URL.startswith("postgres") else "sqlite", "gemini": bool(GEMINI_API_KEY), "google_places": bool(GOOGLE_MAPS_API_KEY), "va_facilities": bool(VA_FACILITIES_API_KEY), "admin_mfa_required": ADMIN_MFA_REQUIRED}
 
 
 @app.get("/db/tables")
@@ -1532,7 +1616,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     if db.query(User).filter(func.lower(User.email) == email).first():
         raise HTTPException(status_code=409, detail="Email already exists")
     try:
-        user = User(email=email, password_hash=hash_password(payload.password), role="veteran")
+        user = User(email=email, password_hash=hash_password(payload.password), role="veteran", approval_status="pending")
         db.add(user); db.flush()
         db.add(UserProfile(
             user_id=user.id,
@@ -1543,8 +1627,8 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
             service_status=payload.service_status,
             service_start_year=payload.service_start_year,
             service_end_year=payload.service_end_year,
-            deployment_history=payload.deployment_history,
-            va_rating=payload.va_rating,
+            deployment_history=protect_text(payload.deployment_history),
+            va_rating=protect_text(payload.va_rating),
             city=payload.city.strip(),
             state=payload.state.strip(),
             interests=payload.interests,
@@ -1561,8 +1645,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         db.rollback()
         logger.exception("User registration failed for %s", email)
         raise HTTPException(status_code=500, detail="Account creation failed. Please try again.")
-    token = create_access_token(user)
-    return LoginResponse(token=token, user=profile_out(user))
+    return LoginResponse(pending_approval=True, message="Account created. An administrator must approve it before you can sign in.")
 
 
 @app.post("/auth/login", response_model=LoginResponse)
@@ -1570,9 +1653,88 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == str(payload.email).lower()).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    if user.role == "veteran" and user.approval_status != "approved":
+        raise HTTPException(status_code=403, detail="Your account is awaiting administrator approval.")
+    if password_needs_rehash(user.password_hash):
+        user.password_hash = hash_password(payload.password)
+    if user.role == "admin" and ADMIN_MFA_REQUIRED:
+        if not user.mfa_enabled:
+            db.commit()
+            return LoginResponse(token=create_access_token(user, "mfa_setup", 10), user=profile_out(user), mfa_setup_required=True, message="Set up administrator MFA to continue.")
+        secret = decrypt_secret(user.mfa_secret_encrypted)
+        if not payload.mfa_code or not pyotp.TOTP(secret).verify(payload.mfa_code.strip(), valid_window=1):
+            raise HTTPException(status_code=401, detail="Administrator verification code required or invalid.")
     token = create_access_token(user)
-    db.add(AuthToken(user_id=user.id, token=token)); db.add(AdminAuditLog(user_id=user.id, action="user.login", details=user.email)); db.commit()
+    # Bearer tokens are returned to the client but never persisted as reusable credentials.
+    db.add(AdminAuditLog(user_id=user.id, action="user.login", details=user.email)); db.commit()
     return LoginResponse(token=token, user=profile_out(user))
+
+
+def token_user(authorization: str | None, db: Session, purposes: set[str]) -> User:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return decode_user_token(authorization.split(" ", 1)[1].strip(), db, purposes)[0]
+
+
+@app.post("/auth/mfa/setup")
+def mfa_setup(authorization: str | None = Header(default=None), db: Session = Depends(get_db)):
+    user = token_user(authorization, db, {"mfa_setup", "access"})
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Administrator access required")
+    secret = pyotp.random_base32()
+    user.mfa_secret_encrypted = encrypt_secret(secret)
+    user.mfa_enabled = False
+    db.add(AdminAuditLog(user_id=user.id, action="admin.mfa_setup_started", details=user.email)); db.commit()
+    return {"secret": secret, "provisioning_uri": pyotp.TOTP(secret).provisioning_uri(name=user.email, issuer_name="ValorBuddy"), "issuer": "ValorBuddy"}
+
+
+@app.post("/auth/mfa/confirm", response_model=LoginResponse)
+def mfa_confirm(payload: MfaCodeRequest, authorization: str | None = Header(default=None), db: Session = Depends(get_db)):
+    user = token_user(authorization, db, {"mfa_setup"})
+    if user.role != "admin" or not pyotp.TOTP(decrypt_secret(user.mfa_secret_encrypted)).verify(payload.code.strip(), valid_window=1):
+        raise HTTPException(status_code=401, detail="Invalid verification code")
+    user.mfa_enabled = True
+    db.add(AdminAuditLog(user_id=user.id, action="admin.mfa_enabled", details=user.email)); db.commit()
+    return LoginResponse(token=create_access_token(user), user=profile_out(user), message="Administrator MFA is enabled.")
+
+
+def send_password_reset_email(recipient: str, reset_url: str) -> bool:
+    if not RESEND_API_KEY:
+        logger.warning("Password reset requested but RESEND_API_KEY is not configured")
+        return False
+    try:
+        response = httpx.post("https://api.resend.com/emails", headers={"Authorization": f"Bearer {RESEND_API_KEY}"}, json={"from": AUTH_FROM_EMAIL, "to": [recipient], "subject": "Reset your ValorBuddy password", "html": f'<p>A password reset was requested for your ValorBuddy account.</p><p><a href="{reset_url}">Reset password</a></p><p>This link expires in {PASSWORD_RESET_EXPIRE_MINUTES} minutes. If you did not request it, ignore this message.</p>'}, timeout=15)
+        response.raise_for_status(); return True
+    except Exception:
+        logger.exception("Password reset email delivery failed")
+        return False
+
+
+@app.post("/auth/forgot-password")
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(func.lower(User.email) == str(payload.email).lower()).first()
+    if user:
+        raw = secrets.token_urlsafe(32)
+        user.password_reset_digest = hashlib.sha256(raw.encode()).hexdigest()
+        user.password_reset_expires_at = datetime.now(timezone.utc) + timedelta(minutes=PASSWORD_RESET_EXPIRE_MINUTES)
+        db.add(AdminAuditLog(user_id=user.id, action="user.password_reset_requested", details=user.email)); db.commit()
+        send_password_reset_email(user.email, f"{PASSWORD_RESET_BASE_URL}/?reset_token={quote_plus(raw)}")
+    return {"message": "If that account exists, a password-reset link has been sent."}
+
+
+@app.post("/auth/reset-password")
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    digest = hashlib.sha256(payload.token.encode()).hexdigest()
+    user = db.query(User).filter(User.password_reset_digest == digest).first()
+    expires = user.password_reset_expires_at if user else None
+    if expires and expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if not user or not expires or expires < datetime.now(timezone.utc):
+        raise HTTPException(status_code=400, detail="This password-reset link is invalid or expired.")
+    user.password_hash = hash_password(payload.new_password)
+    user.password_reset_digest = None; user.password_reset_expires_at = None
+    db.add(AdminAuditLog(user_id=user.id, action="user.password_reset_completed", details=user.email)); db.commit()
+    return {"message": "Password updated. You can now sign in."}
 
 
 PARTNER_PLANS = {
@@ -1638,6 +1800,8 @@ def partner_login(payload: LoginRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="Invalid partner email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Partner account is inactive")
+    if password_needs_rehash(user.password_hash):
+        user.password_hash = hash_password(payload.password)
     db.add(AdminAuditLog(user_id=user.id, action="partner.login", details=user.email)); db.commit()
     return LoginResponse(token=create_access_token(user), user=profile_out(user))
 
@@ -1681,7 +1845,8 @@ def me(user: User = Depends(get_current_user)):
 
 
 @app.get("/api/profile")
-def get_profile(user: User = Depends(get_current_user)):
+def get_profile(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    db.add(AdminAuditLog(user_id=user.id, action="sensitive.profile_read", details="self-service profile access")); db.commit()
     return profile_out(user).model_dump()
 
 @app.post("/api/profile/branch")
@@ -1704,7 +1869,8 @@ def update_profile_branch(payload: BranchUpdate, user: User = Depends(get_curren
 def update_profile(payload: ProfileUpdate, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     p = user.profile or UserProfile(user_id=user.id, first_name=payload.first_name)
     for field in ("first_name", "last_name", "rank", "branch", "service_status", "service_start_year", "service_end_year", "deployment_history", "va_rating", "city", "state", "interests", "accessibility_needs", "preferred_music_genres", "profile_data", "military_mos", "military_job_title", "military_experience", "civilian_career_goal", "business_interest", "military_specialty_description", "years_of_service", "security_clearance", "highest_education", "civilian_certifications", "linkedin_url"):
-        setattr(p, field, getattr(payload, field))
+        value = getattr(payload, field)
+        setattr(p, field, protect_text(value) if field in {"deployment_history", "va_rating"} else value)
     p.updated_at = datetime.now(timezone.utc)
     db.add(p); db.add(AdminAuditLog(user_id=user.id, action="profile.updated", details=f"{payload.first_name} {payload.last_name}".strip()))
     db.commit(); db.refresh(user)
@@ -2131,12 +2297,12 @@ async def upload_document(doc_type: str = Form("general"), file: UploadFile = Fi
     original_name = Path(file.filename or "document").name
     safe_name = f"{user.id}_{int(datetime.now().timestamp())}_{re.sub(r'[^A-Za-z0-9._-]+','_',original_name)}"
     path = UPLOAD_DIR / safe_name
-    path.write_bytes(content)
     extracted = _extract_document_text(original_name, content)
     detected_type = _document_type_from_name(original_name, doc_type, extracted)
+    path.write_bytes(content if detected_type == "memory_photo" else protect_bytes(content))
     analysis = await _analyze_document(original_name, detected_type, extracted, user)
     summary = str(analysis.get("summary") or "Document uploaded and indexed.")[:6000]
-    row = Document(user_id=user.id, filename=original_name, doc_type=detected_type, file_url=f"/uploads/{safe_name}", extracted_text=extracted, ai_summary=summary, analysis_json=analysis, status="processed" if extracted else "needs_ocr", processed_at=datetime.now(timezone.utc))
+    row = Document(user_id=user.id, filename=original_name, doc_type=detected_type, file_url=f"/uploads/{safe_name}", extracted_text=protect_text(extracted) if detected_type != "memory_photo" else extracted, ai_summary=protect_text(summary) if detected_type != "memory_photo" else summary, analysis_json=analysis, status="processed" if extracted else "needs_ocr", processed_at=datetime.now(timezone.utc))
     db.add(row); db.flush()
     # Persist high-value extracted facts as reviewable memory, never as invented truth.
     if detected_type == "resume":
@@ -2152,13 +2318,29 @@ async def upload_document(doc_type: str = Form("general"), file: UploadFile = Fi
             mission = await create_agent_mission(MissionCreateIn(goal=goal, title=f"Analyze {original_name}"), user, db)
         except Exception as exc:
             logger.exception("Automatic document mission failed: %s", exc)
-    return {"id": row.id, "filename": row.filename, "doc_type": row.doc_type, "file_url": row.file_url, "ai_summary": row.ai_summary, "analysis": analysis, "status": row.status, "mission": mission}
+    public_url = row.file_url if detected_type == "memory_photo" else f"/api/documents/{row.id}/file"
+    return {"id": row.id, "filename": row.filename, "doc_type": row.doc_type, "file_url": public_url, "ai_summary": summary, "analysis": analysis, "status": row.status, "mission": mission}
 
 
 @app.get("/api/documents")
 def list_documents(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.query(Document).filter(Document.user_id == user.id).order_by(Document.id.desc()).all()
-    return [{"id": r.id, "filename": r.filename, "doc_type": r.doc_type, "file_url": r.file_url, "ai_summary": r.ai_summary, "analysis": r.analysis_json or {}, "status": r.status, "processed_at": r.processed_at} for r in rows]
+    db.add(AdminAuditLog(user_id=user.id, action="sensitive.document_list_read", details=f"count={len(rows)}")); db.commit()
+    return [{"id": r.id, "filename": r.filename, "doc_type": r.doc_type, "file_url": r.file_url if r.doc_type == "memory_photo" else f"/api/documents/{r.id}/file", "ai_summary": unprotect_text(r.ai_summary), "analysis": r.analysis_json or {}, "status": r.status, "processed_at": r.processed_at} for r in rows]
+
+
+@app.get("/api/documents/{document_id}/file")
+def open_document_file(document_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    document = db.query(Document).filter(Document.id == document_id, Document.user_id == user.id).first()
+    if not document or not document.file_url or not document.file_url.startswith("/uploads/"):
+        raise HTTPException(status_code=404, detail="Document not found")
+    stored = (UPLOAD_DIR / Path(document.file_url).name).resolve()
+    if stored.parent != UPLOAD_DIR.resolve() or not stored.exists():
+        raise HTTPException(status_code=404, detail="Stored file not found")
+    content = unprotect_bytes(stored.read_bytes())
+    db.add(AdminAuditLog(user_id=user.id, action="sensitive.document_file_read", details=f"document_id={document.id}")); db.commit()
+    safe_download = re.sub(r'[^A-Za-z0-9._-]+', '_', document.filename)
+    return Response(content=content, media_type="application/octet-stream", headers={"Content-Disposition": f'attachment; filename="{safe_download}"', "Cache-Control": "no-store"})
 
 
 
@@ -2256,13 +2438,33 @@ async def vapi_action(payload: VapiActionRequest, db: Session = Depends(get_db))
 
 @app.get("/admin/overview")
 def admin_overview(_: User = Depends(admin_required), db: Session = Depends(get_db)):
-    return {"users": db.query(User).count(), "veterans": db.query(User).filter(User.role == "veteran").count(), "admins": db.query(User).filter(User.role == "admin").count(), "reminders": db.query(Reminder).count(), "memories": db.query(Memory).count(), "conversations": db.query(Conversation).count(), "messages": db.query(Message).count(), "documents": db.query(Document).count(), "activity_searches": db.query(ActivitySearch).count()}
+    week_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    month_ago = datetime.now(timezone.utc) - timedelta(days=30)
+    active_7d = db.query(func.count(func.distinct(Message.user_id))).filter(Message.user_id.is_not(None), Message.created_at >= week_ago).scalar() or 0
+    active_30d = db.query(func.count(func.distinct(Message.user_id))).filter(Message.user_id.is_not(None), Message.created_at >= month_ago).scalar() or 0
+    repeat_members = db.query(Message.user_id).filter(Message.role == "user", Message.user_id.is_not(None)).group_by(Message.user_id).having(func.count(Message.id) >= 2).count()
+    return {"users": db.query(User).count(), "pending_members": db.query(User).filter(User.role == "veteran", User.approval_status == "pending").count(), "veterans": db.query(User).filter(User.role == "veteran").count(), "active_members_7d": active_7d, "active_members_30d": active_30d, "repeat_ai_members": repeat_members, "partner_applications": db.query(PartnerOrganization).count(), "reminders": db.query(Reminder).count(), "memories": db.query(Memory).count(), "conversations": db.query(Conversation).count(), "messages": db.query(Message).count(), "documents": db.query(Document).count(), "activity_searches": db.query(ActivitySearch).count()}
 
 
 @app.get("/admin/users")
 def admin_users(_: User = Depends(admin_required), db: Session = Depends(get_db)):
     rows = db.query(User).order_by(User.id.desc()).all()
-    return [{"id": u.id, "email": u.email, "role": u.role, "active": u.is_active, "first_name": u.profile.first_name if u.profile else "", "last_name": u.profile.last_name if u.profile else "", "rank": u.profile.rank if u.profile else "", "branch": u.profile.branch if u.profile else "", "service_status": u.profile.service_status if u.profile else "", "va_rating": u.profile.va_rating if u.profile else "", "city": u.profile.city if u.profile else "", "state": u.profile.state if u.profile else ""} for u in rows]
+    return [{"id": u.id, "email": u.email, "role": u.role, "active": u.is_active, "approval_status": u.approval_status, "mfa_enabled": bool(u.mfa_enabled), "first_name": u.profile.first_name if u.profile else "", "last_name": u.profile.last_name if u.profile else "", "rank": u.profile.rank if u.profile else "", "branch": u.profile.branch if u.profile else "", "service_status": u.profile.service_status if u.profile else "", "city": u.profile.city if u.profile else "", "state": u.profile.state if u.profile else ""} for u in rows]
+
+
+@app.patch("/admin/users/{user_id}/approval")
+def admin_user_approval(user_id: int, payload: UserApprovalRequest, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
+    if payload.approval_status not in {"pending", "approved", "rejected", "suspended"}:
+        raise HTTPException(status_code=400, detail="Unsupported approval status")
+    target = db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Member not found")
+    if target.role == "admin":
+        raise HTTPException(status_code=400, detail="Administrator access cannot be changed here")
+    target.approval_status = payload.approval_status
+    target.is_active = payload.approval_status in {"pending", "approved"}
+    db.add(AdminAuditLog(user_id=admin.id, action="member.approval_changed", details=f"{target.email}: {payload.approval_status}")); db.commit()
+    return {"updated": True, "approval_status": target.approval_status, "active": target.is_active}
 
 
 @app.get("/admin/partners")

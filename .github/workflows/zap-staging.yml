@@ -1,0 +1,28 @@
+name: OWASP ZAP staging baseline
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Isolated staging URL only
+        required: true
+        default: https://staging.valorbuddy.com
+permissions:
+  contents: read
+  issues: write
+jobs:
+  zap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Refuse production target
+        run: |
+          case "${{ inputs.target }}" in
+            *staging*|*test*) exit 0 ;;
+            *) echo "Target must contain staging or test"; exit 1 ;;
+          esac
+      - uses: zaproxy/action-baseline@v0.15.0
+        with:
+          target: '${{ inputs.target }}'
+          fail_action: true
+          allow_issue_writing: true
+
