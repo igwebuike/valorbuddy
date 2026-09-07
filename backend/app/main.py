@@ -31,7 +31,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import Response
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, create_engine, func
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, create_engine, func, inspect, text
 from sqlalchemy.orm import Session, declarative_base, relationship, sessionmaker
 from app.agentic import AGENT_CATALOG as VOS_AGENT_CATALOG, TOOL_CATALOG as VOS_TOOL_CATALOG, CORE_PRINCIPLE as VOS_CORE_PRINCIPLE, route_goal, build_fallback_plan, build_agent_prompt, agent_opening
 from app.security import SecuritySettings, configuration_findings, emit_security_event, hash_password, password_needs_rehash, security_middleware, verify_password
@@ -1546,6 +1546,80 @@ def startup():
     if findings and SECURITY_SETTINGS.enforce_config:
         raise RuntimeError("Unsafe production configuration: " + " ".join(findings))
     Base.metadata.create_all(bind=engine)
+    # Lightweight additive migration for existing PostgreSQL/SQLite deployments.
+    additions = {
+        "rank": "VARCHAR(120) DEFAULT ''", "service_status": "VARCHAR(80) DEFAULT 'Veteran'",
+        "service_start_year": "VARCHAR(10) DEFAULT ''", "service_end_year": "VARCHAR(10) DEFAULT ''",
+        "deployment_history": "TEXT DEFAULT ''", "va_rating": "VARCHAR(30) DEFAULT ''",
+        "accessibility_needs": "JSON", "preferred_music_genres": "JSON", "profile_data": "JSON"
+    }
+    with engine.begin() as conn:
+        user_additions = {
+            "approval_status": "VARCHAR(50) DEFAULT 'approved' NOT NULL",
+            "mfa_secret_encrypted": "TEXT",  # nosec B105
+            "mfa_enabled": "BOOLEAN DEFAULT FALSE NOT NULL",
+            "password_reset_digest": "VARCHAR(64)",  # nosec B105
+            "password_reset_expires_at": "TIMESTAMP",  # nosec B105
+        }
+        user_existing = {c["name"] for c in inspect(engine).get_columns("users")}
+        for name, sql_type in user_additions.items():
+            if name not in user_existing:
+                try:
+                    # The identifiers and SQL types are selected only from the fixed
+                    # user_additions allowlist above; request data cannot reach this DDL.
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {sql_type}"))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
+                except Exception as exc:
+                    logger.warning("User security migration skipped for %s: %s", name, exc)
+        conn.execute(text("UPDATE users SET approval_status='approved' WHERE approval_status IS NULL OR approval_status=''"))
+        existing = {c["name"] for c in inspect(engine).get_columns("user_profiles")}
+        for name, sql_type in additions.items():
+            if name not in existing:
+                try:
+                    # Values come exclusively from the fixed additions allowlist.
+                    conn.execute(text(f"ALTER TABLE user_profiles ADD COLUMN {name} {sql_type}"))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
+                except Exception as exc:
+                    logger.warning("Profile migration skipped for %s: %s", name, exc)
+        reminder_additions = {
+            "timezone_name": "VARCHAR(120) DEFAULT 'UTC'",
+            "due_at": "TIMESTAMP",
+            "notified_at": "TIMESTAMP",
+            "completed_at": "TIMESTAMP",
+            "delivery_state": "VARCHAR(50) DEFAULT 'scheduled'",
+        }
+        reminder_existing = {c["name"] for c in inspect(engine).get_columns("reminders")}
+        for name, sql_type in reminder_additions.items():
+            if name not in reminder_existing:
+                try:
+                    # Values come exclusively from the fixed reminder_additions allowlist.
+                    conn.execute(text(f"ALTER TABLE reminders ADD COLUMN {name} {sql_type}"))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
+                except Exception as exc:
+                    logger.warning("Reminder migration skipped for %s: %s", name, exc)
+        # Existing deployments can already have the legacy partner table. SQLAlchemy's
+        # create_all() creates missing tables but does not add newly introduced columns.
+        # Keep this migration additive and idempotent so partner applications work after
+        # an ordinary deployment without replacing or deleting existing partner data.
+        partner_additions = {
+            "organization_type": "VARCHAR(120) DEFAULT 'Business'",
+            "contact_name": "VARCHAR(255) DEFAULT ''",
+            "contact_title": "VARCHAR(180) DEFAULT ''",
+            "email": "VARCHAR(255) DEFAULT ''",
+            "phone": "VARCHAR(80) DEFAULT ''",
+            "website": "VARCHAR(500) DEFAULT ''",
+            "estimated_veterans": "INTEGER DEFAULT 0 NOT NULL",
+            "plan_code": "VARCHAR(50) DEFAULT 'community' NOT NULL",
+            "approval_status": "VARCHAR(50) DEFAULT 'pending_review' NOT NULL",
+            "billing_status": "VARCHAR(50) DEFAULT 'not_activated' NOT NULL",
+            "onboarding_goal": "TEXT DEFAULT ''",
+            "created_at": "TIMESTAMP",
+        }
+        partner_existing = {c["name"] for c in inspect(engine).get_columns("partner_organizations")}
+        for name, sql_type in partner_additions.items():
+            if name not in partner_existing:
+                try:
+                    # Values come exclusively from the fixed partner_additions allowlist.
+                    conn.execute(text(f"ALTER TABLE partner_organizations ADD COLUMN {name} {sql_type}"))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
+                except Exception as exc:
+                    logger.warning("Partner migration skipped for %s: %s", name, exc)
     db = SessionLocal()
     try:
         # Encrypt legacy sensitive profile fields, extracted document text, summaries,
@@ -1781,7 +1855,7 @@ def partner_register(payload: PartnerRegisterRequest, db: Session = Depends(get_
         user = User(email=email, password_hash=hash_password(payload.password), role="partner_owner")
         db.add(user); db.flush()
         db.add(UserProfile(user_id=user.id, first_name=names[0] or "Partner", last_name=names[1] if len(names) > 1 else "", branch="Army", service_status="Partner", city="", state=""))
-        org = PartnerOrganization(organization_name=payload.organization_name.strip(), organization_type=payload.organization_type, contact_name=payload.contact_name.strip(), contact_title=payload.contact_title, email=email, phone=payload.phone, website=payload.website, estimated_veterans=max(0, payload.estimated_veterans), plan_code=payload.plan_code, onboarding_goal=payload.onboarding_goal)
+        org = PartnerOrganization(organization_name=payload.organization_name.strip(), organization_type=payload.organization_type, contact_name=payload.contact_name.strip(), contact_title=payload.contact_title, email=email, phone=payload.phone, website=(payload.website or "").strip(), estimated_veterans=max(0, payload.estimated_veterans), plan_code=payload.plan_code, onboarding_goal=payload.onboarding_goal)
         db.add(org); db.flush()
         db.add(PartnerMembership(organization_id=org.id, user_id=user.id, organization_role="owner"))
         db.add(AdminAuditLog(user_id=user.id, action="partner.application_submitted", details=org.organization_name))
