@@ -1565,7 +1565,9 @@ def startup():
         for name, sql_type in user_additions.items():
             if name not in user_existing:
                 try:
-                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {sql_type}"))
+                    # The identifiers and SQL types are selected only from the fixed
+                    # user_additions allowlist above; request data cannot reach this DDL.
+                    conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {sql_type}"))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
                 except Exception as exc:
                     logger.warning("User security migration skipped for %s: %s", name, exc)
         conn.execute(text("UPDATE users SET approval_status='approved' WHERE approval_status IS NULL OR approval_status=''"))
@@ -1573,7 +1575,8 @@ def startup():
         for name, sql_type in additions.items():
             if name not in existing:
                 try:
-                    conn.execute(text(f"ALTER TABLE user_profiles ADD COLUMN {name} {sql_type}"))
+                    # Values come exclusively from the fixed additions allowlist.
+                    conn.execute(text(f"ALTER TABLE user_profiles ADD COLUMN {name} {sql_type}"))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
                 except Exception as exc:
                     logger.warning("Profile migration skipped for %s: %s", name, exc)
         reminder_additions = {
@@ -1587,7 +1590,8 @@ def startup():
         for name, sql_type in reminder_additions.items():
             if name not in reminder_existing:
                 try:
-                    conn.execute(text(f"ALTER TABLE reminders ADD COLUMN {name} {sql_type}"))
+                    # Values come exclusively from the fixed reminder_additions allowlist.
+                    conn.execute(text(f"ALTER TABLE reminders ADD COLUMN {name} {sql_type}"))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
                 except Exception as exc:
                     logger.warning("Reminder migration skipped for %s: %s", name, exc)
         # Existing deployments can already have the legacy partner table. SQLAlchemy's
@@ -1612,7 +1616,8 @@ def startup():
         for name, sql_type in partner_additions.items():
             if name not in partner_existing:
                 try:
-                    conn.execute(text(f"ALTER TABLE partner_organizations ADD COLUMN {name} {sql_type}"))
+                    # Values come exclusively from the fixed partner_additions allowlist.
+                    conn.execute(text(f"ALTER TABLE partner_organizations ADD COLUMN {name} {sql_type}"))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
                 except Exception as exc:
                     logger.warning("Partner migration skipped for %s: %s", name, exc)
     db = SessionLocal()
