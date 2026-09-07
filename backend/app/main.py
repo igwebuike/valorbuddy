@@ -164,6 +164,33 @@ class PartnerMembership(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
+class PartnerListing(Base):
+    __tablename__ = "partner_listings"
+    id = Column(Integer, primary_key=True)
+    organization_id = Column(Integer, ForeignKey("partner_organizations.id"), nullable=False, index=True)
+    created_by_user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    listing_type = Column(String(40), nullable=False, default="product")
+    title = Column(String(180), nullable=False)
+    description = Column(Text, nullable=False, default="")
+    image_url = Column(String(1000), nullable=True, default="")
+    destination_url = Column(String(1000), nullable=True, default="")
+    price_label = Column(String(80), nullable=True, default="")
+    veteran_offer = Column(String(255), nullable=True, default="")
+    promo_code = Column(String(80), nullable=True, default="")
+    audience_state = Column(String(80), nullable=True, default="")
+    audience_city = Column(String(120), nullable=True, default="")
+    audience_branch = Column(String(80), nullable=True, default="All")
+    starts_at = Column(DateTime(timezone=True), nullable=True)
+    ends_at = Column(DateTime(timezone=True), nullable=True)
+    status = Column(String(40), nullable=False, default="draft", index=True)
+    impressions = Column(Integer, nullable=False, default=0)
+    clicks = Column(Integer, nullable=False, default=0)
+    redemptions = Column(Integer, nullable=False, default=0)
+    admin_note = Column(Text, nullable=True, default="")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
 class AuthToken(Base):
     __tablename__ = "auth_tokens"
     id = Column(Integer, primary_key=True)
@@ -453,6 +480,28 @@ class PartnerTeamRequest(BaseModel):
 
 class PartnerStatusRequest(BaseModel):
     approval_status: str
+
+
+class PartnerListingRequest(BaseModel):
+    listing_type: str = "product"
+    title: str = Field(min_length=2, max_length=180)
+    description: str = Field(default="", max_length=4000)
+    image_url: str = Field(default="", max_length=1000)
+    destination_url: str = Field(default="", max_length=1000)
+    price_label: str = Field(default="", max_length=80)
+    veteran_offer: str = Field(default="", max_length=255)
+    promo_code: str = Field(default="", max_length=80)
+    audience_state: str = Field(default="", max_length=80)
+    audience_city: str = Field(default="", max_length=120)
+    audience_branch: str = Field(default="All", max_length=80)
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    submit_for_review: bool = False
+
+
+class PartnerListingStatusRequest(BaseModel):
+    status: str
+    admin_note: str = Field(default="", max_length=2000)
 
 
 class ProfileOut(BaseModel):
@@ -1565,8 +1614,6 @@ def startup():
         for name, sql_type in user_additions.items():
             if name not in user_existing:
                 try:
-                    # The identifiers and SQL types are selected only from the fixed
-                    # user_additions allowlist above; request data cannot reach this DDL.
                     conn.execute(text(f"ALTER TABLE users ADD COLUMN {name} {sql_type}"))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
                 except Exception as exc:
                     logger.warning("User security migration skipped for %s: %s", name, exc)
@@ -1575,7 +1622,6 @@ def startup():
         for name, sql_type in additions.items():
             if name not in existing:
                 try:
-                    # Values come exclusively from the fixed additions allowlist.
                     conn.execute(text(f"ALTER TABLE user_profiles ADD COLUMN {name} {sql_type}"))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
                 except Exception as exc:
                     logger.warning("Profile migration skipped for %s: %s", name, exc)
@@ -1590,7 +1636,6 @@ def startup():
         for name, sql_type in reminder_additions.items():
             if name not in reminder_existing:
                 try:
-                    # Values come exclusively from the fixed reminder_additions allowlist.
                     conn.execute(text(f"ALTER TABLE reminders ADD COLUMN {name} {sql_type}"))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
                 except Exception as exc:
                     logger.warning("Reminder migration skipped for %s: %s", name, exc)
@@ -1616,7 +1661,6 @@ def startup():
         for name, sql_type in partner_additions.items():
             if name not in partner_existing:
                 try:
-                    # Values come exclusively from the fixed partner_additions allowlist.
                     conn.execute(text(f"ALTER TABLE partner_organizations ADD COLUMN {name} {sql_type}"))  # nosemgrep: python.sqlalchemy.security.audit.avoid-sqlalchemy-text.avoid-sqlalchemy-text
                 except Exception as exc:
                     logger.warning("Partner migration skipped for %s: %s", name, exc)
@@ -1834,13 +1878,57 @@ def partner_payload(org: PartnerOrganization, db: Session) -> dict[str, Any]:
         if member:
             profile = member.profile
             team.append({"membership_id": membership.id, "user_id": member.id, "email": member.email, "first_name": profile.first_name if profile else "", "last_name": profile.last_name if profile else "", "organization_role": membership.organization_role})
+    listings = db.query(PartnerListing).filter(PartnerListing.organization_id == org.id).all()
     return {
         "organization": {"id": org.id, "organization_name": org.organization_name, "organization_type": org.organization_type, "contact_name": org.contact_name, "contact_title": org.contact_title, "email": org.email, "phone": org.phone, "website": org.website, "estimated_veterans": org.estimated_veterans, "plan_code": org.plan_code, "plan_name": plan["name"], "monthly_price_cents": plan["monthly_price_cents"], "approval_status": org.approval_status, "billing_status": org.billing_status, "onboarding_goal": org.onboarding_goal},
-        "metrics": {"veterans_reached": 0, "resource_views": 0, "referrals_started": 0, "offers_redeemed": 0},
+        "metrics": {
+            "live_listings": sum(1 for item in listings if item.status == "published"),
+            "impressions": sum(item.impressions or 0 for item in listings),
+            "referral_clicks": sum(item.clicks or 0 for item in listings),
+            "offers_redeemed": sum(item.redemptions or 0 for item in listings),
+        },
         "team": team,
         "next_steps": ["Complete organization verification", "Publish the first Veteran offer or resource", "Define pilot audience and success measures", "Launch a privacy-safe Veteran marketplace campaign"],
         "privacy_note": "Partners receive aggregate engagement and referral outcomes only. Private Veteran conversations, documents, reminders, medical information, and profile details are never exposed.",
     }
+
+
+PARTNER_LISTING_TYPES = {"product", "service", "job", "event", "discount", "resource"}
+PARTNER_LISTING_LIMITS = {"community": 10, "professional": 50, "enterprise": 500}
+
+
+def partner_listing_out(item: PartnerListing, organization_name: str = "") -> dict[str, Any]:
+    return {
+        "id": item.id,
+        "organization_id": item.organization_id,
+        "organization_name": organization_name,
+        "listing_type": item.listing_type,
+        "title": item.title,
+        "description": item.description,
+        "image_url": item.image_url,
+        "destination_url": item.destination_url,
+        "price_label": item.price_label,
+        "veteran_offer": item.veteran_offer,
+        "promo_code": item.promo_code,
+        "audience_state": item.audience_state,
+        "audience_city": item.audience_city,
+        "audience_branch": item.audience_branch,
+        "starts_at": item.starts_at.isoformat() if item.starts_at else None,
+        "ends_at": item.ends_at.isoformat() if item.ends_at else None,
+        "status": item.status,
+        "impressions": item.impressions or 0,
+        "clicks": item.clicks or 0,
+        "redemptions": item.redemptions or 0,
+        "admin_note": item.admin_note,
+        "created_at": item.created_at.isoformat() if item.created_at else None,
+    }
+
+
+def clean_optional_url(value: str, field_name: str) -> str:
+    value = (value or "").strip()
+    if value and not value.lower().startswith(("https://", "http://")):
+        raise HTTPException(status_code=400, detail=f"{field_name} must begin with https:// or http://")
+    return value
 
 
 @app.post("/auth/partner/register", response_model=LoginResponse)
@@ -1911,6 +1999,90 @@ def partner_add_team(payload: PartnerTeamRequest, user: User = Depends(get_curre
     member = User(email=email, password_hash=hash_password(payload.password), role="partner_member")
     db.add(member); db.flush(); db.add(UserProfile(user_id=member.id, first_name=payload.first_name, last_name=payload.last_name, branch="Army", service_status="Partner", city="", state="")); db.add(PartnerMembership(organization_id=membership.organization_id, user_id=member.id, organization_role=payload.organization_role)); db.commit()
     return {"created": True, "email": email}
+
+
+@app.get("/api/partner/listings")
+def partner_listings(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    membership = partner_membership(user, db)
+    org = db.get(PartnerOrganization, membership.organization_id)
+    items = db.query(PartnerListing).filter(PartnerListing.organization_id == org.id).order_by(PartnerListing.id.desc()).all()
+    return {"items": [partner_listing_out(item, org.organization_name) for item in items], "privacy_mode": "aggregate_only"}
+
+
+@app.post("/api/partner/listings")
+def partner_create_listing(payload: PartnerListingRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    membership = partner_membership(user, db)
+    if membership.organization_role not in {"owner", "organization_admin", "manager"}:
+        raise HTTPException(status_code=403, detail="Listing publisher access required")
+    org = db.get(PartnerOrganization, membership.organization_id)
+    if not org or org.approval_status != "approved":
+        raise HTTPException(status_code=403, detail="Organization approval is required before submitting listings")
+    listing_type = payload.listing_type.strip().lower()
+    if listing_type not in PARTNER_LISTING_TYPES:
+        raise HTTPException(status_code=400, detail="Unsupported listing type")
+    active_count = db.query(PartnerListing).filter(
+        PartnerListing.organization_id == org.id,
+        PartnerListing.status.in_(["draft", "pending_review", "published", "paused"]),
+    ).count()
+    if active_count >= PARTNER_LISTING_LIMITS.get(org.plan_code, 10):
+        raise HTTPException(status_code=403, detail="Your plan listing limit has been reached")
+    if payload.starts_at and payload.ends_at and payload.ends_at <= payload.starts_at:
+        raise HTTPException(status_code=400, detail="End date must be after start date")
+    item = PartnerListing(
+        organization_id=org.id,
+        created_by_user_id=user.id,
+        listing_type=listing_type,
+        title=payload.title.strip(),
+        description=payload.description.strip(),
+        image_url=clean_optional_url(payload.image_url, "Image URL"),
+        destination_url=clean_optional_url(payload.destination_url, "Destination URL"),
+        price_label=payload.price_label.strip(),
+        veteran_offer=payload.veteran_offer.strip(),
+        promo_code=payload.promo_code.strip(),
+        audience_state=payload.audience_state.strip(),
+        audience_city=payload.audience_city.strip(),
+        audience_branch=payload.audience_branch.strip() or "All",
+        starts_at=payload.starts_at,
+        ends_at=payload.ends_at,
+        status="pending_review" if payload.submit_for_review else "draft",
+    )
+    db.add(item)
+    db.flush()
+    db.add(AdminAuditLog(user_id=user.id, action="partner.listing_created", details=f"{org.organization_name}: {item.id} {item.status}"))
+    db.commit()
+    db.refresh(item)
+    return partner_listing_out(item, org.organization_name)
+
+
+@app.patch("/api/partner/listings/{listing_id}/status")
+def partner_listing_status(listing_id: int, payload: PartnerListingStatusRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    membership = partner_membership(user, db)
+    if membership.organization_role not in {"owner", "organization_admin", "manager"}:
+        raise HTTPException(status_code=403, detail="Listing publisher access required")
+    item = db.get(PartnerListing, listing_id)
+    if not item or item.organization_id != membership.organization_id:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    allowed = {"draft": {"pending_review"}, "pending_review": {"draft"}, "published": {"paused"}, "paused": {"published", "draft"}, "rejected": {"draft"}}
+    if payload.status not in allowed.get(item.status, set()):
+        raise HTTPException(status_code=400, detail=f"Cannot change {item.status} listing to {payload.status}")
+    if payload.status == "published":
+        raise HTTPException(status_code=403, detail="Only a ValorBuddy administrator can publish a listing")
+    item.status = payload.status
+    item.updated_at = datetime.now(timezone.utc)
+    db.add(AdminAuditLog(user_id=user.id, action="partner.listing_status_changed", details=f"{item.id}: {item.status}"))
+    db.commit()
+    return partner_listing_out(item)
+
+
+@app.get("/api/marketplace/listings")
+def marketplace_listings(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if user.role not in {"veteran", "admin"}:
+        raise HTTPException(status_code=403, detail="Veteran marketplace access required")
+    now = datetime.now(timezone.utc)
+    items = db.query(PartnerListing).filter(PartnerListing.status == "published").order_by(PartnerListing.id.desc()).limit(100).all()
+    visible = [item for item in items if (not item.starts_at or item.starts_at <= now) and (not item.ends_at or item.ends_at >= now)]
+    organizations = {org.id: org.organization_name for org in db.query(PartnerOrganization).filter(PartnerOrganization.id.in_([item.organization_id for item in visible])).all()} if visible else {}
+    return {"items": [partner_listing_out(item, organizations.get(item.organization_id, "Verified partner")) for item in visible]}
 
 
 @app.get("/auth/me", response_model=ProfileOut)
@@ -2561,6 +2733,29 @@ def admin_partner_preview(partner_id: int, _: User = Depends(admin_required), db
     org = db.get(PartnerOrganization, partner_id)
     if not org: raise HTTPException(status_code=404, detail="Partner not found")
     return partner_payload(org, db)
+
+
+@app.get("/admin/partner-listings")
+def admin_partner_listings(_: User = Depends(admin_required), db: Session = Depends(get_db)):
+    items = db.query(PartnerListing).order_by(PartnerListing.id.desc()).limit(250).all()
+    organization_ids = list({item.organization_id for item in items})
+    organizations = {org.id: org.organization_name for org in db.query(PartnerOrganization).filter(PartnerOrganization.id.in_(organization_ids)).all()} if organization_ids else {}
+    return {"items": [partner_listing_out(item, organizations.get(item.organization_id, "Partner")) for item in items]}
+
+
+@app.patch("/admin/partner-listings/{listing_id}/status")
+def admin_partner_listing_status(listing_id: int, payload: PartnerListingStatusRequest, admin: User = Depends(admin_required), db: Session = Depends(get_db)):
+    if payload.status not in {"pending_review", "published", "rejected", "paused"}:
+        raise HTTPException(status_code=400, detail="Unsupported listing status")
+    item = db.get(PartnerListing, listing_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Listing not found")
+    item.status = payload.status
+    item.admin_note = payload.admin_note.strip()
+    item.updated_at = datetime.now(timezone.utc)
+    db.add(AdminAuditLog(user_id=admin.id, action="partner.listing_reviewed", details=f"{item.id}: {item.status}"))
+    db.commit()
+    return partner_listing_out(item)
 
 
 @app.patch("/admin/partners/{partner_id}/plan")
