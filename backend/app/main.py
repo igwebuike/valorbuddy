@@ -3,6 +3,7 @@ from __future__ import annotations
 import io
 import base64
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -152,6 +153,8 @@ class PartnerOrganization(Base):
     approval_status = Column(String(50), nullable=False, default="pending_review")
     billing_status = Column(String(50), nullable=False, default="not_activated")
     onboarding_goal = Column(Text, nullable=True, default="")
+    stripe_customer_id = Column(String(120), nullable=True)
+    stripe_subscription_id = Column(String(120), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
@@ -1655,6 +1658,8 @@ def startup():
             "approval_status": "VARCHAR(50) DEFAULT 'pending_review' NOT NULL",
             "billing_status": "VARCHAR(50) DEFAULT 'not_activated' NOT NULL",
             "onboarding_goal": "TEXT DEFAULT ''",
+            "stripe_customer_id": "VARCHAR(120)",
+            "stripe_subscription_id": "VARCHAR(120)",
             "created_at": "TIMESTAMP",
         }
         partner_existing = {c["name"] for c in inspect(engine).get_columns("partner_organizations")}
@@ -1984,6 +1989,116 @@ def partner_plan(payload: PartnerPlanRequest, user: User = Depends(get_current_u
         raise HTTPException(status_code=400, detail="Unsupported partner plan")
     org = db.get(PartnerOrganization, membership.organization_id); org.plan_code = payload.plan_code; db.commit()
     return {"saved": True, "plan_code": payload.plan_code}
+
+
+# Stripe institutional billing. Price IDs are configured on Render, never trusted from clients.
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
+STRIPE_PARTNER_PRICES = {
+    "community": os.getenv("STRIPE_PRICE_PARTNER_COMMUNITY", "").strip(),
+    "professional": os.getenv("STRIPE_PRICE_PARTNER_PROFESSIONAL", "").strip(),
+}
+STRIPE_SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL", "https://valorbuddy.com/?billing=success")
+STRIPE_CANCEL_URL = os.getenv("STRIPE_CANCEL_URL", "https://valorbuddy.com/?billing=cancelled")
+
+
+def stripe_request(path: str, data: dict[str, str]):
+    if not STRIPE_SECRET_KEY:
+        raise HTTPException(status_code=503, detail="Stripe billing is not configured")
+    try:
+        response = httpx.post(
+            "https://api.stripe.com/v1/" + path,
+            data=data,
+            auth=(STRIPE_SECRET_KEY, ""),
+            timeout=15.0,
+        )
+        response.raise_for_status()
+        return response.json()
+    except httpx.HTTPError:
+        logger.exception("Stripe API request failed")
+        raise HTTPException(status_code=502, detail="Payment provider unavailable")
+
+
+@app.post("/api/partner/billing/checkout")
+def partner_billing_checkout(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    membership = partner_membership(user, db)
+    if membership.organization_role not in {"owner", "organization_admin"}:
+        raise HTTPException(status_code=403, detail="Organization administrator access required")
+    org = db.get(PartnerOrganization, membership.organization_id)
+    if org.approval_status != "approved":
+        raise HTTPException(status_code=403, detail="Organization verification is required before billing")
+    if org.plan_code == "enterprise":
+        raise HTTPException(status_code=400, detail="Contact ValorBuddy for an Enterprise agreement")
+    if org.billing_status in {"active", "trialing"}:
+        raise HTTPException(status_code=409, detail="Subscription already active")
+    price_id = STRIPE_PARTNER_PRICES.get(org.plan_code)
+    if not price_id:
+        raise HTTPException(status_code=503, detail="Stripe price for this plan is not configured")
+    data = {
+        "mode": "subscription",
+        "line_items[0][price]": price_id,
+        "line_items[0][quantity]": "1",
+        "customer_email": org.email,
+        "client_reference_id": str(org.id),
+        "metadata[organization_id]": str(org.id),
+        "subscription_data[metadata][organization_id]": str(org.id),
+        "success_url": STRIPE_SUCCESS_URL,
+        "cancel_url": STRIPE_CANCEL_URL,
+    }
+    if org.stripe_customer_id:
+        data.pop("customer_email", None)
+        data["customer"] = org.stripe_customer_id
+    session = stripe_request("checkout/sessions", data)
+    return {"url": session["url"]}
+
+
+@app.post("/api/stripe/webhook")
+async def stripe_partner_webhook(request: Request, db: Session = Depends(get_db)):
+    if not STRIPE_WEBHOOK_SECRET:
+        raise HTTPException(status_code=503, detail="Stripe webhook is not configured")
+    body = await request.body()
+    if len(body) > 1024 * 1024:
+        raise HTTPException(status_code=413, detail="Webhook payload too large")
+    header = request.headers.get("stripe-signature", "")
+    fields = dict(part.split("=", 1) for part in header.split(",") if "=" in part)
+    try:
+        timestamp = int(fields.get("t", "0"))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    if abs(time.time() - timestamp) > 300:
+        raise HTTPException(status_code=400, detail="Expired signature")
+    digest = hmac.new(STRIPE_WEBHOOK_SECRET.encode(), str(timestamp).encode() + b"." + body, hashlib.sha256).hexdigest()
+    signatures = [part.split("=", 1)[1] for part in header.split(",") if part.startswith("v1=")]
+    if not any(hmac.compare_digest(digest, signature) for signature in signatures):
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    event = json.loads(body)
+    obj = event.get("data", {}).get("object", {})
+    event_type = event.get("type", "")
+    if event_type == "checkout.session.completed" and obj.get("mode") == "subscription":
+        org_id = obj.get("client_reference_id") or obj.get("metadata", {}).get("organization_id")
+        if org_id and str(org_id).isdigit():
+            org = db.get(PartnerOrganization, int(org_id))
+            if org and org.approval_status == "approved":
+                org.stripe_customer_id = obj.get("customer")
+                org.stripe_subscription_id = obj.get("subscription")
+                org.billing_status = "pending_confirmation"
+                db.commit()
+    elif event_type in {"customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"}:
+        sub_id = obj.get("id")
+        customer_id = obj.get("customer")
+        org = db.query(PartnerOrganization).filter(PartnerOrganization.stripe_subscription_id == sub_id).first()
+        if not org and customer_id:
+            org = db.query(PartnerOrganization).filter(PartnerOrganization.stripe_customer_id == customer_id).first()
+        if not org:
+            org_id = obj.get("metadata", {}).get("organization_id")
+            if org_id and str(org_id).isdigit():
+                org = db.get(PartnerOrganization, int(org_id))
+        if org and org.approval_status == "approved":
+            org.stripe_customer_id = customer_id
+            org.stripe_subscription_id = sub_id
+            org.billing_status = "canceled" if event_type.endswith("deleted") else obj.get("status", "pending")
+            db.commit()
+    return {"received": True}
 
 
 @app.post("/api/partner/team")
