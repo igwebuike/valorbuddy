@@ -149,7 +149,7 @@ class PartnerOrganization(Base):
     phone = Column(String(80), nullable=True, default="")
     website = Column(String(500), nullable=True, default="")
     estimated_veterans = Column(Integer, nullable=False, default=0)
-    plan_code = Column(String(50), nullable=False, default="community")
+    plan_code = Column(String(50), nullable=False, default="institutional")
     approval_status = Column(String(50), nullable=False, default="pending_review")
     billing_status = Column(String(50), nullable=False, default="not_activated")
     onboarding_goal = Column(Text, nullable=True, default="")
@@ -465,7 +465,7 @@ class PartnerRegisterRequest(BaseModel):
     website: str = ""
     phone: str = ""
     estimated_veterans: int = 0
-    plan_code: str = "community"
+    plan_code: str = "institutional"
     onboarding_goal: str = ""
 
 
@@ -1654,7 +1654,7 @@ def startup():
             "phone": "VARCHAR(80) DEFAULT ''",
             "website": "VARCHAR(500) DEFAULT ''",
             "estimated_veterans": "INTEGER DEFAULT 0 NOT NULL",
-            "plan_code": "VARCHAR(50) DEFAULT 'community' NOT NULL",
+            "plan_code": "VARCHAR(50) DEFAULT 'institutional' NOT NULL",
             "approval_status": "VARCHAR(50) DEFAULT 'pending_review' NOT NULL",
             "billing_status": "VARCHAR(50) DEFAULT 'not_activated' NOT NULL",
             "onboarding_goal": "TEXT DEFAULT ''",
@@ -1861,10 +1861,14 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
 
 
 PARTNER_PLANS = {
-    "community": {"name": "Community Partner", "monthly_price_cents": 49900},
-    "professional": {"name": "Professional", "monthly_price_cents": 149900},
-    "enterprise": {"name": "Enterprise", "monthly_price_cents": 0},
+    "institutional": {"name": "Institutional Partnership", "monthly_price_cents": 49900},
 }
+# Previous plan identifiers are recognized for existing records until migrated.
+LEGACY_INSTITUTIONAL_PLANS = {"community", "professional", "enterprise"}
+
+
+def normalize_partner_plan(code: str) -> str:
+    return "institutional" if code in LEGACY_INSTITUTIONAL_PLANS else code
 
 
 def partner_membership(user: User, db: Session) -> PartnerMembership:
@@ -1875,7 +1879,7 @@ def partner_membership(user: User, db: Session) -> PartnerMembership:
 
 
 def partner_payload(org: PartnerOrganization, db: Session) -> dict[str, Any]:
-    plan = PARTNER_PLANS.get(org.plan_code, PARTNER_PLANS["community"])
+    plan = PARTNER_PLANS["institutional"]
     memberships = db.query(PartnerMembership).filter(PartnerMembership.organization_id == org.id).all()
     team = []
     for membership in memberships:
@@ -1885,7 +1889,7 @@ def partner_payload(org: PartnerOrganization, db: Session) -> dict[str, Any]:
             team.append({"membership_id": membership.id, "user_id": member.id, "email": member.email, "first_name": profile.first_name if profile else "", "last_name": profile.last_name if profile else "", "organization_role": membership.organization_role})
     listings = db.query(PartnerListing).filter(PartnerListing.organization_id == org.id).all()
     return {
-        "organization": {"id": org.id, "organization_name": org.organization_name, "organization_type": org.organization_type, "contact_name": org.contact_name, "contact_title": org.contact_title, "email": org.email, "phone": org.phone, "website": org.website, "estimated_veterans": org.estimated_veterans, "plan_code": org.plan_code, "plan_name": plan["name"], "monthly_price_cents": plan["monthly_price_cents"], "approval_status": org.approval_status, "billing_status": org.billing_status, "onboarding_goal": org.onboarding_goal},
+        "organization": {"id": org.id, "organization_name": org.organization_name, "organization_type": org.organization_type, "contact_name": org.contact_name, "contact_title": org.contact_title, "email": org.email, "phone": org.phone, "website": org.website, "estimated_veterans": org.estimated_veterans, "plan_code": normalize_partner_plan(org.plan_code), "plan_name": plan["name"], "monthly_price_cents": plan["monthly_price_cents"], "approval_status": org.approval_status, "billing_status": org.billing_status, "onboarding_goal": org.onboarding_goal},
         "metrics": {
             "live_listings": sum(1 for item in listings if item.status == "published"),
             "impressions": sum(item.impressions or 0 for item in listings),
@@ -1899,7 +1903,7 @@ def partner_payload(org: PartnerOrganization, db: Session) -> dict[str, Any]:
 
 
 PARTNER_LISTING_TYPES = {"product", "service", "job", "event", "discount", "resource"}
-PARTNER_LISTING_LIMITS = {"community": 10, "professional": 50, "enterprise": 500}
+PARTNER_LISTING_LIMITS = {"institutional": 10}
 
 
 def partner_listing_out(item: PartnerListing, organization_name: str = "") -> dict[str, Any]:
@@ -1941,8 +1945,8 @@ def partner_register(payload: PartnerRegisterRequest, db: Session = Depends(get_
     email = str(payload.email).strip().lower()
     if db.query(User).filter(func.lower(User.email) == email).first():
         raise HTTPException(status_code=409, detail="Email already exists")
-    if payload.plan_code not in PARTNER_PLANS:
-        raise HTTPException(status_code=400, detail="Unsupported partner plan")
+    if payload.plan_code != "institutional":
+        raise HTTPException(status_code=400, detail="Only the Institutional Partnership plan is available")
     names = payload.contact_name.strip().split(" ", 1)
     try:
         user = User(email=email, password_hash=hash_password(payload.password), role="partner_owner")
@@ -1985,19 +1989,18 @@ def partner_plan(payload: PartnerPlanRequest, user: User = Depends(get_current_u
     membership = partner_membership(user, db)
     if membership.organization_role not in {"owner", "organization_admin"}:
         raise HTTPException(status_code=403, detail="Organization administrator access required")
-    if payload.plan_code not in PARTNER_PLANS:
-        raise HTTPException(status_code=400, detail="Unsupported partner plan")
-    org = db.get(PartnerOrganization, membership.organization_id); org.plan_code = payload.plan_code; db.commit()
+    if payload.plan_code != "institutional":
+        raise HTTPException(status_code=400, detail="Only the Institutional Partnership plan is available")
+    org = db.get(PartnerOrganization, membership.organization_id)
+    org.plan_code = "institutional"
+    db.commit()
     return {"saved": True, "plan_code": payload.plan_code}
 
 
 # Stripe institutional billing. Price IDs are configured on Render, never trusted from clients.
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
-STRIPE_PARTNER_PRICES = {
-    "community": os.getenv("STRIPE_PRICE_PARTNER_COMMUNITY", "").strip(),
-    "professional": os.getenv("STRIPE_PRICE_PARTNER_PROFESSIONAL", "").strip(),
-}
+STRIPE_PRICE_INSTITUTIONAL = os.getenv("STRIPE_PRICE_INSTITUTIONAL", "").strip()
 STRIPE_SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL", "https://valorbuddy.com/?billing=success")
 STRIPE_CANCEL_URL = os.getenv("STRIPE_CANCEL_URL", "https://valorbuddy.com/?billing=cancelled")
 
@@ -2027,11 +2030,9 @@ def partner_billing_checkout(user: User = Depends(get_current_user), db: Session
     org = db.get(PartnerOrganization, membership.organization_id)
     if org.approval_status != "approved":
         raise HTTPException(status_code=403, detail="Organization verification is required before billing")
-    if org.plan_code == "enterprise":
-        raise HTTPException(status_code=400, detail="Contact ValorBuddy for an Enterprise agreement")
     if org.billing_status in {"active", "trialing"}:
         raise HTTPException(status_code=409, detail="Subscription already active")
-    price_id = STRIPE_PARTNER_PRICES.get(org.plan_code)
+    price_id = STRIPE_PRICE_INSTITUTIONAL
     if not price_id:
         raise HTTPException(status_code=503, detail="Stripe price for this plan is not configured")
     data = {
@@ -2139,7 +2140,7 @@ def partner_create_listing(payload: PartnerListingRequest, user: User = Depends(
         PartnerListing.organization_id == org.id,
         PartnerListing.status.in_(["draft", "pending_review", "published", "paused"]),
     ).count()
-    if active_count >= PARTNER_LISTING_LIMITS.get(org.plan_code, 10):
+    if active_count >= PARTNER_LISTING_LIMITS["institutional"]:
         raise HTTPException(status_code=403, detail="Your plan listing limit has been reached")
     if payload.starts_at and payload.ends_at and payload.ends_at <= payload.starts_at:
         raise HTTPException(status_code=400, detail="End date must be after start date")
@@ -2875,8 +2876,8 @@ def admin_partner_listing_status(listing_id: int, payload: PartnerListingStatusR
 
 @app.patch("/admin/partners/{partner_id}/plan")
 def admin_partner_plan(partner_id: int, payload: PartnerPlanRequest, _: User = Depends(admin_required), db: Session = Depends(get_db)):
-    if payload.plan_code not in PARTNER_PLANS:
-        raise HTTPException(status_code=400, detail="Unsupported partner plan")
+    if payload.plan_code != "institutional":
+        raise HTTPException(status_code=400, detail="Only the Institutional Partnership plan is available")
     org = db.get(PartnerOrganization, partner_id)
     if not org:
         raise HTTPException(status_code=404, detail="Partner not found")
