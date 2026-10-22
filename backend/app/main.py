@@ -1862,6 +1862,7 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
 
 PARTNER_PLANS = {
     "institutional": {"name": "Institutional Partnership", "monthly_price_cents": 49900},
+    "vendor": {"name": "Vendor Membership", "monthly_price_cents": 5000},
 }
 # Previous plan identifiers are recognized for existing records until migrated.
 LEGACY_INSTITUTIONAL_PLANS = {"community", "professional", "enterprise"}
@@ -1879,7 +1880,7 @@ def partner_membership(user: User, db: Session) -> PartnerMembership:
 
 
 def partner_payload(org: PartnerOrganization, db: Session) -> dict[str, Any]:
-    plan = PARTNER_PLANS["institutional"]
+    plan = PARTNER_PLANS.get(normalize_partner_plan(org.plan_code), PARTNER_PLANS["institutional"])
     memberships = db.query(PartnerMembership).filter(PartnerMembership.organization_id == org.id).all()
     team = []
     for membership in memberships:
@@ -1903,7 +1904,7 @@ def partner_payload(org: PartnerOrganization, db: Session) -> dict[str, Any]:
 
 
 PARTNER_LISTING_TYPES = {"product", "service", "job", "event", "discount", "resource"}
-PARTNER_LISTING_LIMITS = {"institutional": 10}
+PARTNER_LISTING_LIMITS = {"institutional": 10, "vendor": 10}
 
 
 def partner_listing_out(item: PartnerListing, organization_name: str = "") -> dict[str, Any]:
@@ -1945,8 +1946,8 @@ def partner_register(payload: PartnerRegisterRequest, db: Session = Depends(get_
     email = str(payload.email).strip().lower()
     if db.query(User).filter(func.lower(User.email) == email).first():
         raise HTTPException(status_code=409, detail="Email already exists")
-    if payload.plan_code != "institutional":
-        raise HTTPException(status_code=400, detail="Only the Institutional Partnership plan is available")
+    if payload.plan_code not in PARTNER_PLANS:
+        raise HTTPException(status_code=400, detail="Unknown subscription plan")
     names = payload.contact_name.strip().split(" ", 1)
     try:
         user = User(email=email, password_hash=hash_password(payload.password), role="partner_owner")
@@ -1989,8 +1990,8 @@ def partner_plan(payload: PartnerPlanRequest, user: User = Depends(get_current_u
     membership = partner_membership(user, db)
     if membership.organization_role not in {"owner", "organization_admin"}:
         raise HTTPException(status_code=403, detail="Organization administrator access required")
-    if payload.plan_code != "institutional":
-        raise HTTPException(status_code=400, detail="Only the Institutional Partnership plan is available")
+    if payload.plan_code not in PARTNER_PLANS:
+        raise HTTPException(status_code=400, detail="Unknown subscription plan")
     org = db.get(PartnerOrganization, membership.organization_id)
     org.plan_code = "institutional"
     db.commit()
@@ -2001,6 +2002,7 @@ def partner_plan(payload: PartnerPlanRequest, user: User = Depends(get_current_u
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "").strip()
 STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
 STRIPE_PRICE_INSTITUTIONAL = os.getenv("STRIPE_PRICE_INSTITUTIONAL", "").strip()
+STRIPE_PRICE_VENDOR = os.getenv("STRIPE_PRICE_VENDOR", "").strip()
 STRIPE_SUCCESS_URL = os.getenv("STRIPE_SUCCESS_URL", "https://valorbuddy.com/?billing=success")
 STRIPE_CANCEL_URL = os.getenv("STRIPE_CANCEL_URL", "https://valorbuddy.com/?billing=cancelled")
 
@@ -2032,7 +2034,7 @@ def partner_billing_checkout(user: User = Depends(get_current_user), db: Session
         raise HTTPException(status_code=403, detail="Organization verification is required before billing")
     if org.billing_status in {"active", "trialing"}:
         raise HTTPException(status_code=409, detail="Subscription already active")
-    price_id = STRIPE_PRICE_INSTITUTIONAL
+    price_id = STRIPE_PRICE_VENDOR if normalize_partner_plan(org.plan_code) == "vendor" else STRIPE_PRICE_INSTITUTIONAL
     if not price_id:
         raise HTTPException(status_code=503, detail="Stripe price for this plan is not configured")
     data = {
@@ -2042,7 +2044,9 @@ def partner_billing_checkout(user: User = Depends(get_current_user), db: Session
         "customer_email": org.email,
         "client_reference_id": str(org.id),
         "metadata[organization_id]": str(org.id),
+        "metadata[plan_code]": normalize_partner_plan(org.plan_code),
         "subscription_data[metadata][organization_id]": str(org.id),
+        "subscription_data[metadata][plan_code]": normalize_partner_plan(org.plan_code),
         "success_url": STRIPE_SUCCESS_URL,
         "cancel_url": STRIPE_CANCEL_URL,
     }
@@ -2072,32 +2076,63 @@ async def stripe_partner_webhook(request: Request, db: Session = Depends(get_db)
     signatures = [part.split("=", 1)[1] for part in header.split(",") if part.startswith("v1=")]
     if not any(hmac.compare_digest(digest, signature) for signature in signatures):
         raise HTTPException(status_code=400, detail="Invalid signature")
-    event = json.loads(body)
+    try:
+        event = json.loads(body)
+    except (ValueError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="Invalid event JSON")
     obj = event.get("data", {}).get("object", {})
     event_type = event.get("type", "")
-    if event_type == "checkout.session.completed" and obj.get("mode") == "subscription":
-        org_id = obj.get("client_reference_id") or obj.get("metadata", {}).get("organization_id")
+    metadata = obj.get("metadata") or {}
+    org_id = metadata.get("organization_id")
+
+    def find_org(subscription_id=None, customer_id=None, reference_id=None):
+        if subscription_id:
+            match = db.query(PartnerOrganization).filter(PartnerOrganization.stripe_subscription_id == subscription_id).first()
+            if match:
+                return match
+        if reference_id and str(reference_id).isdigit():
+            return db.get(PartnerOrganization, int(reference_id))
         if org_id and str(org_id).isdigit():
-            org = db.get(PartnerOrganization, int(org_id))
-            if org and org.approval_status == "approved":
-                org.stripe_customer_id = obj.get("customer")
-                org.stripe_subscription_id = obj.get("subscription")
-                org.billing_status = "pending_confirmation"
-                db.commit()
-    elif event_type in {"customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"}:
-        sub_id = obj.get("id")
-        customer_id = obj.get("customer")
-        org = db.query(PartnerOrganization).filter(PartnerOrganization.stripe_subscription_id == sub_id).first()
-        if not org and customer_id:
-            org = db.query(PartnerOrganization).filter(PartnerOrganization.stripe_customer_id == customer_id).first()
-        if not org:
-            org_id = obj.get("metadata", {}).get("organization_id")
-            if org_id and str(org_id).isdigit():
-                org = db.get(PartnerOrganization, int(org_id))
+            return db.get(PartnerOrganization, int(org_id))
+        # Customer fallback is safe only if it uniquely identifies one organization.
+        if customer_id:
+            matches = db.query(PartnerOrganization).filter(PartnerOrganization.stripe_customer_id == customer_id).limit(2).all()
+            if len(matches) == 1:
+                return matches[0]
+        return None
+
+    if event_type == "checkout.session.completed" and obj.get("mode") == "subscription":
+        org = find_org(obj.get("subscription"), obj.get("customer"), obj.get("client_reference_id"))
         if org and org.approval_status == "approved":
-            org.stripe_customer_id = customer_id
-            org.stripe_subscription_id = sub_id
+            org.stripe_customer_id = obj.get("customer")
+            org.stripe_subscription_id = obj.get("subscription")
+            # Checkout completion alone is not proof of a successful recurring payment.
+            if org.billing_status not in {"active", "trialing"}:
+                org.billing_status = "pending_confirmation"
+            db.commit()
+    elif event_type in {"customer.subscription.created", "customer.subscription.updated", "customer.subscription.deleted"}:
+        org = find_org(obj.get("id"), obj.get("customer"))
+        if org and org.approval_status == "approved":
+            # Never replace an existing subscription with an unrelated subscription.
+            if org.stripe_subscription_id and org.stripe_subscription_id != obj.get("id"):
+                return {"received": True}
+            org.stripe_customer_id = obj.get("customer")
+            org.stripe_subscription_id = obj.get("id")
             org.billing_status = "canceled" if event_type.endswith("deleted") else obj.get("status", "pending")
+            db.commit()
+    elif event_type in {"invoice.paid", "invoice.payment_failed"}:
+        # Invoice payload formats vary by Stripe API version; match by known customer
+        # and, when available, verify the invoice belongs to the tracked subscription.
+        sub_id = obj.get("subscription")
+        if not sub_id:
+            parent = obj.get("parent") or {}
+            sub_id = (parent.get("subscription_details") or {}).get("subscription")
+        org = find_org(sub_id, obj.get("customer"))
+        if org and org.approval_status == "approved" and (not sub_id or org.stripe_subscription_id == sub_id):
+            if event_type == "invoice.payment_failed":
+                org.billing_status = "past_due"
+            elif org.billing_status not in {"canceled", "unpaid"}:
+                org.billing_status = "active"
             db.commit()
     return {"received": True}
 
@@ -2876,8 +2911,8 @@ def admin_partner_listing_status(listing_id: int, payload: PartnerListingStatusR
 
 @app.patch("/admin/partners/{partner_id}/plan")
 def admin_partner_plan(partner_id: int, payload: PartnerPlanRequest, _: User = Depends(admin_required), db: Session = Depends(get_db)):
-    if payload.plan_code != "institutional":
-        raise HTTPException(status_code=400, detail="Only the Institutional Partnership plan is available")
+    if payload.plan_code not in PARTNER_PLANS:
+        raise HTTPException(status_code=400, detail="Unknown subscription plan")
     org = db.get(PartnerOrganization, partner_id)
     if not org:
         raise HTTPException(status_code=404, detail="Partner not found")
