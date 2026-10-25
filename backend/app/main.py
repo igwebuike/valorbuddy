@@ -1739,7 +1739,8 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     if db.query(User).filter(func.lower(User.email) == email).first():
         raise HTTPException(status_code=409, detail="Email already exists")
     try:
-        user = User(email=email, password_hash=hash_password(payload.password), role="veteran", approval_status="pending")
+        status = "approved" if ENVIRONMENT == "development" else "pending"
+        user = User(email=email, password_hash=hash_password(payload.password), role="veteran", approval_status=status)
         db.add(user); db.flush()
         db.add(UserProfile(
             user_id=user.id,
@@ -1768,6 +1769,9 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         db.rollback()
         logger.exception("User registration failed for %s", email)
         raise HTTPException(status_code=500, detail="Account creation failed. Please try again.")
+    if ENVIRONMENT == "development":
+        token = create_access_token(user)
+        return LoginResponse(token=token, user=profile_out(user), pending_approval=False, message="Welcome to ValorBuddy!")
     return LoginResponse(pending_approval=True, message="Account created. An administrator must approve it before you can sign in.")
 
 

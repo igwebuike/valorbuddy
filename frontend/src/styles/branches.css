@@ -1,0 +1,198 @@
+/* ==========================================================================
+   VALORBUDDY DESIGN SYSTEM — BRANCH THEMING (branches.css)
+   Authentic Military Branch Colors & Official Command Identities
+   Zero !important declarations
+   ========================================================================== */
+
+/* --- 1. United States Army (Forest Green & Military Gold) --- */
+:root[data-branch="army"],
+body.army,
+.app.army,
+.loginPage.army {
+  --branch-bg: #070e0a;
+  --branch-panel: #0c1812;
+  --branch-panel-elevated: #12241b;
+  --branch-panel-subtle: #08120c;
+  --branch-primary: #10b981;
+  --branch-primary-hover: #059669;
+  --branch-primary-light: #34d399;
+  --branch-gold: #E5C158;
+  --branch-gold-muted: #D4AF37;
+  --branch-gold-tint: rgba(229, 193, 88, 0.12);
+  --branch-gold-border: rgba(229, 193, 88, 0.32);
+  --branch-border-subtle: rgba(16, 185, 129, 0.18);
+  --branch-border-medium: rgba(16, 185, 129, 0.35);
+  --branch-glow: rgba(16, 185, 129, 0.15);
+  --branch-accent: #E5C158;
+  --branch-accent-secondary: #10b981;
+  --branch-tint: rgba(229, 193, 88, 0.05);
+  --branch-border: rgba(229, 193, 88, 0.28);
+}
+
+.app.army {
+  background-image: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(16, 185, 129, 0.10), transparent 70%),
+    radial-gradient(circle at 10% 20%, rgba(229, 193, 88, 0.03), transparent 40%);
+}
+
+/* --- 2. United States Navy (Deep Sea Ocean & Naval Gold) --- */
+:root[data-branch="navy"],
+body.navy,
+.app.navy,
+.loginPage.navy {
+  --branch-bg: #020b14;
+  --branch-panel: #06182c;
+  --branch-panel-elevated: #0a2440;
+  --branch-panel-subtle: #03101e;
+  --branch-primary: #38bdf8;
+  --branch-primary-hover: #0ea5e9;
+  --branch-primary-light: #7dd3fc;
+  --branch-gold: #E5C158;
+  --branch-gold-muted: #D4AF37;
+  --branch-gold-tint: rgba(229, 193, 88, 0.14);
+  --branch-gold-border: rgba(229, 193, 88, 0.35);
+  --branch-border-subtle: rgba(56, 189, 248, 0.18);
+  --branch-border-medium: rgba(56, 189, 248, 0.35);
+  --branch-glow: rgba(56, 189, 248, 0.15);
+  --branch-accent: #E5C158;
+  --branch-accent-secondary: #38bdf8;
+  --branch-tint: rgba(56, 189, 248, 0.06);
+  --branch-border: rgba(56, 189, 248, 0.3);
+}
+
+.app.navy {
+  background-image: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(56, 189, 248, 0.12), transparent 70%),
+    radial-gradient(circle at 10% 20%, rgba(229, 193, 88, 0.04), transparent 40%);
+}
+
+/* --- 3. United States Air Force (Stealth Aerospace & Sky Blue) --- */
+:root[data-branch="airforce"],
+body.airforce,
+.app.airforce,
+.loginPage.airforce {
+  --branch-bg: #040d1a;
+  --branch-panel: #081a32;
+  --branch-panel-elevated: #0d274a;
+  --branch-panel-subtle: #051224;
+  --branch-primary: #60a5fa;
+  --branch-primary-hover: #3b82f6;
+  --branch-primary-light: #93c5fd;
+  --branch-gold: #93c5fd;
+  --branch-gold-muted: #60a5fa;
+  --branch-gold-tint: rgba(96, 165, 250, 0.12);
+  --branch-gold-border: rgba(96, 165, 250, 0.32);
+  --branch-border-subtle: rgba(96, 165, 250, 0.18);
+  --branch-border-medium: rgba(96, 165, 250, 0.35);
+  --branch-glow: rgba(96, 165, 250, 0.15);
+  --branch-accent: #60a5fa;
+  --branch-accent-secondary: #e2e8f0;
+  --branch-tint: rgba(96, 165, 250, 0.06);
+  --branch-border: rgba(96, 165, 250, 0.3);
+}
+
+.app.airforce {
+  background-image: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(96, 165, 250, 0.12), transparent 70%),
+    radial-gradient(circle at 10% 20%, rgba(226, 232, 240, 0.04), transparent 40%);
+}
+
+/* --- 4. United States Marine Corps (Combat Scarlet & Brass Gold) --- */
+:root[data-branch="marines"],
+body.marines,
+.app.marines,
+.loginPage.marines {
+  --branch-bg: #0f0505;
+  --branch-panel: #1b0c0c;
+  --branch-panel-elevated: #281313;
+  --branch-panel-subtle: #130808;
+  --branch-primary: #ef4444;
+  --branch-primary-hover: #dc2626;
+  --branch-primary-light: #f87171;
+  --branch-gold: #E5C158;
+  --branch-gold-muted: #D4AF37;
+  --branch-gold-tint: rgba(229, 193, 88, 0.12);
+  --branch-gold-border: rgba(229, 193, 88, 0.32);
+  --branch-border-subtle: rgba(239, 68, 68, 0.2);
+  --branch-border-medium: rgba(239, 68, 68, 0.38);
+  --branch-glow: rgba(239, 68, 68, 0.15);
+  --branch-accent: #E5C158;
+  --branch-accent-secondary: #ef4444;
+  --branch-tint: rgba(239, 68, 68, 0.06);
+  --branch-border: rgba(239, 68, 68, 0.3);
+}
+
+.app.marines {
+  background-image: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(239, 68, 68, 0.12), transparent 70%),
+    radial-gradient(circle at 10% 20%, rgba(229, 193, 88, 0.04), transparent 40%);
+}
+
+/* --- 5. United States Coast Guard (Maritime Cyan & Rescue Orange) --- */
+:root[data-branch="coastguard"],
+body.coastguard,
+.app.coastguard,
+.loginPage.coastguard {
+  --branch-bg: #030f16;
+  --branch-panel: #061d2b;
+  --branch-panel-elevated: #0a2c3f;
+  --branch-panel-subtle: #04141e;
+  --branch-primary: #06b6d4;
+  --branch-primary-hover: #0891b2;
+  --branch-primary-light: #67e8f9;
+  --branch-gold: #f97316;
+  --branch-gold-muted: #ea580c;
+  --branch-gold-tint: rgba(249, 115, 22, 0.12);
+  --branch-gold-border: rgba(249, 115, 22, 0.35);
+  --branch-border-subtle: rgba(6, 182, 212, 0.2);
+  --branch-border-medium: rgba(6, 182, 212, 0.38);
+  --branch-glow: rgba(6, 182, 212, 0.15);
+  --branch-accent: #f97316;
+  --branch-accent-secondary: #06b6d4;
+  --branch-tint: rgba(6, 182, 212, 0.06);
+  --branch-border: rgba(6, 182, 212, 0.3);
+}
+
+.app.coastguard {
+  background-image: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(6, 182, 212, 0.12), transparent 70%),
+    radial-gradient(circle at 10% 20%, rgba(249, 115, 22, 0.04), transparent 40%);
+}
+
+/* --- 6. United States Space Force (Cosmic Void & Polaris Platinum) --- */
+:root[data-branch="spaceforce"],
+body.spaceforce,
+.app.spaceforce,
+.loginPage.spaceforce {
+  --branch-bg: #060511;
+  --branch-panel: #0f0c22;
+  --branch-panel-elevated: #171335;
+  --branch-panel-subtle: #0a0818;
+  --branch-primary: #a855f7;
+  --branch-primary-hover: #9333ea;
+  --branch-primary-light: #c084fc;
+  --branch-gold: #e2e8f0;
+  --branch-gold-muted: #cbd5e1;
+  --branch-gold-tint: rgba(226, 232, 240, 0.12);
+  --branch-gold-border: rgba(226, 232, 240, 0.32);
+  --branch-border-subtle: rgba(168, 85, 247, 0.2);
+  --branch-border-medium: rgba(168, 85, 247, 0.38);
+  --branch-glow: rgba(168, 85, 247, 0.15);
+  --branch-accent: #c084fc;
+  --branch-accent-secondary: #e2e8f0;
+  --branch-tint: rgba(168, 85, 247, 0.06);
+  --branch-border: rgba(168, 85, 247, 0.3);
+}
+
+.app.spaceforce {
+  background-image: 
+    radial-gradient(ellipse 80% 50% at 50% -20%, rgba(168, 85, 247, 0.14), transparent 70%),
+    radial-gradient(circle at 10% 20%, rgba(226, 232, 240, 0.04), transparent 40%);
+}
+
+/* Tactical App Canvas Base */
+.app {
+  background-color: var(--vb-bg-canvas);
+  background-attachment: fixed;
+  min-height: 100vh;
+}

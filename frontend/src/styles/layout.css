@@ -1,0 +1,1150 @@
+/* ==========================================================================
+   VALORBUDDY DESIGN SYSTEM — LAYOUT (layout.css)
+   Phase 2: High-Trust Application Shell, Grouped Sidebar, Topbar & Crisis Anchor
+   Zero !important declarations
+   ========================================================================== */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--vb-bg-canvas);
+  color: var(--vb-text-primary);
+  font-family: var(--vb-font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Accessibility Focus Indicator (WCAG 2.2 AA) */
+:focus-visible {
+  outline: 2px solid var(--branch-accent, #38bdf8);
+  outline-offset: 2px;
+}
+
+/* Boot / Initial Load Splash */
+.boot {
+  min-height: 100vh;
+  display: flex;
+  gap: var(--vb-space-12);
+  align-items: center;
+  justify-content: center;
+  background: var(--vb-bg-canvas);
+  color: var(--branch-accent);
+  font-weight: var(--vb-font-weight-semibold);
+  font-size: 16px;
+}
+
+.boot svg {
+  width: 24px;
+  height: 24px;
+  animation: pulse 2s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; transform: scale(0.98); }
+  50% { opacity: 1; transform: scale(1.02); }
+}
+
+/* --- App Root Grid Shell --- */
+.app {
+  min-height: 100vh;
+  max-width: 100vw;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  background-color: var(--vb-bg-canvas);
+  color: var(--vb-text-primary);
+  overflow-x: hidden;
+}
+
+.app svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.appMain {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.appContent,
+main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* ==========================================================================
+   1. CRISIS & SAFETY ANCHOR (Veterans Crisis Line 988 & 911)
+   ========================================================================== */
+.healthSafetyNotice {
+  background: var(--vb-bg-surface-subtle);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 8px var(--vb-space-24);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--vb-space-16);
+  font-size: 12px;
+  color: var(--vb-text-secondary);
+  z-index: 25;
+  height: auto;
+  min-height: unset;
+  flex-shrink: 0;
+}
+
+.healthSafetyInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--vb-space-10);
+  flex-wrap: wrap;
+}
+
+.healthSafetyBadge {
+  font-size: 10px;
+  font-weight: var(--vb-font-weight-bold);
+  letter-spacing: 0.08em;
+  padding: 2px 7px;
+  border-radius: var(--vb-radius-sm);
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+  text-transform: uppercase;
+}
+
+.healthSafetyActions {
+  display: flex;
+  align-items: center;
+  gap: var(--vb-space-8);
+  flex-wrap: wrap;
+}
+
+.crisisAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px var(--vb-space-10);
+  border-radius: var(--vb-radius-sm);
+  font-size: 11.5px;
+  font-weight: var(--vb-font-weight-medium);
+  text-decoration: none;
+  transition: all var(--vb-transition-fast);
+}
+
+.emergencyAction {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.emergencyAction:hover {
+  background: rgba(239, 68, 68, 0.22);
+  color: #ffffff;
+}
+
+.vclAction {
+  background: rgba(239, 68, 68, 0.16);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: #fee2e2;
+}
+
+.vclAction b {
+  color: #fca5a5;
+  font-weight: var(--vb-font-weight-bold);
+}
+
+.vclAction:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
+/* ==========================================================================
+   2. TOP APPLICATION BAR
+   ========================================================================== */
+.appMain > header,
+header.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--vb-space-16);
+  justify-content: space-between;
+  padding: 0 var(--vb-space-24);
+  background: var(--vb-bg-surface);
+  border-bottom: 1px solid var(--vb-border-subtle);
+  height: 60px;
+  flex-shrink: 0;
+}
+
+.topbarLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--vb-space-12);
+  flex-shrink: 0;
+}
+
+.mobileMenu {
+  display: none;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--vb-border-subtle);
+  background: var(--vb-bg-surface-subtle);
+  border-radius: var(--vb-radius-md);
+  color: var(--vb-text-primary);
+  cursor: pointer;
+  padding: 0;
+}
+
+.topbarContext {
+  display: flex;
+  align-items: center;
+  gap: var(--vb-space-8);
+}
+
+.breadcrumbRoot {
+  font-size: 12px;
+  font-weight: var(--vb-font-weight-medium);
+  color: var(--vb-text-muted);
+}
+
+.breadcrumbSep {
+  font-size: 12px;
+  color: var(--vb-border-strong);
+}
+
+.breadcrumbCurrent {
+  font-size: 13px;
+  font-weight: var(--vb-font-weight-semibold);
+  color: var(--vb-text-primary);
+}
+
+.topbarCenter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  margin: 0 var(--vb-space-12);
+}
+
+.topbarCenter .globalSearch {
+  margin: 0;
+  padding: 4px var(--vb-space-12);
+  min-height: 38px;
+  border-radius: var(--vb-radius-md);
+  background: var(--vb-bg-surface-subtle);
+  border-color: var(--vb-border-medium);
+}
+
+.topbarCenter .globalSearch input {
+  font-size: 13px;
+  padding: 4px 0;
+}
+
+.topbarCenter .globalSearch button {
+  min-height: 28px;
+  padding: 2px var(--vb-space-10);
+  font-size: 12px;
+}
+
+.topbarRight {
+  display: flex;
+  align-items: center;
+  gap: var(--vb-space-8);
+  flex-shrink: 0;
+}
+
+/* Tactical Command Topbar Elements (Matching Reference) */
+.topbarCommandTitle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.topbarBranchEmblem {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px var(--vb-accent-emerald-glow));
+  flex-shrink: 0;
+}
+
+.topbarMissionTitle {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--vb-text-primary);
+  display: block;
+  letter-spacing: 0.02em;
+}
+
+.topbarMotto {
+  font-size: 10.5px;
+  color: var(--vb-text-secondary);
+  display: block;
+}
+
+.topbarBranchPills {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  background: rgba(3, 8, 6, 0.75);
+  padding: 2px 3px;
+  border-radius: var(--vb-radius-full);
+  border: 1px solid var(--vb-border-subtle);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex-shrink: 0;
+}
+
+.topbarBranchPills::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.branchPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 26px;
+  padding: 3px 8px;
+  border-radius: var(--vb-radius-full);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--vb-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--vb-transition-fast);
+  user-select: none;
+}
+
+.branchPip {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--pip-color, #10b981);
+  box-shadow: 0 0 5px var(--pip-color, #10b981);
+  flex-shrink: 0;
+  opacity: 0.85;
+  transition: transform var(--vb-transition-fast), opacity var(--vb-transition-fast);
+}
+
+.branchPill:hover {
+  color: var(--vb-text-primary);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.branchPill:hover .branchPip {
+  transform: scale(1.3);
+  opacity: 1;
+}
+
+.branchPill.active {
+  background: var(--vb-accent-emerald);
+  color: #030712;
+  border-color: transparent;
+  font-weight: 700;
+  padding: 3px 10px;
+  box-shadow: 0 0 12px var(--vb-accent-emerald-glow);
+}
+
+.branchPill--marines.active,
+.branchPill--spaceforce.active {
+  color: #ffffff;
+}
+
+.branchPill.active .pillBranchEmblem {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+  flex-shrink: 0;
+}
+
+.branchNameFull {
+  display: inline;
+}
+
+.branchNameShort {
+  display: none;
+}
+
+@media (max-width: 1360px) {
+  .branchNameFull {
+    display: none;
+  }
+  .branchNameShort {
+    display: inline;
+  }
+  .branchPill {
+    padding: 3px 6px;
+    font-size: 10.5px;
+    gap: 4px;
+  }
+  .branchPill.active {
+    padding: 3px 8px;
+  }
+}
+
+.topbarCrisisPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  min-height: 28px;
+  border-radius: var(--vb-radius-full);
+  background: var(--vb-status-crisis);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+  transition: background var(--vb-transition-fast);
+  white-space: nowrap;
+}
+
+.crisisTextFull {
+  display: inline;
+}
+
+.crisisTextShort {
+  display: none;
+}
+
+.topbarCrisisPill:hover {
+  background: #b91c1c;
+  color: #ffffff;
+}
+
+.topbarEmergencyPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  min-height: 28px;
+  border-radius: var(--vb-radius-full);
+  background: rgba(220, 38, 38, 0.18);
+  border: 1px solid rgba(220, 38, 38, 0.45);
+  color: #fca5a5;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all var(--vb-transition-fast);
+}
+
+.topbarEmergencyPill:hover {
+  background: rgba(220, 38, 38, 0.3);
+  color: #ffffff;
+}
+
+.topbarOperationalBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  min-height: 28px;
+  border-radius: var(--vb-radius-full);
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  color: var(--vb-accent-emerald);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.crisisDot {
+  color: #fecaca;
+  font-size: 8px;
+}
+
+.operationalDot {
+  color: var(--vb-accent-emerald);
+  font-size: 8px;
+}
+
+/* --- Elegant Branch Selector Dropdown --- */
+.branchDropdownContainer {
+  position: relative;
+  display: inline-block;
+}
+
+.branchDropdownTrigger {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--vb-space-8);
+  padding: 4px var(--vb-space-12);
+  border-radius: var(--vb-radius-md);
+  border: 1px solid var(--branch-border);
+  background: var(--vb-bg-surface-subtle);
+  color: var(--branch-accent);
+  font-size: 11.5px;
+  font-weight: var(--vb-font-weight-bold);
+  cursor: pointer;
+  transition: all var(--vb-transition-fast);
+}
+
+.branchDropdownTrigger:hover {
+  background: var(--vb-bg-surface-elevated);
+  border-color: var(--branch-accent);
+}
+
+.branchDropdownTrigger:focus-visible {
+  outline: 2px solid var(--branch-accent);
+  outline-offset: 2px;
+}
+
+.branchTriggerBadge {
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.branchTriggerArrow {
+  transition: transform var(--vb-transition-fast);
+  color: var(--vb-text-muted);
+}
+
+.branchTriggerArrow.open {
+  transform: rotate(90deg);
+  color: var(--branch-accent);
+}
+
+.branchDropdownMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 260px;
+  background: var(--vb-bg-surface);
+  border: 1px solid var(--vb-border-medium);
+  border-radius: var(--vb-radius-lg);
+  box-shadow: var(--vb-shadow-lg);
+  padding: var(--vb-space-6);
+  list-style: none;
+  margin: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.branchOptionItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--vb-space-8) var(--vb-space-12);
+  border-radius: var(--vb-radius-sm);
+  cursor: pointer;
+  transition: all var(--vb-transition-fast);
+}
+
+.branchOptionItem:hover {
+  background: var(--vb-bg-surface-elevated);
+}
+
+.branchOptionItem.selected {
+  background: var(--branch-tint);
+  border: 1px solid var(--branch-border);
+}
+
+.branchOptionInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.branchOptionName {
+  font-size: 13px;
+  font-weight: var(--vb-font-weight-semibold);
+  color: var(--vb-text-primary);
+}
+
+.branchOptionItem.selected .branchOptionName {
+  color: var(--branch-accent);
+}
+
+.branchOptionMotto {
+  font-size: 11px;
+  color: var(--vb-text-muted);
+}
+
+.branchOptionActiveDot {
+  font-size: 10px;
+  color: var(--branch-accent);
+}
+
+.branchSwitcher {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.branchSwitcher button {
+  min-height: 32px;
+  padding: 2px var(--vb-space-10);
+  border-radius: var(--vb-radius-full);
+  border: 1px solid var(--vb-border-subtle);
+  background: var(--vb-bg-surface-subtle);
+  color: var(--vb-text-secondary);
+  font-size: 11px;
+  font-weight: var(--vb-font-weight-medium);
+  cursor: pointer;
+  transition: all var(--vb-transition-fast);
+}
+
+.branchSwitcher button:hover {
+  background: var(--vb-bg-surface-elevated);
+  color: var(--vb-text-primary);
+}
+
+.branchSwitcher button.active {
+  border-color: var(--branch-accent);
+  color: var(--vb-text-primary);
+  background: var(--branch-tint);
+  font-weight: var(--vb-font-weight-semibold);
+}
+
+.quickVoiceButton {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px var(--vb-space-12);
+  border-radius: var(--vb-radius-md);
+  border: 1px solid var(--branch-border);
+  background: var(--branch-tint);
+  color: var(--branch-accent);
+  font-size: 12px;
+  font-weight: var(--vb-font-weight-semibold);
+  cursor: pointer;
+  transition: all var(--vb-transition-fast);
+}
+
+.quickVoiceButton:hover {
+  background: var(--branch-accent);
+  color: var(--vb-text-inverse);
+}
+
+header .logout {
+  min-height: 36px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px var(--vb-space-12);
+  border-radius: var(--vb-radius-md);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  font-size: 12px;
+  font-weight: var(--vb-font-weight-medium);
+  cursor: pointer;
+  transition: all var(--vb-transition-fast);
+}
+
+header .logout:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #fff;
+}
+
+/* ==========================================================================
+   3. SIDEBAR NAVIGATION & GROUPED INFORMATION ARCHITECTURE
+   ========================================================================== */
+.app > aside,
+aside.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  padding: 0;
+  background: var(--vb-bg-surface);
+  border-right: 1px solid var(--vb-border-subtle);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  z-index: 30;
+}
+
+.sidebarBrandArea {
+  padding: 16px 16px 12px;
+  border-bottom: 1px solid var(--vb-border-subtle);
+}
+
+.brandHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brandLogo {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--vb-radius-md);
+  object-fit: cover;
+  border: 1px solid var(--vb-border-subtle);
+}
+
+.brandTitle {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  color: #f0fdf4;
+  display: block;
+}
+
+.brandSubtitle,
+.tacticalBrandSubtitle {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--vb-accent-emerald);
+  display: block;
+  text-transform: uppercase;
+}
+
+/* Tactical User Profile Card (Reference Image 3) */
+.tacticalUserCard {
+  margin: 12px 14px 8px;
+  padding: 10px 12px;
+  background: var(--vb-bg-surface-subtle);
+  border: 1px solid var(--vb-border-subtle);
+  border-radius: var(--vb-radius-md);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all var(--vb-transition-fast);
+}
+
+.tacticalUserCard:hover {
+  background: var(--vb-bg-surface-elevated);
+  border-color: var(--vb-border-medium);
+}
+
+.tacticalAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--vb-radius-full);
+  background: #0b1a12;
+  border: 1.5px solid var(--vb-accent-emerald);
+  color: var(--vb-accent-gold);
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.tacticalStatusDot {
+  position: absolute;
+  bottom: -1px;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--vb-accent-emerald);
+  border: 1.5px solid var(--vb-bg-canvas);
+}
+
+.tacticalUserInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tacticalUserName {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--vb-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tacticalUserBranch {
+  font-size: 11px;
+  color: var(--vb-text-secondary);
+  line-height: 1.3;
+}
+
+.tacticalUserLocation {
+  font-size: 10px;
+  color: var(--vb-text-muted);
+}
+
+.branchIdentityBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 14px 4px;
+  padding: 8px 12px;
+  border-radius: var(--vb-radius-md);
+  background: var(--vb-bg-surface-subtle);
+  border: 1px solid var(--vb-border-subtle);
+  transition: all var(--vb-transition-fast);
+}
+
+.branchIdentityBanner:hover {
+  border-color: var(--vb-border-medium);
+  background: var(--vb-bg-surface-elevated);
+}
+
+.branchEmblemMini {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 6px var(--vb-accent-emerald-glow));
+  flex-shrink: 0;
+}
+
+.branchIdentityDetails {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.branchBadgeText {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--vb-accent-emerald);
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
+.branchLabelSub {
+  font-size: 11px;
+  color: var(--vb-text-secondary);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.tacticalUserBranchEmblem {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  margin-right: 4px;
+  vertical-align: -2px;
+  display: inline-block;
+}
+
+.sidebarNav {
+  padding: var(--vb-space-12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--vb-space-12);
+  flex: 1;
+}
+
+.sidebarMissionHubLabel {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--vb-text-emerald);
+  padding: 4px 10px 2px;
+}
+
+.navGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navGroupLabel {
+  font-size: 10px;
+  font-weight: var(--vb-font-weight-bold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--vb-text-muted);
+  padding: var(--vb-space-4) var(--vb-space-10);
+  margin-bottom: 2px;
+}
+
+.navItem,
+.app > aside button {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px var(--vb-space-12);
+  border-radius: var(--vb-radius-md);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--vb-text-secondary);
+  font-size: 13px;
+  font-weight: var(--vb-font-weight-medium);
+  display: flex;
+  align-items: center;
+  gap: var(--vb-space-10);
+  cursor: pointer;
+  transition: all var(--vb-transition-fast);
+  text-align: left;
+}
+
+.navItem:hover,
+.app > aside button:hover {
+  background: var(--vb-bg-surface-elevated);
+  color: var(--vb-text-primary);
+}
+
+.navItem.active,
+.app > aside button.active {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid var(--vb-accent-emerald);
+  color: #ffffff;
+  font-weight: 700;
+  border-radius: var(--vb-radius-md);
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.15);
+}
+
+.navItem.active svg,
+.app > aside button.active svg {
+  color: var(--vb-accent-emerald);
+}
+
+.sidebarFooter {
+  padding: var(--vb-space-12);
+  border-top: 1px solid var(--vb-border-subtle);
+  background: var(--vb-bg-surface-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--vb-space-8);
+}
+
+.sidebarBottomAction {
+  margin-top: auto;
+  padding: 14px 14px;
+  border-top: 1px solid var(--vb-border-subtle);
+}
+
+.secureSignOutBtn {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--vb-radius-md);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--vb-transition-fast);
+}
+
+.secureSignOutBtn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+  color: #ffffff;
+}
+
+.sidebarUserCard {
+  display: flex;
+  align-items: center;
+  gap: var(--vb-space-10);
+  padding: var(--vb-space-8);
+  border-radius: var(--vb-radius-sm);
+  cursor: pointer;
+  transition: background var(--vb-transition-fast);
+}
+
+.sidebarUserCard:hover {
+  background: var(--vb-bg-surface-elevated);
+}
+
+.sidebarUserCard svg {
+  color: var(--branch-accent);
+  flex-shrink: 0;
+}
+
+.sidebarUserName {
+  font-size: 12px;
+  font-weight: var(--vb-font-weight-semibold);
+  color: var(--vb-text-primary);
+  display: block;
+}
+
+.sidebarUserBranch {
+  font-size: 11px;
+  color: var(--vb-text-muted);
+  display: block;
+}
+
+.sidebarPledge {
+  font-size: 10px;
+  color: var(--vb-text-muted);
+  text-align: center;
+  line-height: 1.4;
+  padding: var(--vb-space-4) 0;
+  border-top: 1px solid var(--vb-border-subtle);
+}
+
+/* ==========================================================================
+   4. RESPONSIVE MOBILE DRAWER & BREAKPOINTS
+   ========================================================================== */
+.mobileNavBackdrop {
+  display: none;
+}
+
+@media (max-width: 1000px) {
+  .app {
+    grid-template-columns: 1fr;
+  }
+  
+  .mobileMenu {
+    display: flex;
+  }
+  
+  .app > aside,
+  aside.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 280px;
+    height: 100vh;
+    z-index: 50;
+    transform: translateX(-100%);
+    transition: transform var(--vb-transition-normal);
+    box-shadow: var(--vb-shadow-lg);
+  }
+  
+  .app > aside.mobileOpen,
+  aside.sidebar.mobileOpen {
+    transform: translateX(0);
+  }
+  
+  .mobileNavBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    z-index: 40;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--vb-transition-normal);
+    border: none;
+    padding: 0;
+  }
+  
+  .mobileNavBackdrop.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  
+  .appMain > header,
+  header.topbar {
+    height: auto;
+    padding: var(--vb-space-10) var(--vb-space-16);
+    flex-wrap: wrap;
+    gap: var(--vb-space-10);
+  }
+  
+  .topbarLeft {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .topbarRight {
+    flex-shrink: 0;
+  }
+
+  .topbarCenter {
+    order: 3;
+    width: 100%;
+    flex-basis: 100%;
+    display: flex;
+    justify-content: center;
+    margin: 4px 0 0 0;
+  }
+  
+  .healthSafetyNotice {
+    padding: var(--vb-space-8) var(--vb-space-16);
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 720px) {
+  .topbarOperationalBadge {
+    display: none;
+  }
+  
+  .topbarRight .quickVoiceButton span {
+    display: none;
+  }
+  
+  .topbarRight .quickVoiceButton {
+    padding: 6px 10px;
+    min-height: 32px;
+    min-width: 32px;
+  }
+
+  .topbarCrisisPill {
+    padding: 3px 10px;
+    font-size: 10.5px;
+  }
+  
+  .healthSafetyNotice {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 6px 12px;
+    gap: 6px;
+    font-size: 11px;
+  }
+  
+  .healthSafetyActions {
+    width: 100%;
+    display: flex;
+    gap: 6px;
+  }
+
+  .healthSafetyActions .crisisAction {
+    flex: 1;
+    justify-content: center;
+    min-height: 28px;
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+}
+
+@media (max-width: 500px) {
+  .crisisTextFull {
+    display: none;
+  }
+  .crisisTextShort {
+    display: inline;
+  }
+  .topbarMissionTitle {
+    font-size: 12px;
+  }
+  .topbarMotto {
+    display: none;
+  }
+}

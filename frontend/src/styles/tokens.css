@@ -1,0 +1,115 @@
+/* ==========================================================================
+   VALORBUDDY DESIGN SYSTEM — TOKENS (tokens.css)
+   Command-Center Aesthetic (Deep Forest-Green, Emerald & Military Gold)
+   WCAG 2.2 AA Compliant Foundations
+   ========================================================================== */
+
+:root {
+  /* Surface Foundations (Dynamic Branch Foundations with Fallbacks) */
+  --vb-bg-canvas: var(--branch-bg, #070e0a);
+  --vb-bg-surface: var(--branch-panel, #0c1812);
+  --vb-bg-surface-elevated: var(--branch-panel-elevated, #12241b);
+  --vb-bg-surface-subtle: var(--branch-panel-subtle, #08120c);
+  
+  /* Primary Interactive & Status Colors */
+  --vb-accent-emerald: var(--branch-primary, #10b981);
+  --vb-accent-emerald-hover: var(--branch-primary-hover, #059669);
+  --vb-accent-emerald-glow: var(--branch-glow, rgba(16, 185, 129, 0.14));
+  
+  /* Military Gold Accents (Headings, Emphasis, Branch Badges) */
+  --vb-accent-gold: var(--branch-gold, #E5C158);
+  --vb-accent-gold-muted: var(--branch-gold-muted, #D4AF37);
+  --vb-accent-gold-tint: var(--branch-gold-tint, rgba(229, 193, 88, 0.12));
+  --vb-accent-gold-border: var(--branch-gold-border, rgba(229, 193, 88, 0.32));
+
+  /* Text Foundations (High Accessibility Contrast) */
+  --vb-text-primary: #f0fdf4;
+  --vb-text-secondary: #94a3b8;
+  --vb-text-muted: #64748b;
+  --vb-text-emerald: var(--branch-primary-light, #34d399);
+  --vb-text-gold: var(--branch-gold, #E5C158);
+  --vb-text-inverse: #070e0a;
+  
+  /* Structural Thin Borders */
+  --vb-border-subtle: var(--branch-border-subtle, rgba(16, 185, 129, 0.16));
+  --vb-border-medium: var(--branch-border-medium, rgba(16, 185, 129, 0.32));
+  --vb-border-strong: var(--branch-border-strong, rgba(16, 185, 129, 0.55));
+  
+  /* Semantic Status Colors (WCAG AA Compliant) */
+  --vb-status-crisis: #dc2626;        /* Emergency & Veterans Crisis Line (988) */
+  --vb-status-crisis-bg: #dc2626;     /* Solid red pill from reference */
+  --vb-status-crisis-border: #b91c1c;
+  --vb-status-success: #10b981;       /* Operational, Verified, Live */
+  --vb-status-success-bg: rgba(16, 185, 129, 0.15);
+  --vb-status-success-border: rgba(16, 185, 129, 0.45);
+  --vb-status-warning: #f59e0b;       /* Pending, Action Required */
+  --vb-status-warning-bg: rgba(245, 158, 11, 0.12);
+  --vb-status-warning-border: rgba(245, 158, 11, 0.4);
+  --vb-status-info: #38bdf8;          /* Informational */
+  --vb-status-info-bg: rgba(56, 189, 248, 0.12);
+  --vb-status-info-border: rgba(56, 189, 248, 0.35);
+  
+  /* Spacing Scale (8pt / 4pt Rhythm) */
+  --vb-space-2: 2px;
+  --vb-space-4: 4px;
+  --vb-space-6: 6px;
+  --vb-space-8: 8px;
+  --vb-space-10: 10px;
+  --vb-space-12: 12px;
+  --vb-space-14: 14px;
+  --vb-space-16: 16px;
+  --vb-space-20: 20px;
+  --vb-space-24: 24px;
+  --vb-space-28: 28px;
+  --vb-space-32: 32px;
+  --vb-space-48: 48px;
+  
+  /* Restrained Corner Radii from Reference */
+  --vb-radius-xs: 4px;
+  --vb-radius-sm: 6px;
+  --vb-radius-md: 8px;
+  --vb-radius-lg: 12px;
+  --vb-radius-xl: 16px;
+  --vb-radius-full: 9999px;
+  
+  /* Shadows & Ambient Tactical Glow */
+  --vb-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --vb-shadow-md: 0 4px 18px rgba(0, 0, 0, 0.5);
+  --vb-shadow-lg: 0 12px 36px rgba(0, 0, 0, 0.6);
+  --vb-shadow-glow-emerald: 0 0 16px rgba(16, 185, 129, 0.25);
+  
+  /* Typography Scale & Tracking */
+  --vb-font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --vb-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --vb-font-weight-regular: 400;
+  --vb-font-weight-medium: 500;
+  --vb-font-weight-semibold: 600;
+  --vb-font-weight-bold: 700;
+  --vb-font-weight-black: 800;
+  --vb-tracking-tight: -0.02em;
+  --vb-tracking-wide: 0.05em;
+  
+  /* Metrics Scale */
+  --vb-metric-val-size: 2rem;
+  --vb-metric-label-size: 13px;
+  
+  /* Transitions */
+  --vb-transition-fast: 150ms ease;
+  --vb-transition-normal: 250ms ease;
+  
+  /* Default Branch Fallback Accents */
+  --branch-accent: #E5C158;
+  --branch-accent-secondary: #10b981;
+  --branch-tint: rgba(16, 185, 129, 0.06);
+  --branch-border: rgba(16, 185, 129, 0.22);
+  
+  /* Backward-Compatibility Aliases */
+  --bg: var(--vb-bg-canvas);
+  --panel: var(--vb-bg-surface);
+  --panel2: var(--vb-bg-surface-elevated);
+  --text: var(--vb-text-primary);
+  --muted: var(--vb-text-secondary);
+  --border: var(--vb-border-subtle);
+  --accent: var(--vb-accent-emerald);
+  --accent2: var(--branch-accent);
+}

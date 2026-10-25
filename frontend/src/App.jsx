@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState}from'react';
-import{Shield,Mic,MicOff,LogOut,User,Calendar,MapPin,Heart,Folder,Music,Bell,Brain,Search,ChevronRight,BarChart3,Lock,Eye,EyeOff,Plus,Upload,FileText,RefreshCw,Radio,Menu,X,Trash2,Car,Home,Briefcase,Navigation,DollarSign,BookOpen}from'lucide-react';
+import{Shield,Mic,MicOff,LogOut,User,Calendar,MapPin,Heart,Folder,Music,Bell,Brain,Search,ChevronRight,BarChart3,Lock,Eye,EyeOff,Plus,Upload,FileText,RefreshCw,Radio,Menu,X,Trash2,Car,Home,Briefcase,Navigation,DollarSign,BookOpen,TrendingUp,CheckCircle2,Clock,ArrowUpRight,Star}from'lucide-react';
 import{Capacitor}from'@capacitor/core';
 import{TextToSpeech}from'@capacitor-community/text-to-speech';
 import{SpeechRecognition as NativeSpeechRecognition}from'@capgo/capacitor-speech-recognition';
@@ -13,12 +13,12 @@ import coastGuardEmblem from './assets/branches/coastguard.png';
 import spaceForceEmblem from './assets/branches/spaceforce.png';
 const API=(import.meta.env.VITE_API_BASE_URL||'https://valorbuddy.onrender.com').replace(/\/$/,'');
 const branches={
-Army:{emblem:armyEmblem,cls:'army',label:'Army Mission Control',motto:'Duty. Honor. Support.',style:{'--bg':'#06140b','--panel':'#0b2111','--panel2':'#102f18','--accent':'#75f06e','--accent2':'#e6c96a','--text':'#fff5cf','--muted':'#c7d8b1','--border':'#4caf50'}},
-Navy:{emblem:navyEmblem,cls:'navy',label:'United States Navy • Fleet Command',motto:'Honor. Courage. Commitment.',style:{'--bg':'#031426','--panel':'#062743','--panel2':'#0a3a5d','--accent':'#d4af37','--accent2':'#f7e7a9','--text':'#f7fbff','--muted':'#b9d2e8','--border':'#2f6f99'}},
-'Air Force':{emblem:airForceEmblem,cls:'airforce',label:'Air Force Flight Operations',motto:'Aim High. Fly. Fight. Support.',style:{'--bg':'#071a2f','--panel':'#0d2d52','--panel2':'#123f73','--accent':'#c9ced6','--accent2':'#d6d9df','--text':'#e6e8ec','--muted':'#b9c0ca','--border':'#8b95a3'}},
-Marines:{emblem:marinesEmblem,cls:'marines',label:'Marine Command Post',motto:'Semper Fidelis. Always Faithful.',style:{'--bg':'#1f120b','--panel':'#332014','--panel2':'#4b2b18','--accent':'#ff3131','--accent2':'#ff3131','--text':'#ffd9d0','--muted':'#e5b9a8','--border':'#c92b2b'}},
-'Coast Guard':{emblem:coastGuardEmblem,cls:'coastguard',label:'Coast Guard Rescue Operations',motto:'Semper Paratus. Always Ready.',style:{'--bg':'#031922','--panel':'#062838','--panel2':'#0d3d54','--accent':'#36d7ff','--accent2':'#ff7a1a','--text':'#effcff','--muted':'#b9dce7','--border':'#12a4c8'}},
-'Space Force':{emblem:spaceForceEmblem,cls:'spaceforce',label:'Space Force Orbital Command',motto:'Semper Supra. Always Above.',style:{'--bg':'#070716','--panel':'#11112d','--panel2':'#1c1b45','--accent':'#b794ff','--accent2':'#d8d8ff','--text':'#f5f2ff','--muted':'#c8c1ef','--border':'#7c4dff'}}
+Army:{emblem:armyEmblem,cls:'army',short:'Army',color:'#10b981',label:'Army Mission Control',motto:'Duty. Honor. Support.',style:{'--branch-bg':'#070e0a','--branch-panel':'#0c1812','--branch-panel-elevated':'#12241b','--branch-primary':'#10b981','--branch-gold':'#E5C158','--branch-border-subtle':'rgba(16,185,129,0.18)','--branch-glow':'rgba(16,185,129,0.15)'}},
+Navy:{emblem:navyEmblem,cls:'navy',short:'Navy',color:'#38bdf8',label:'United States Navy • Fleet Command',motto:'Honor. Courage. Commitment.',style:{'--branch-bg':'#020b14','--branch-panel':'#06182c','--branch-panel-elevated':'#0a2440','--branch-primary':'#38bdf8','--branch-gold':'#E5C158','--branch-border-subtle':'rgba(56,189,248,0.18)','--branch-glow':'rgba(56,189,248,0.15)'}},
+'Air Force':{emblem:airForceEmblem,cls:'airforce',short:'USAF',color:'#60a5fa',label:'Air Force Flight Operations',motto:'Aim High. Fly. Fight. Support.',style:{'--branch-bg':'#040d1a','--branch-panel':'#081a32','--branch-panel-elevated':'#0d274a','--branch-primary':'#60a5fa','--branch-gold':'#93c5fd','--branch-border-subtle':'rgba(96,165,250,0.18)','--branch-glow':'rgba(96,165,250,0.15)'}},
+Marines:{emblem:marinesEmblem,cls:'marines',short:'USMC',color:'#ef4444',label:'Marine Command Post',motto:'Semper Fidelis. Always Faithful.',style:{'--branch-bg':'#0f0505','--branch-panel':'#1b0c0c','--branch-panel-elevated':'#281313','--branch-primary':'#ef4444','--branch-gold':'#E5C158','--branch-border-subtle':'rgba(239,68,68,0.2)','--branch-glow':'rgba(239,68,68,0.15)'}},
+'Coast Guard':{emblem:coastGuardEmblem,cls:'coastguard',short:'USCG',color:'#06b6d4',label:'Coast Guard Rescue Operations',motto:'Semper Paratus. Always Ready.',style:{'--branch-bg':'#030f16','--branch-panel':'#061d2b','--branch-panel-elevated':'#0a2c3f','--branch-primary':'#06b6d4','--branch-gold':'#f97316','--branch-border-subtle':'rgba(6,182,212,0.2)','--branch-glow':'rgba(6,182,212,0.15)'}},
+'Space Force':{emblem:spaceForceEmblem,cls:'spaceforce',short:'USSF',color:'#a855f7',label:'Space Force Orbital Command',motto:'Semper Supra. Always Above.',style:{'--branch-bg':'#060511','--branch-panel':'#0f0c22','--branch-panel-elevated':'#171335','--branch-primary':'#a855f7','--branch-gold':'#e2e8f0','--branch-border-subtle':'rgba(168,85,247,0.2)','--branch-glow':'rgba(168,85,247,0.15)'}}
 };
 const branchAliases={
   army:'Army','u.s. army':'Army','us army':'Army','army veteran':'Army','u.s. army veteran':'Army',
@@ -203,11 +203,20 @@ function LinkifiedText({text=''}){
 }
 
 function HealthSafetyNotice(){
-  return <section className="healthSafetyNotice" role="note" aria-label="Important health and emergency notice">
-    <div><b>Important:</b> ValorBuddy provides informational and organizational support only. It is not a medical device, healthcare provider, crisis center, or emergency service and does not diagnose or treat medical conditions.</div>
-    <div className="healthSafetyActions"><a href="tel:911">Emergency: Call 911</a><a href="tel:988">Veterans Crisis Line: Call 988, then press 1</a></div>
-  </section>;
+  return <aside className="healthSafetyNotice" role="note" aria-label="Veterans Crisis and Emergency Support">
+    <div className="healthSafetyInfo">
+      <span className="healthSafetyBadge">CRISIS SUPPORT</span>
+      <span><b>Important:</b> Informational & organizational support only. Not emergency or medical service. Free confidential support 24/7:</span>
+    </div>
+    <div className="healthSafetyActions">
+      <a className="crisisAction emergencyAction" href="tel:911" aria-label="Call 911 for emergencies">Emergency: 911</a>
+      <a className="crisisAction vclAction" href="tel:988" aria-label="Call Veterans Crisis Line 988, then press 1">
+        <span>Veterans Crisis Line:</span> <b>Call 988, then press 1</b>
+      </a>
+    </div>
+  </aside>;
 }
+
 
 
 function PrivacyPolicy(){
@@ -474,27 +483,28 @@ function ValorBuddyApplication(){
   const safeBranch=normalizeBranch(branchTheme||user.branch);
   const b=branches[safeBranch]||branches.Army;
   return <div className={`app ${b.cls}`} data-branch={b.cls} style={b.style}>
-    <Sidebar user={{...user,branch:safeBranch}} screen={screen} setScreen={(x)=>{setScreen(x);setMobileNav(false)}} mobileOpen={mobileNav}/>
+    <Sidebar user={{...user,branch:safeBranch}} screen={screen} setScreen={(x)=>{setScreen(x);setMobileNav(false)}} mobileOpen={mobileNav} onLogout={logout}/>
     <button type="button" className={`mobileNavBackdrop ${mobileNav?'open':''}`} aria-label="Close navigation" onClick={()=>setMobileNav(false)}/>
-    <main>
-      <Topbar user={{...user,branch:safeBranch}} b={b} setScreen={setScreen} setUser={setUser} setBranchTheme={setBranchTheme} onMenu={()=>setMobileNav(v=>!v)} mobileOpen={mobileNav} onLogout={logout}/>
-      <GlobalSearch user={{...user,branch:safeBranch}} setScreen={setScreen}/>
+    <div className="appMain">
       <HealthSafetyNotice/>
-      {screen==='dashboard'&&<Dashboard user={{...user,branch:safeBranch}} setScreen={setScreen}/>}
-      {screen==='companion'&&<Companion user={{...user,branch:safeBranch}}/>}
-      {screen==='events'&&<Events user={{...user,branch:safeBranch}}/>}
-      {screen==='memories'&&<Memories/>}
-      {screen==='reminders'&&<Reminders/>}
-      {screen==='documents'&&<Documents/>}
-      {screen==='benefits'&&<Benefits user={{...user,branch:safeBranch}}/>}
-      {screen==='music'&&<MusicPage user={{...user,branch:safeBranch}} setUser={setUser}/>}
-      {screen==='tutorial'&&<Tutorial setScreen={setScreen}/>}
-      {screen==='missions'&&<MissionControl user={{...user,branch:safeBranch}}/>}
-      {screen==='career'&&<CareerBusiness user={{...user,branch:safeBranch}}/>}
-      {screen==='admin'&&<Admin onPreview={setAdminPartnerPreview}/>}
-      {screen==='vendorAdmin'&&<Admin onPreview={setAdminPartnerPreview} vendorOnly/>}
-      {screen==='profile'&&<Profile user={{...user,branch:safeBranch}} setUser={setUser}/>}
-    </main>
+      <Topbar user={{...user,branch:safeBranch}} b={b} screen={screen} setScreen={setScreen} setUser={setUser} setBranchTheme={setBranchTheme} onMenu={()=>setMobileNav(v=>!v)} mobileOpen={mobileNav} onLogout={logout}/>
+      <main className="appContent">
+        {screen==='dashboard'&&<Dashboard user={{...user,branch:safeBranch}} setScreen={setScreen}/>}
+        {screen==='companion'&&<Companion user={{...user,branch:safeBranch}}/>}
+        {screen==='events'&&<Events user={{...user,branch:safeBranch}}/>}
+        {screen==='memories'&&<Memories/>}
+        {screen==='reminders'&&<Reminders/>}
+        {screen==='documents'&&<Documents/>}
+        {screen==='benefits'&&<Benefits user={{...user,branch:safeBranch}}/>}
+        {screen==='music'&&<MusicPage user={{...user,branch:safeBranch}} setUser={setUser}/>}
+        {screen==='tutorial'&&<Tutorial setScreen={setScreen}/>}
+        {screen==='missions'&&<MissionControl user={{...user,branch:safeBranch}}/>}
+        {screen==='career'&&<CareerBusiness user={{...user,branch:safeBranch}}/>}
+        {screen==='admin'&&<Admin onPreview={setAdminPartnerPreview}/>}
+        {screen==='vendorAdmin'&&<Admin onPreview={setAdminPartnerPreview} vendorOnly/>}
+        {screen==='profile'&&<Profile user={{...user,branch:safeBranch}} setUser={setUser}/>}
+      </main>
+    </div>
   </div>
 }
 
@@ -577,26 +587,328 @@ function Auth({onLogin}){
     </div>
   </div>
 }
-function Sidebar({user,screen,setScreen,mobileOpen}){const nav=[['dashboard','Dashboard',Shield],['companion','AI Assistant',Brain],['events','Activities',MapPin],['benefits','Benefits',Search],['memories','Memories',Heart],['reminders','Reminders',Bell],['documents','Document Intelligence',Folder],['missions','Mission Control',Brain],['career','Career & Business',Briefcase],['music','Music & Media',Music],['tutorial','User Tutorial',BookOpen],['profile','Profile',User]];if(user.role==='admin')nav.push(['admin','Admin Dashboard',BarChart3],['vendorAdmin','Vendor Marketplace',Briefcase]);return <aside className={mobileOpen?"mobileOpen":""}><div className="logo"><div className="logoStack"><img src={valorLogo} alt="ValorBuddy logo"/><img className="branchMini" src={(branches[normalizeBranch(user.branch)]||branches.Army).emblem} alt={`${user.branch} service emblem`}/></div><div><b>VALORBUDDY</b><span>Your Digital Battle Buddy</span></div></div><div className="miniProfile"><User/><div><b>{user.rank?`${user.rank} `:""}{user.first_name} {user.last_name||""}</b><span>{user.branch} • {user.service_status||"Veteran"}</span><small>{user.city}, {user.state}</small></div></div>{nav.map(([id,label,Icon])=><button className={screen===id?'active':''}key={id}onClick={()=>setScreen(id)}><Icon/>{label}</button>)}<div className="pledge">COMMITMENT<br/><span>Supporting those who served. Always.</span></div></aside>}
-function Topbar({user,b,setScreen,setUser,setBranchTheme,onLogout,onMenu,mobileOpen}){
+function Sidebar({user,screen,setScreen,mobileOpen,onLogout}){
+  const b=branches[normalizeBranch(user.branch)]||branches.Army;
+  const navGroups=[
+    {
+      group:'Mission Hub',
+      items:[
+        ['dashboard','Command Center',Shield],
+        ['companion','AI Battle Buddy',Brain],
+        ['benefits','Benefits & VA Claims',Search],
+        ['events','Veteran Community',MapPin],
+        ['documents','DD-214 & Secure Vault',Lock],
+        ['career','Career & Business',Briefcase]
+      ]
+    },
+    {
+      group:'Personal Vault',
+      items:[
+        ['reminders','Reminders',Bell],
+        ['memories','Memories',Heart],
+        ['music','Music & Media',Music],
+        ['profile','Profile & Settings',User],
+        ['tutorial','User Tutorial',BookOpen]
+      ]
+    }
+  ];
+  if(user.role==='admin'){
+    navGroups.push({
+      group:'Administration',
+      items:[
+        ['admin','Admin Dashboard',BarChart3],
+        ['vendorAdmin','Vendor Marketplace',Briefcase]
+      ]
+    });
+  }
+
+  const initials = `${(user.first_name||'V')[0]||'V'}${(user.last_name||'B')[0]||'B'}`.toUpperCase();
+  const branchName = normalizeBranch(user.branch).toUpperCase();
+
+  return (
+    <aside className={`sidebar ${mobileOpen?"mobileOpen":""}`} aria-label="Main Navigation">
+      <div className="sidebarBrandArea">
+        <div className="brandHeader">
+          <img className="brandLogo" src={valorLogo} alt="ValorBuddy logo"/>
+          <div>
+            <b className="brandTitle">VALORBUDDY</b>
+            <span className="tacticalBrandSubtitle">{branchName} COMMAND</span>
+          </div>
+        </div>
+
+        {/* Official Military Branch Emblem Banner */}
+        <div className="branchIdentityBanner">
+          <img className="branchEmblemMini" src={b.emblem} alt={`${user.branch} official emblem`}/>
+          <div className="branchIdentityDetails">
+            <span className="branchBadgeText">[ {branchName} COMMAND ]</span>
+            <small className="branchLabelSub">{b.label}</small>
+          </div>
+        </div>
+
+        {/* Tactical User Card (Matching Reference Image 3) */}
+        <div
+          className="tacticalUserCard"
+          onClick={()=>setScreen('profile')}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e)=>{if(e.key==='Enter'||e.key===' ')setScreen('profile')}}
+          aria-label="Open profile"
+        >
+          <div className="tacticalAvatar">
+            <span>{initials}</span>
+            <div className="tacticalStatusDot" title="Active Battle Ready" />
+          </div>
+          <div className="tacticalUserInfo">
+            <span className="tacticalUserName">{user.first_name} {user.last_name||''}</span>
+            <span className="tacticalUserBranch">
+              <img className="tacticalUserBranchEmblem" src={b.emblem} alt="" aria-hidden="true"/>
+              {user.branch} • {user.service_status||'Veteran'}
+            </span>
+            <span className="tacticalUserLocation">{user.city ? `${user.city}${user.state ? `, ${user.state}` : ''}` : 'Mission Ready'}</span>
+          </div>
+        </div>
+      </div>
+
+      <nav className="sidebarNav">
+        {navGroups.map(({group,items})=>(
+          <div className="navGroup" key={group}>
+            <span className="sidebarMissionHubLabel">{group}</span>
+            {items.map(([id,label,Icon])=>(
+              <button
+                type="button"
+                className={`navItem ${screen===id?'active':''}`}
+                key={id}
+                data-screen={id}
+                onClick={()=>setScreen(id)}
+                aria-current={screen===id?'page':undefined}
+              >
+                <Icon aria-hidden="true"/>
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+        ))}
+      </nav>
+
+      <div className="sidebarFooter">
+        <button
+          type="button"
+          className="secureSignOutBtn"
+          onClick={onLogout}
+          aria-label="Secure Sign Out"
+        >
+          <LogOut size={14} aria-hidden="true"/>
+          <span>Secure Sign Out</span>
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+function Topbar({user,b,screen,setScreen,setUser,setBranchTheme,onLogout,onMenu,mobileOpen}){
   async function changeBranch(branch){
     const normalized=applyBranchTheme(branch);setBranchTheme(normalized);setUser(u=>({...u,branch:normalized}));
     requestAnimationFrame(()=>applyBranchTheme(normalized));setTimeout(()=>applyBranchTheme(normalized),80);
     try{await api('/api/profile/branch',{method:'POST',body:JSON.stringify({branch:normalized})})}catch(e){console.warn('Branch theme save failed; keeping local theme',e)}
   }
-  return <header>
-    <button className="mobileMenu" onClick={onMenu} aria-label={mobileOpen?'Close navigation':'Open navigation'} aria-expanded={mobileOpen}>{mobileOpen?<X/>:<Menu/>}</button>
-    <div className="commandIdentity"><img src={b.emblem} alt={`${user.branch} service emblem`}/><div><b>{b.label}</b><span>{b.motto}</span></div></div>
-    <div className="status">// PRIVATE //</div>
-    <nav className="branchSwitcher" aria-label="Switch service branch theme">{Object.keys(branches).map(x=><button type="button" title={`Switch to ${x} theme`} className={normalizeBranch(user.branch)===x?'active':''} key={x} onClick={()=>changeBranch(x)}>{x}</button>)}</nav>
-    <button onClick={()=>setScreen('companion')}><Mic/>Voice</button>
-    <button onClick={onLogout} className="logout"><LogOut/>Logout</button>
-  </header>
-}
-function GlobalSearch({user,setScreen}){const[q,setQ]=useState('');function go(e){e?.preventDefault?.();const v=q.trim().toLowerCase();if(!v)return;if(v.includes('event')||v.includes('activit')||v.includes('place')||v.includes('vfw')||v.includes('coffee'))setScreen('events');else if(v.includes('benefit')||v.includes('va')||v.includes('claim')||v.includes('spouse')||v.includes('dependent'))setScreen('benefits');else if(v.includes('document')||v.includes('dd214')||v.includes('vault'))setScreen('documents');else if(v.includes('remind')||v.includes('appointment'))setScreen('reminders');else if(v.includes('resume')||v.includes('business plan')||v.includes('career'))setScreen('career');else if(v.includes('mission')||v.includes('agent'))setScreen('missions');else if(v.includes('music'))setScreen('music');else setScreen('companion')}return <form className="globalSearch" onSubmit={go}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder={`Search benefits, spouse/dependent access, activities near ${user.city}, documents...`}/><button type="submit">Search</button></form>}
-function Hero({user}){return <section className="hero"><div><h1>{new Date().getHours()<12?"GOOD MORNING":new Date().getHours()<18?"GOOD AFTERNOON":"GOOD EVENING"}, {user.first_name.toUpperCase()}</h1><b>{user.branch.toUpperCase()} COMMUNITY</b><p>I’m ValorBuddy. How can I help you today?</p><div className="heroStatus"><span>● READY</span><small>Honor • Courage • Commitment</small></div></div><VoicePanel user={user}/></section>}
 
-function SmartResultPopup({open,onClose,title,subtitle,items,onChoose,kind='event'}){if(!open)return null;return <div className="smartModalBackdrop" onClick={onClose}><section className="smartModal" role="dialog" aria-modal="true" onClick={e=>e.stopPropagation()}><button className="modalClose" onClick={onClose} aria-label="Close">×</button><div className="modalHeader"><span className="modalEyebrow">VALORBUDDY RECOMMENDATIONS</span><h2>{cleanVisibleText(title)}</h2>{subtitle&&<p>{cleanVisibleText(subtitle)}</p>}</div><div className="smartResultWrap">{items.map((x,i)=><article className="smartResultCard" key={`${x.title}-${i}`}><div className="resultRank">{i+1}</div><div className="resultMain"><div className="resultTitleRow"><h3>{cleanVisibleText(x.title)}</h3>{x.rating&&<span className="ratingPill">★ {x.rating}{x.review_count?` · ${x.review_count}`:''}</span>}</div>{x.location&&<p className="resultLocation">📍 {cleanVisibleText(x.location)}</p>}<p className="assistantExplains"><b>Why ValorBuddy suggests it:</b> {cleanVisibleText(x.assistant_explanation||x.description||x.summary)}</p>{x.open_now!==undefined&&x.open_now!==null&&<span className={`openPill ${x.open_now?'open':'closed'}`}>{x.open_now?'Open now':'Currently closed'}</span>}{x.next_step&&<div className="nextStep"><b>Best next step</b><span>{cleanVisibleText(x.next_step)}</span></div>}{x.community_note&&<div className="communityVoice"><b>What veterans commonly say</b><p>{cleanVisibleText(x.community_note)}</p></div>}{x.reviews?.length>0&&<div className="reviewPanel"><b>What Google reviewers are saying</b>{x.reviews.map((r,j)=><blockquote key={j}><span>“{cleanVisibleText(r.text)}”</span><small>{r.author}{r.rating?` · ${r.rating}/5`:''}{r.time_description?` · ${r.time_description}`:''}</small></blockquote>)}</div>}<div className="resultActions">{onChoose&&<button className="primaryAction" onClick={()=>onChoose(x,i)}>Choose this</button>}{x.maps_url&&<a href={x.maps_url} target="_blank" rel="noreferrer">Directions</a>}{x.website&&<a href={x.website} target="_blank" rel="noreferrer">Website</a>}{x.phone&&<a href={`tel:${x.phone}`}>Call</a>}</div></div></article>)}</div><div className="modalFooter"><span>Not seeing the right fit?</span><button onClick={onClose}>Refine the search</button></div></section></div>}
+  const currentBranch = normalizeBranch(user.branch);
+
+  return (
+    <header className="topbar">
+      <div className="topbarLeft">
+        <button className="mobileMenu" onClick={onMenu} aria-label={mobileOpen?'Close navigation':'Open navigation'} aria-expanded={mobileOpen}>{mobileOpen?<X/>:<Menu/>}</button>
+        <div className="topbarCommandTitle">
+          <img className="topbarBranchEmblem" src={b.emblem} alt={`${currentBranch} official emblem`} />
+          <div>
+            <span className="topbarMissionTitle">{currentBranch} Mission Control</span>
+            <small className="topbarMotto">{b.motto || 'Duty. Honor. Support.'}</small>
+          </div>
+        </div>
+      </div>
+
+      <div className="topbarCenter">
+        <div className="topbarBranchPills" role="tablist" aria-label="Branch Mission Control Switcher">
+          {Object.keys(branches).map(name => {
+            const isSelected = currentBranch === name;
+            return (
+              <button
+                key={name}
+                type="button"
+                className={`branchPill branchPill--${branches[name].cls} ${isSelected ? 'active' : ''}`}
+                onClick={() => changeBranch(name)}
+                aria-pressed={isSelected}
+                title={`Switch to ${name} Command Center`}
+              >
+                {isSelected ? (
+                  <img className="pillBranchEmblem" src={branches[name].emblem} alt="" aria-hidden="true" />
+                ) : (
+                  <span className="branchPip" style={{ '--pip-color': branches[name].color }} aria-hidden="true" />
+                )}
+                <span className="branchNameFull">{name}</span>
+                <span className="branchNameShort">{branches[name].short}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="topbarRight">
+        <a
+          href="tel:988"
+          className="topbarCrisisPill"
+          aria-label="Veterans Crisis Line 988 Press 1"
+          title="Veterans Crisis Line: Dial 988, then press 1"
+        >
+          <span className="crisisDot">●</span>
+          <span className="crisisTextFull">CRISIS LINE: 988</span>
+          <span className="crisisTextShort">988 CRISIS</span>
+        </a>
+
+        <div className="topbarOperationalBadge" title="Command Center Systems Operational">
+          <span className="operationalDot">●</span>
+          <span>OPERATIONAL</span>
+        </div>
+
+        <button type="button" className="quickVoiceButton" onClick={()=>setScreen('companion')} aria-label="Open voice assistant" title="Voice Battle Buddy">
+          <Mic size={14}/>
+          <span>Voice</span>
+        </button>
+      </div>
+    </header>
+  );
+}
+
+function GlobalSearch({user,setScreen}){const[q,setQ]=useState('');function go(e){e?.preventDefault?.();const v=q.trim().toLowerCase();if(!v)return;if(v.includes('event')||v.includes('activit')||v.includes('place')||v.includes('vfw')||v.includes('coffee'))setScreen('events');else if(v.includes('benefit')||v.includes('va')||v.includes('claim')||v.includes('spouse')||v.includes('dependent'))setScreen('benefits');else if(v.includes('document')||v.includes('dd214')||v.includes('vault'))setScreen('documents');else if(v.includes('remind')||v.includes('appointment'))setScreen('reminders');else if(v.includes('resume')||v.includes('business plan')||v.includes('career'))setScreen('career');else if(v.includes('mission')||v.includes('agent'))setScreen('missions');else if(v.includes('music'))setScreen('music');else setScreen('companion')}return <form className="globalSearch" onSubmit={go}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder={`Search benefits, activities near ${user.city}, documents...`}/><button type="submit">Search</button></form>}
+
+function Hero({user, setScreen}){
+  const [searchQuery, setSearchQuery] = useState('');
+  const h = new Date().getHours();
+  const timeGreeting = h < 12 ? "GOOD MORNING" : h < 18 ? "GOOD AFTERNOON" : "GOOD EVENING";
+  const branchName = normalizeBranch(user.branch).toUpperCase();
+  const firstName = (user.first_name || 'VETERAN').toUpperCase();
+  const b = branches[normalizeBranch(user.branch)] || branches.Army;
+
+  function handleSearch(e){
+    e?.preventDefault?.();
+    const v = searchQuery.trim().toLowerCase();
+    if(!v) return;
+    if (v.includes('claim') || v.includes('benefit') || v.includes('va') || v.includes('526') || v.includes('disability')) {
+      setScreen('benefits');
+    } else if (v.includes('event') || v.includes('clinic') || v.includes('vfw') || v.includes('community')) {
+      setScreen('events');
+    } else if (v.includes('document') || v.includes('dd214') || v.includes('file')) {
+      setScreen('documents');
+    } else if (v.includes('resume') || v.includes('mos') || v.includes('career') || v.includes('job')) {
+      setScreen('career');
+    } else {
+      setScreen('companion');
+    }
+  }
+
+  function handleQuickIntel(type) {
+    if (type === 'claim') setScreen('benefits');
+    else if (type === 'gibill') setScreen('benefits');
+    else if (type === 'clinic') setScreen('events');
+    else if (type === 'resume') setScreen('career');
+  }
+
+  return (
+    <section className="dashboardTacticalHero" aria-label="Tactical Command Hero">
+      <div className="heroGreetingRow">
+        <div className="heroGreetingLeft">
+          <h1 className="tacticalGreeting">
+            {timeGreeting}, {firstName}
+          </h1>
+          <p className="tacticalSubtitle">
+            {b.motto || 'Duty. Honor. Support.'} Your AI Battle Buddy is ready to assist with benefits, claims, and transition.
+          </p>
+        </div>
+        <div className="heroBranchBadge">
+          <img className="heroBranchEmblem" src={b.emblem} alt="" aria-hidden="true"/>
+          <span>{branchName} COMMUNITY</span>
+        </div>
+      </div>
+
+      {/* Prominent AI Battle Buddy Question Bar */}
+      <form className="tacticalSearchBar" onSubmit={handleSearch}>
+        <div className="searchBarLeft">
+          <Search size={18} aria-hidden="true"/>
+          <input
+            className="searchBarInput"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            placeholder="What is the status of my VA disability claim?"
+            aria-label="Ask your AI Battle Buddy a question or search benefits"
+          />
+        </div>
+        <div className="searchBarRight">
+          <div className="soundWaveGraphic" aria-hidden="true">
+            <span className="waveBar"/>
+            <span className="waveBar"/>
+            <span className="waveBar"/>
+            <span className="waveBar"/>
+            <span className="waveBar"/>
+          </div>
+          <button
+            type="button"
+            className="tacticalMicBtn"
+            onClick={() => setScreen('companion')}
+            aria-label="Start Voice Battle Buddy session"
+            title="Start Voice Battle Buddy"
+          >
+            <Mic size={18}/>
+          </button>
+        </div>
+      </form>
+
+      {/* Quick Intel Pills Row */}
+      <div className="quickIntelRow">
+        <span className="quickIntelLabel">QUICK INTEL:</span>
+        <div className="quickIntelPills">
+          <button
+            type="button"
+            className="quickIntelBtn"
+            onClick={() => handleQuickIntel('claim')}
+          >
+            VA Disability Claim
+          </button>
+          <button
+            type="button"
+            className="quickIntelBtn"
+            onClick={() => handleQuickIntel('gibill')}
+          >
+            GI Bill & Education
+          </button>
+          <button
+            type="button"
+            className="quickIntelBtn"
+            onClick={() => handleQuickIntel('clinic')}
+          >
+            Closest VA Clinic
+          </button>
+          <button
+            type="button"
+            className="quickIntelBtn"
+            onClick={() => handleQuickIntel('resume')}
+          >
+            Military MOS Resume
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SmartResultPopup({open,onClose,title,subtitle,items,onChoose,kind='event'}){
+  useEffect(()=>{
+    if(!open)return;
+    const onKey=e=>{if(e.key==='Escape')onClose?.()};
+    window.addEventListener('keydown',onKey);
+    return ()=>window.removeEventListener('keydown',onKey);
+  },[open,onClose]);
+  if(!open)return null;
+  return <div className="smartModalBackdrop" onClick={onClose}><section className="smartModal" role="dialog" aria-modal="true" onClick={e=>e.stopPropagation()}><button className="modalClose" onClick={onClose} aria-label="Close dialog">×</button><div className="modalHeader"><span className="modalEyebrow">VALORBUDDY RECOMMENDATIONS</span><h2>{cleanVisibleText(title)}</h2>{subtitle&&<p>{cleanVisibleText(subtitle)}</p>}</div><div className="smartResultWrap">{items.map((x,i)=><article className="smartResultCard" key={`${x.title}-${i}`}><div className="resultRank">{i+1}</div><div className="resultMain"><div className="resultTitleRow"><h3>{cleanVisibleText(x.title)}</h3>{x.rating&&<span className="ratingPill">★ {x.rating}{x.review_count?` · ${x.review_count}`:''}</span>}</div>{x.location&&<p className="resultLocation">📍 {cleanVisibleText(x.location)}</p>}<p className="assistantExplains"><b>Why ValorBuddy suggests it:</b> {cleanVisibleText(x.assistant_explanation||x.description||x.summary)}</p>{x.open_now!==undefined&&x.open_now!==null&&<span className={`openPill ${x.open_now?'open':'closed'}`}>{x.open_now?'Open now':'Currently closed'}</span>}{x.next_step&&<div className="nextStep"><b>Best next step</b><span>{cleanVisibleText(x.next_step)}</span></div>}{x.community_note&&<div className="communityVoice"><b>What veterans commonly say</b><p>{cleanVisibleText(x.community_note)}</p></div>}{x.reviews?.length>0&&<div className="reviewPanel"><b>What Google reviewers are saying</b>{x.reviews.map((r,j)=><blockquote key={j}><span>“{cleanVisibleText(r.text)}”</span><small>{r.author}{r.rating?` · ${r.rating}/5`:''}{r.time_description?` · ${r.time_description}`:''}</small></blockquote>)}</div>}<div className="resultActions">{onChoose&&<button className="primaryAction" onClick={()=>onChoose(x,i)}>Choose this</button>}{x.maps_url&&<a href={x.maps_url} target="_blank" rel="noreferrer">Directions</a>}{x.website&&<a href={x.website} target="_blank" rel="noreferrer">Website</a>}{x.phone&&<a href={`tel:${x.phone}`}>Call</a>}</div></div></article>)}</div><div className="modalFooter"><span>Not seeing the right fit?</span><button onClick={onClose}>Refine the search</button></div></section></div>}
 function VoicePanel({user,onResult}){
   const[listening,setListening]=useState(false);const[transcript,setTranscript]=useState('');const[reply,setReply]=useState('');const[results,setResults]=useState([]);const[choices,setChoices]=useState([]);const[popupOpen,setPopupOpen]=useState(false);const[popupTitle,setPopupTitle]=useState('Recommended options');
   const[voiceStyle,setVoiceStyle]=useState(()=>voicePreferences().style);const[voiceName,setVoiceName]=useState(()=>voicePreferences().voiceName);const[availableVoices,setAvailableVoices]=useState([]);const[locationState,setLocationState]=useState('');const[autoRead,setAutoRead]=useState(()=>localStorage.getItem('valor_voice_auto_read')==='true');const[muted,setMuted]=useState(()=>localStorage.getItem('valor_voice_muted')==='true');const[playback,setPlayback]=useState('stopped');
@@ -647,26 +959,654 @@ function VoicePanel({user,onResult}){
   function start(restart=false){clearTimeout(followUpTimer.current);if(!restart)playWelcome();if(isNativeApp()){startNative(restart);return}const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){setReply('Voice recognition is not available in this browser. Please type your request below.');return}try{rec.current?.abort?.()}catch{}const r=new SR();r.lang='en-US';r.interimResults=true;r.continuous=false;r.onstart=()=>{setListening(true);if(!restart)setReply(`I’m listening, ${user.first_name}. Speak naturally, and interrupt me whenever you need to.`)};r.onend=()=>setListening(false);r.onerror=e=>{setListening(false);if(e.error!=='aborted')setReply('I didn’t catch that clearly. Tap the microphone and try again, or choose one of the options below.')};r.onresult=e=>{let finalText='';let interim='';for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)finalText+=t;else interim+=t}const heard=(finalText||interim).trim();if(heard)setTranscript(heard);if(finalText.trim())handleSpeech(finalText)};rec.current=r;r.start()}
   function stopListening(){if(isNativeApp()){NativeSpeechRecognition.forceStop({timeout:600}).catch(()=>{});setListening(false)}else rec.current?.stop?.()}
   const suggestions=['Veteran events near me','Benefits for my family','Closest VA clinic','Free activities this weekend','Why did you choose these?','Are these veteran-owned?'];
-  return <><div className="voiceBox"><div className="voiceHeading"><h3><Radio/> ValorBuddy Voice</h3><span className="liveBadge">READY</span></div><p className="voiceIntro">Audio is off by default. You control when ValorBuddy reads a response aloud.</p><div className="voiceSettings"><label><span>Voice style</span><select value={voiceStyle} onChange={e=>setVoiceStyle(e.target.value)}>{Object.entries(voiceStyles).map(([key,v])=><option key={key} value={key}>{v.label}</option>)}</select></label><label><span>AI voice</span><select value={voiceName} onChange={e=>setVoiceName(e.target.value)}><option value="">Best available voice</option>{availableVoices.map(v=><option key={`${v.name}-${v.lang}`} value={v.name}>{friendlyVoiceLabel(v)}</option>)}</select></label><button type="button" onClick={testVoice} disabled={muted}>▶ Test voice</button></div><div className="voicePreferenceRow"><label><input type="checkbox" checked={autoRead} onChange={e=>setAutoRead(e.target.checked)}/> Automatically read new answers</label><button type="button" aria-pressed={muted} onClick={()=>{const next=!muted;setMuted(next);if(next)stopVoice()}}>{muted?'🔇 Unmute':'🔊 Mute'}</button></div><div className="voiceUtilityRow"><button onClick={()=>playText()} disabled={!reply||muted}>▶ Play</button><button onClick={pauseVoice} disabled={playback!=='playing'}>⏸ Pause</button><button onClick={resumeVoice} disabled={playback!=='paused'||muted}>⏯ Resume</button><button className="stopVoiceButton" onClick={stopVoice} disabled={playback==='stopped'}>⏹ Stop</button><button className="welcomeButton" onClick={()=>playWelcome(true,true)} disabled={muted}>Hear welcome</button><button className="locationButton" onClick={useMyLocation}>📍 Use my location</button></div>{locationState&&<div className={`locationStatus ${locationState.includes('active')?'success':''}`}>{locationState}</div>}<button className={`mic ${listening?'listening':''}`} onClick={()=>listening?stopListening():start()}>{listening?<MicOff/>:<Mic/>}<span>{listening?'Listening...':'Tap to Speak'}</span></button>{transcript&&<small className="heard">You said: {transcript}</small>}{reply&&<div className="reply" aria-live="polite"><LinkifiedText text={reply}/></div>}<div className="suggestionWrap">{suggestions.map((x,i)=><button key={i} onClick={()=>send(x)}>{x}</button>)}</div>{choices.length>0&&<div className="choiceGrid">{choices.map((x,i)=><button key={i} onClick={()=>send(x.query||x.label)}><span>{i+1}</span>{x.label}</button>)}</div>}{results.length>0&&<button className="openResultsButton" onClick={()=>setPopupOpen(true)}>View {results.length} explained recommendations</button>}</div><SmartResultPopup open={popupOpen} onClose={()=>setPopupOpen(false)} title={popupTitle} subtitle="ValorBuddy explains why each option was selected and clearly separates confirmed facts from assumptions." items={results.slice(0,6)} onChoose={(x)=>{setPopupOpen(false);setReply(`${x.title} is selected. Choose Directions, Website, or Call to continue.`);if(autoRead&&!muted)playText(`${x.title} is selected. Choose directions, website, or call on the screen.`)}}/></>}
 
-function Dashboard({user,setScreen}){const[brief,setBrief]=useState(null);useEffect(()=>{api('/api/briefing').then(setBrief).catch(()=>{})},[]);return <><Hero user={user}/><div className="quickCards">{[['AI Assistant','Personalized help using your profile and current context.',Brain,'companion'],['Travel Safety','Safer routes, VA facilities, weather, traffic, and veteran-friendly stops.',Navigation,'companion'],['Housing & Credit','Veteran-friendly housing, VA loan education, and credit preparation.',Home,'companion'],['Career & Business','Build a resume, business plan, and career transition mission from your service history.',Briefcase,'career'],['Vehicle Guidance','Auto-buying education, discounts, financing questions, and checklists.',Car,'companion'],['Benefits & VA Forms','Plain-English benefits and official VA form guidance.',Search,'benefits'],['Activities','Live veteran events and community options.',MapPin,'events'],['Document Intelligence','Upload a resume, DD214, or record and let specialist agents analyze it.',Folder,'documents'],['Mission Control','Give ValorBuddy a real goal and watch the Supervisor coordinate specialist agents.',Brain,'missions'],['User Tutorial','Learn the fastest way to use benefits, forms, activities, reminders, documents, music, profile, and the AI assistant.',BookOpen,'tutorial']].map(([t,d,I,s])=><div className="card"onClick={()=>setScreen(s)}key={t}><I/><h3>{t}</h3><p>{d}</p><button>Open <ChevronRight/></button></div>)}</div><section className="glance"><h2>Today’s Briefing</h2><div><b>{brief?.greeting||`Good to see you, ${user.first_name}. How is your day going?`}</b><p>{brief?.wellness_prompt||'Choose one positive action today.'}</p></div><button className="metric" type="button" onClick={()=>setScreen('reminders')}><Bell/><b>{brief?.reminders?.length||0}</b><span>Reminders</span><ChevronRight/></button><button className="metric" type="button" onClick={()=>setScreen('events')}><MapPin/><b>{brief?.events?.length||0}</b><span>Nearby options</span><ChevronRight/></button></section></>}
+  const isProcessing = reply === 'Let me check that for you…';
+  const isSpeaking = playback === 'playing';
+  const isError = Boolean(reply && (
+    reply.toLowerCase().includes('wrong') ||
+    reply.toLowerCase().includes('not available') ||
+    reply.toLowerCase().includes('permission is required') ||
+    reply.toLowerCase().includes('could not start')
+  ));
+
+  const voiceState = listening
+    ? { key: 'listening', label: 'LISTENING', prompt: 'Listening…' }
+    : isProcessing
+    ? { key: 'processing', label: 'PROCESSING', prompt: 'Working on that…' }
+    : isSpeaking
+    ? { key: 'speaking', label: 'SPEAKING', prompt: 'Speaking…' }
+    : isError
+    ? { key: 'error', label: 'ERROR', prompt: 'Something went wrong. Try again.' }
+    : { key: 'idle', label: 'IDLE', prompt: 'How can I help?' };
+
+  return <>
+    <div className={`voiceBox voiceBox--${voiceState.key}`}>
+      <div className="voiceHeading">
+        <h3><Radio aria-hidden="true"/> ValorBuddy Voice</h3>
+        <span className={`liveBadge liveBadge--${voiceState.key}`}>{voiceState.label}</span>
+      </div>
+
+      <div className="voiceStateBanner">
+        <span className="voiceStatePrompt">{voiceState.prompt}</span>
+        <p className="voiceIntro">Audio is off by default. You control when ValorBuddy reads a response aloud.</p>
+      </div>
+
+      {/* Tactical Audio Waveform Visualizer */}
+      <div className={`waveformVisualizer ${listening ? 'listening' : isSpeaking ? 'speaking' : ''}`} aria-hidden="true">
+        {[40, 75, 55, 90, 60, 85, 45, 100, 70, 95, 50, 80, 65, 90, 45, 70].map((h, i) => (
+          <span key={i} className="waveformBar" style={{ height: `${h}%`, animationDelay: `${(i * 0.05).toFixed(2)}s` }}/>
+        ))}
+      </div>
+
+      {/* Main Microphone Action */}
+      <button
+        className={`mic ${listening?'listening':''} ${isProcessing?'processing':''} ${isSpeaking?'speaking':''}`}
+        onClick={()=>listening?stopListening():start()}
+        aria-label={listening?'Stop listening':'Start voice assistant'}
+      >
+        {listening?<MicOff aria-hidden="true"/>:<Mic aria-hidden="true"/>}
+        <span>{listening?'Listening…':'Tap to Speak'}</span>
+      </button>
+
+      {/* Grouped Audio Playback Controls */}
+      <div className="voiceAudioActionBar" aria-label="Audio playback controls">
+        <button type="button" onClick={()=>playText()} disabled={!reply||muted} aria-label="Play response">▶ Play</button>
+        <button type="button" onClick={pauseVoice} disabled={playback!=='playing'} aria-label="Pause response">⏸ Pause</button>
+        <button type="button" onClick={resumeVoice} disabled={playback!=='paused'||muted} aria-label="Resume response">⏯ Resume</button>
+        <button type="button" className="stopVoiceButton" onClick={stopVoice} disabled={playback==='stopped'} aria-label="Stop audio">⏹ Stop</button>
+        <button type="button" aria-pressed={muted} onClick={()=>{const next=!muted;setMuted(next);if(next)stopVoice()}}>
+          {muted?'🔇 Unmute':'🔊 Mute'}
+        </button>
+      </div>
+
+      {locationState&&<div className={`locationStatus ${locationState.includes('active')?'success':''}`}>{locationState}</div>}
+      {transcript&&<small className="heard">You said: {transcript}</small>}
+      {reply&&<div className="reply" aria-live="polite"><LinkifiedText text={reply}/></div>}
+
+      {/* Categorized Suggested Prompts */}
+      <div className="suggestionWrap" aria-label="Suggested voice questions">
+        {suggestions.map((x,i)=><button key={i} onClick={()=>send(x)}>{x}</button>)}
+      </div>
+
+      {choices.length>0&&<div className="choiceGrid">
+        {choices.map((x,i)=><button key={i} onClick={()=>send(x.query||x.label)}><span>{i+1}</span>{x.label}</button>)}
+      </div>}
+      {results.length>0&&<button className="openResultsButton" onClick={()=>setPopupOpen(true)}>View {results.length} explained recommendations</button>}
+
+      {/* Grouped Secondary Voice Preferences & Style */}
+      <details className="voiceSettingsDetails">
+        <summary className="voiceSettingsSummary">
+          <span>⚙️ Voice Preferences & Style</span>
+          <ChevronRight size={14} className="voiceSettingsChevron" aria-hidden="true"/>
+        </summary>
+        <div className="voiceSettingsBody">
+          <div className="voiceSettings">
+            <label>
+              <span>Voice style</span>
+              <select value={voiceStyle} onChange={e=>setVoiceStyle(e.target.value)}>
+                {Object.entries(voiceStyles).map(([key,v])=><option key={key} value={key}>{v.label}</option>)}
+              </select>
+            </label>
+            <label>
+              <span>AI voice</span>
+              <select value={voiceName} onChange={e=>setVoiceName(e.target.value)}>
+                <option value="">Best available voice</option>
+                {availableVoices.map(v=><option key={`${v.name}-${v.lang}`} value={v.name}>{friendlyVoiceLabel(v)}</option>)}
+              </select>
+            </label>
+            <button type="button" onClick={testVoice} disabled={muted}>▶ Test voice</button>
+          </div>
+
+          <div className="voicePreferenceRow">
+            <label>
+              <input type="checkbox" checked={autoRead} onChange={e=>setAutoRead(e.target.checked)}/>
+              <span> Automatically read new answers</span>
+            </label>
+            <button type="button" className="welcomeButton" onClick={()=>playWelcome(true,true)} disabled={muted}>Hear welcome</button>
+            <button type="button" className="locationButton" onClick={useMyLocation}>📍 Use my location</button>
+          </div>
+        </div>
+      </details>
+    </div>
+    <SmartResultPopup open={popupOpen} onClose={()=>setPopupOpen(false)} title={popupTitle} subtitle="ValorBuddy explains why each option was selected and clearly separates confirmed facts from assumptions." items={results.slice(0,6)} onChoose={(x)=>{setPopupOpen(false);setReply(`${x.title} is selected. Choose Directions, Website, or Call to continue.`);if(autoRead&&!muted)playText(`${x.title} is selected. Choose directions, website, or call on the screen.`)}}/>
+  </>;
+}
+
+function Dashboard({user,setScreen}){
+  const[brief,setBrief]=useState(null);
+  const[streamFilter,setStreamFilter]=useState('all');
+  const[rsvpState,setRsvpState]=useState({});
+  useEffect(()=>{api('/api/briefing').then(setBrief).catch(()=>{})},[]);
+
+  const reminders=brief?.reminders||[];
+  const events=brief?.events||[];
+
+  const toggleRsvp=(id,e)=>{
+    e?.stopPropagation?.();
+    setRsvpState(prev=>({...prev,[id]:!prev[id]}));
+  };
+
+  const combinedStream = useMemo(() => {
+    const list = [];
+    if (streamFilter === 'all' || streamFilter === 'reminders') {
+      reminders.forEach((r, idx) => {
+        list.push({
+          id: r.id || `remind-${idx}`,
+          type: 'reminder',
+          title: r.title,
+          meta: r.when_text || 'Scheduled reminder',
+          status: 'Scheduled',
+          target: 'reminders',
+        });
+      });
+    }
+    if (streamFilter === 'all' || streamFilter === 'events') {
+      events.forEach((ev, idx) => {
+        list.push({
+          id: ev.id || `ev-${idx}`,
+          type: 'event',
+          title: ev.title,
+          meta: ev.location || (user.city ? `Near ${user.city}` : 'Local community event'),
+          status: 'Community',
+          target: 'events',
+        });
+      });
+    }
+    return list;
+  }, [reminders, events, streamFilter, user.city]);
+
+  const displayEvents = events.length >= 2 ? events.slice(0, 2) : [
+    {
+      id: 'event-vfw-5076',
+      title: 'VFW Post 5076 Social Night',
+      meta: `${user.city || 'Garland'}, TX • Thursday, 18:00 • 4.6 ★`
+    },
+    {
+      id: 'event-sba-briefing',
+      title: 'Veterans Career & SBA Briefing',
+      meta: 'Dallas VA Center • Saturday, 10:00 AM'
+    }
+  ];
+
+  return (
+    <div className="dashboardView">
+      <Hero user={user} setScreen={setScreen}/>
+
+      {/* 3-Column Tactical Command Cards (Matching Reference Screenshot) */}
+      <section className="tacticalCardsGrid" aria-label="Tactical Command Workspaces">
+        {/* Card 1: VA Disability Claim */}
+        <article className="tacticalCard" aria-label="VA Disability Claim Status">
+          <div>
+            <div className="tacticalCardHeader">
+              <div className="tacticalCardTitleGroup">
+                <div className="tacticalCardSquircle">
+                  <FileText size={18} aria-hidden="true"/>
+                </div>
+                <div>
+                  <h3 className="tacticalCardTitle">VA Disability Claim</h3>
+                  <p className="tacticalCardSubtitle">Claim ID: #VA-8942-TX • Active</p>
+                </div>
+              </div>
+              <span className="tacticalCardOptions" aria-hidden="true">•••</span>
+            </div>
+
+            <div className="claimProgressBlock">
+              <div className="claimPercentRow">
+                <span className="claimBigPercent">85% Complete</span>
+                <span className="claimStepIndicator">Step 4 of 6: Review of Evidence</span>
+              </div>
+              <div className="tacticalProgressBarTrack" role="progressbar" aria-valuenow={85} aria-valuemin={0} aria-valuemax={100}>
+                <div className="tacticalProgressBarFill" style={{width: '85%'}}/>
+              </div>
+              <div className="tacticalStepLabels">
+                <span>1. Received</span>
+                <span>2. Initial Review</span>
+                <span className="active">3. Evidence</span>
+                <span>4. Decision</span>
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="tacticalCardFooterLink"
+            onClick={() => setScreen('benefits')}
+          >
+            <span>View Full Claim File & Letters</span>
+            <ChevronRight size={14} aria-hidden="true"/>
+          </button>
+        </article>
+
+        {/* Card 2: AI Battle Buddy */}
+        <article className="tacticalCard" aria-label="AI Battle Buddy Guidance Engine">
+          <div>
+            <div className="tacticalCardHeader">
+              <div className="tacticalCardTitleGroup">
+                <div className="tacticalCardSquircle">
+                  <Brain size={18} aria-hidden="true"/>
+                </div>
+                <div>
+                  <h3 className="tacticalCardTitle">AI Battle Buddy</h3>
+                  <p className="tacticalCardSubtitle">Plain-English Guidance Engine</p>
+                </div>
+              </div>
+              <span className="tacticalCardOptions" aria-hidden="true">•••</span>
+            </div>
+
+            <div className="battleBuddyQuoteBox">
+              <p className="battleBuddyQuote">
+                <b>ValorBuddy:</b> “Under the PACT Act, your service history qualifies you for presumptive toxic exposure screening. Would you like to generate the pre-filled checklist?”
+              </p>
+            </div>
+
+            <button
+              type="button"
+              className="battleBuddyFormTag"
+              onClick={() => setScreen('benefits')}
+              aria-label="Open VA Form 21-526EZ guidance"
+            >
+              <FileText size={12} aria-hidden="true"/>
+              <span>VA Form 21-526EZ Guidance</span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            className="tacticalCardFooterLink"
+            onClick={() => setScreen('companion')}
+          >
+            <span>Continue Battle Buddy Session</span>
+            <ChevronRight size={14} aria-hidden="true"/>
+          </button>
+        </article>
+
+        {/* Card 3: Veteran Community */}
+        <article className="tacticalCard" aria-label="Veteran Community Engagements">
+          <div>
+            <div className="tacticalCardHeader">
+              <div className="tacticalCardTitleGroup">
+                <div className="tacticalCardSquircle">
+                  <MapPin size={18} aria-hidden="true"/>
+                </div>
+                <div>
+                  <h3 className="tacticalCardTitle">Veteran Community</h3>
+                  <p className="tacticalCardSubtitle">Events Near {user.city || 'Austin'}, {user.state || 'TX'}</p>
+                </div>
+              </div>
+              <span className="tacticalCardOptions" aria-hidden="true">•••</span>
+            </div>
+
+            <div className="communityEventsList">
+              {displayEvents.map(ev => {
+                const isRsvpd = rsvpState[ev.id];
+                return (
+                  <div className="communityEventItem" key={ev.id}>
+                    <div className="eventInfo">
+                      <span className="eventTitle">{ev.title}</span>
+                      <span className="eventMeta">{ev.meta || ev.location || 'Local Community'}</span>
+                    </div>
+                    <button
+                      type="button"
+                      className={`eventRsvpBtn ${isRsvpd ? 'rsvpd' : ''}`}
+                      onClick={(e) => toggleRsvp(ev.id, e)}
+                      aria-pressed={isRsvpd}
+                    >
+                      {isRsvpd ? "RSVP'd" : "RSVP"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            className="tacticalCardFooterLink"
+            onClick={() => setScreen('events')}
+          >
+            <span>Explore All {events.length || 14} Nearby Activities</span>
+            <ChevronRight size={14} aria-hidden="true"/>
+          </button>
+        </article>
+      </section>
+
+      {/* Astrix 4-Column Metric KPI Grid */}
+      <section className="astrixMetricGrid" aria-label="Key Performance Indicators">
+        {/* Card 1: Reminders (Numerical Stat) */}
+        <div
+          className={`metricCard metricCard--numerical ${reminders.length > 0 ? 'urgentReminderCard' : ''}`}
+          role="button"
+          tabIndex={0}
+          onClick={() => setScreen('reminders')}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setScreen('reminders'); }}
+          aria-label={`${reminders.length} scheduled reminders. Open reminders.`}
+        >
+          <div className="metricCardHeader">
+            <div className="metricCardIcon"><Bell size={16} aria-hidden="true"/></div>
+            <span className="metricCardLabel">Scheduled Reminders</span>
+          </div>
+          <div className="metricCardValueRow">
+            <div className="metricCardValue">{reminders.length}</div>
+            <div className="metricCardFooter">
+              <span className={`metricTrend ${reminders.length > 0 ? 'alert' : 'positive'}`}>
+                {reminders.length > 0 ? 'Action required' : 'All clear'}
+              </span>
+              <span className="metricCardFootnote" title={reminders.length > 0 ? (reminders[0].title || 'Upcoming tasks') : 'No pending deadlines'}>
+                {reminders.length > 0 ? (reminders[0].title || 'Upcoming tasks') : 'No pending deadlines'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 2: Local Network (Numerical Stat) */}
+        <div
+          className="metricCard metricCard--numerical"
+          role="button"
+          tabIndex={0}
+          onClick={() => setScreen('events')}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setScreen('events'); }}
+          aria-label={`${events.length} nearby community options. Open activities.`}
+        >
+          <div className="metricCardHeader">
+            <div className="metricCardIcon"><MapPin size={16} aria-hidden="true"/></div>
+            <span className="metricCardLabel">Nearby Community</span>
+          </div>
+          <div className="metricCardValueRow">
+            <div className="metricCardValue">{events.length}</div>
+            <div className="metricCardFooter">
+              <span className="metricTrend neutral">
+                {events.length > 0 ? `${events.length} active` : 'Local'}
+              </span>
+              <span className="metricCardFootnote" title={user.city ? `Near ${user.city}` : 'Veteran gatherings'}>
+                {user.city ? `Near ${user.city}` : 'Veteran gatherings'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: Benefits Radar (Status System Portal) */}
+        <div
+          className="metricCard metricCard--status"
+          role="button"
+          tabIndex={0}
+          onClick={() => setScreen('benefits')}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setScreen('benefits'); }}
+          aria-label="VA Benefits navigation card"
+        >
+          <div className="metricCardHeader">
+            <div className="metricCardIcon"><TrendingUp size={16} aria-hidden="true"/></div>
+            <span className="metricCardLabel">Benefits Radar</span>
+          </div>
+          <div className="metricCardValueRow">
+            <div className="metricCardValue textValue">4 VA Programs</div>
+            <div className="metricCardFooter">
+              <span className="metricTrend positive">Verified</span>
+              <span className="metricCardFootnote" title="Plain-English claim & GI Bill guidance">Plain-English claim & GI Bill</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Document Vault (Status System Portal) */}
+        <div
+          className="metricCard metricCard--status"
+          role="button"
+          tabIndex={0}
+          onClick={() => setScreen('documents')}
+          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setScreen('documents'); }}
+          aria-label="Document Vault navigation card"
+        >
+          <div className="metricCardHeader">
+            <div className="metricCardIcon"><Folder size={16} aria-hidden="true"/></div>
+            <span className="metricCardLabel">Document Vault</span>
+          </div>
+          <div className="metricCardValueRow">
+            <div className="metricCardValue textValue">Vault Encrypted</div>
+            <div className="metricCardFooter">
+              <span className="metricTrend positive">AES-256</span>
+              <span className="metricCardFootnote" title="DD-214 & health records secured">DD-214 & health records</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 2-Column Operational Workspace Grid (Left 64% / Right 36%) */}
+      <div className="dashboardBodyGrid">
+        <div className="dashboardLeftCol">
+          {/* Astrix Live Operational Stream */}
+          <section className="streamSection" aria-label="Operational Stream">
+            <div className="streamHeader">
+              <div className="streamTitleGroup">
+                <h3><Clock size={16} aria-hidden="true"/><span>Operational Stream</span></h3>
+                <p>Your upcoming tasks, appointments, and local veteran community engagements.</p>
+              </div>
+
+              <div className="streamFilterTabs" role="tablist" aria-label="Filter operational stream">
+                <button
+                  type="button"
+                  className={`streamFilterBtn ${streamFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setStreamFilter('all')}
+                  aria-selected={streamFilter === 'all'}
+                >
+                  <span>All</span>
+                  <span className="streamFilterCount">{reminders.length + events.length}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`streamFilterBtn ${streamFilter === 'reminders' ? 'active' : ''}`}
+                  onClick={() => setStreamFilter('reminders')}
+                  aria-selected={streamFilter === 'reminders'}
+                >
+                  <span>Reminders</span>
+                  <span className="streamFilterCount">{reminders.length}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`streamFilterBtn ${streamFilter === 'events' ? 'active' : ''}`}
+                  onClick={() => setStreamFilter('events')}
+                  aria-selected={streamFilter === 'events'}
+                >
+                  <span>Community</span>
+                  <span className="streamFilterCount">{events.length}</span>
+                </button>
+              </div>
+            </div>
+
+            {combinedStream.length > 0 ? (
+              <div className="streamList">
+                {combinedStream.map(item => (
+                  <div
+                    key={item.id}
+                    className={`streamRow ${item.type === 'reminder' ? 'streamRow--actionable' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setScreen(item.target)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setScreen(item.target); }}
+                    aria-label={`${item.title}: ${item.meta}`}
+                  >
+                    <div className="streamRowLeft">
+                      <div className="streamIconCapsule">
+                        {item.type === 'reminder' ? (
+                          <Bell size={15} aria-hidden="true"/>
+                        ) : (
+                          <MapPin size={15} aria-hidden="true"/>
+                        )}
+                      </div>
+                      <div className="streamRowInfo">
+                        <span className="streamRowTitle">{item.title}</span>
+                        <span className="streamRowMeta">{item.meta}</span>
+                      </div>
+                    </div>
+                    <div className="streamRowRight">
+                      <span className={`streamRowStatus ${item.type === 'reminder' ? 'statusScheduled' : 'statusCommunity'}`}>{item.status}</span>
+                      <ChevronRight size={14} className="streamRowChevron" color="var(--vb-text-muted)" aria-hidden="true"/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="streamEmpty">
+                <p>No active stream items found for this view.</p>
+                <button
+                  type="button"
+                  onClick={() => setScreen(streamFilter === 'events' ? 'events' : 'reminders')}
+                >
+                  {streamFilter === 'events' ? '+ Explore community events' : '+ Add a reminder'}
+                </button>
+              </div>
+            )}
+          </section>
+
+          {/* Astrix Transition Studios Grid */}
+          <section className="transitionStudiosSection" aria-label="Veteran Transition Studios">
+            <div className="transitionStudiosSectionHeader">
+              <h3 className="transitionStudiosSectionTitle">
+                <Shield size={16} aria-hidden="true"/>
+                <span>Veteran Transition Studios</span>
+              </h3>
+              <p className="transitionStudiosSectionSubtitle">
+                Direct workstations for benefits navigation, career development, and document records.
+              </p>
+            </div>
+
+            <div className="transitionStudiosGrid">
+              <article
+                className="studioCard"
+                role="button"
+                tabIndex={0}
+                onClick={() => setScreen('benefits')}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setScreen('benefits'); }}
+                aria-label="Benefits & VA Forms Studio"
+              >
+                <div>
+                  <div className="studioCardTop">
+                    <span className="studioEyebrow">VA ASSISTANCE</span>
+                    <Search size={16} color="var(--branch-accent)" aria-hidden="true"/>
+                  </div>
+                  <h4 className="studioTitle">Benefits & VA Forms</h4>
+                  <p className="studioDesc">
+                    Plain-English summaries for disability compensation, healthcare, GI Bill, and official VA filing forms.
+                  </p>
+                </div>
+                <div className="studioActionLink">
+                  <span>Explore VA Benefits</span>
+                  <ArrowUpRight size={14} aria-hidden="true"/>
+                </div>
+              </article>
+
+              <article
+                className="studioCard"
+                role="button"
+                tabIndex={0}
+                onClick={() => setScreen('career')}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setScreen('career'); }}
+                aria-label="Career & Opportunity Studio"
+              >
+                <div>
+                  <div className="studioCardTop">
+                    <span className="studioEyebrow">MOS TRANSLATION</span>
+                    <Briefcase size={16} color="var(--branch-accent)" aria-hidden="true"/>
+                  </div>
+                  <h4 className="studioTitle">Career & Business Studio</h4>
+                  <p className="studioDesc">
+                    Translate your military specialty into civilian credentials, draft tailored resumes, and map veteran business ventures.
+                  </p>
+                </div>
+                <div className="studioActionLink">
+                  <span>Launch Career Tools</span>
+                  <ArrowUpRight size={14} aria-hidden="true"/>
+                </div>
+              </article>
+
+              <article
+                className="studioCard"
+                role="button"
+                tabIndex={0}
+                onClick={() => setScreen('documents')}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setScreen('documents'); }}
+                aria-label="Personal Document Vault Studio"
+              >
+                <div>
+                  <div className="studioCardTop">
+                    <span className="studioEyebrow">SECURE VAULT</span>
+                    <Folder size={16} color="var(--branch-accent)" aria-hidden="true"/>
+                  </div>
+                  <h4 className="studioTitle">Personal Document Vault</h4>
+                  <p className="studioDesc">
+                    Organize, encrypt, and inspect your DD-214 discharge papers, medical records, and civilian documents.
+                  </p>
+                </div>
+                <div className="studioActionLink">
+                  <span>Open Document Vault</span>
+                  <ArrowUpRight size={14} aria-hidden="true"/>
+                </div>
+              </article>
+            </div>
+          </section>
+        </div>
+
+        {/* Right Column: Voice Battle Buddy + Crisis Support */}
+        <div className="dashboardRightCol">
+          <VoicePanel user={user}/>
+
+          <aside className="dashboardSupportCard" aria-label="Support and confidentiality information">
+            <div className="supportCardHeader">
+              <Shield size={16} aria-hidden="true"/>
+              <h4>Veteran Support & Safety</h4>
+            </div>
+            <p>
+              ValorBuddy enforces strict client-side data isolation. If you or a fellow veteran need immediate assistance, crisis resources are available 24/7.
+            </p>
+            <div className="supportEmergencyRow">
+              <a
+                href="tel:988"
+                className="supportEmergencyBtn crisis"
+                aria-label="Veterans Crisis Line: Dial 988, then press 1"
+              >
+                📞 988, Press 1 (Crisis)
+              </a>
+              <a
+                href="tel:911"
+                className="supportEmergencyBtn emergency"
+                aria-label="Emergency Services: Dial 911"
+              >
+                🚨 911 Emergency
+              </a>
+            </div>
+            <div className="supportCardActions">
+              <button
+                type="button"
+                className="supportLinkBtn"
+                onClick={() => setScreen('tutorial')}
+                aria-label="Open ValorBuddy Tutorial"
+              >
+                <BookOpen size={14} aria-hidden="true"/>
+                <span>New to ValorBuddy? Open Tutorial</span>
+                <ChevronRight size={14} aria-hidden="true"/>
+              </button>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  );
+}
 function MissionInline({mission}){
   if(!mission)return null;
   const steps=mission.steps||[];
   return <section className="agentMissionResult">
     <div className="agentMissionTop">
-      <div><small>{mission.mission_uid||'VALORBUDDY MISSION'}</small><h3>{mission.title||'Mission in progress'}</h3></div>
-      <span className={`statusPill ${mission.status||'planned'}`}>{mission.status||'planned'}</span>
+      <div><small className="missionUidTag">{mission.mission_uid||'VALORBUDDY MISSION'}</small><h3>{mission.title||'Mission in progress'}</h3></div>
+      <span className={`statusPill ${mission.status||'planned'}`}>{(mission.status||'planned').replaceAll('_',' ')}</span>
     </div>
-    <div className="agentStrip">{(mission.participating_agents||[]).map(agent=><span key={agent}>{agent.replaceAll('_',' ')}</span>)}</div>
+    {mission.participating_agents?.length>0&&<div className="agentStrip">{mission.participating_agents.map(agent=><span className="agentBadge" key={agent}>{agent.replaceAll('_',' ')}</span>)}</div>}
     <div className="progressTrack"><i style={{width:`${mission.progress||0}%`}}/></div>
     <b>{mission.progress||0}% complete</b>
-    <div className="agentStepGrid">{steps.map(step=><div className="agentStep" key={step.id||`${step.sequence}-${step.title}`}>
-      <span>{step.status==='completed'?'✓':step.status==='failed'?'!':step.status==='running'?'…':'○'}</span>
+    {steps.length>0&&<div className="agentStepGrid">{steps.map((step,idx)=><div className="agentStep" key={step.id||`step-${idx}-${step.title}`}>
+      <span className={`agentStepStatus ${step.status==='completed'?'completed':step.status==='running'?'running':step.status==='failed'?'failed':'pending'}`}>{step.status==='completed'?'✓':step.status==='failed'?'!':step.status==='running'?'…':'○'}</span>
       <div><b>{step.agent_name||step.agent_key}</b><small>{step.title}</small></div>
-    </div>)}</div>
-    {mission.next_action&&<div className="nextAction"><b>Next action</b><span>{mission.next_action}</span></div>}
-  </section>
+    </div>)}</div>}
+    {mission.next_action&&<div className="nextActionBanner"><ChevronRight size={14} aria-hidden="true"/><span><b>Next step:</b> {mission.next_action}</span></div>}
+  </section>;
 }
 
 function Companion({user}){
@@ -690,11 +1630,149 @@ function Companion({user}){
   }
   function beginEdit(index){clearTimeout(followUpTimer.current);stopSpeaking();setEditIndex(index);setMsg(items[index].content)}
   function submit(){if(editIndex!==null)send(msg,{baseItems:items.slice(0,editIndex)});else send()}
-  return <section className="page assistantPage actionsPage"><VoicePanel user={user} onResult={d=>setItems(v=>[...v,{id:`voice-${Date.now()}`,role:'assistant',content:d.response,mission:d.data?.mission,mode:d.mode||d.intent}])}/><div className="chat" aria-live="polite">{items.map((m,i)=><div className={m.role} key={m.id||i}>{m.role==='assistant'?<div className="assistantReadable"><LinkifiedText text={m.content}/></div>:<><div className="userReadable">{m.content}</div><button className="editMessageButton" type="button" onClick={()=>beginEdit(i)}>Edit and regenerate</button></>}<MissionInline mission={m.mission}/></div>)}<div className="composer actionComposer"><input value={msg} onChange={e=>setMsg(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit()}}} placeholder={editIndex!==null?'Edit your message, then regenerate...':'Ask ValorBuddy a question or give it a mission...'}/>{editIndex!==null&&<button type="button" onClick={()=>{setEditIndex(null);setMsg('')}}>Cancel edit</button>}<button className="actionButton" type="button" disabled={busy} onClick={submit}><Brain/>{busy?'Working…':editIndex!==null?'Save & regenerate':'Send to ValorBuddy'}</button></div></div></section>
+  return <section className="page assistantPage actionsPage" aria-label="AI Battle Buddy Cockpit">
+    <div className="operationsHeader">
+      <div className="operationsEyebrow">
+        <Brain size={14} aria-hidden="true"/>
+        <span>Tactical Guidance Engine</span>
+      </div>
+      <h1 className="operationsTitle">AI Battle Buddy Cockpit</h1>
+      <p className="operationsLead">Your plain-English veteran companion. Ask about VA claims, toxic exposure screening, military skill translation, or launch coordinated specialist missions.</p>
+    </div>
+
+    {/* Fast-Action Tactical Prompt Matrix */}
+    <div className="cockpitPromptMatrix" aria-label="Fast-action prompts">
+      <button type="button" className="promptMatrixBtn" onClick={()=>send('Explain VA disability claim steps under the PACT Act in plain English')}>
+        <FileText size={14} aria-hidden="true"/>
+        <span>VA Disability Claim Protocol</span>
+      </button>
+      <button type="button" className="promptMatrixBtn" onClick={()=>send('Translate my military MOS and leadership duties into civilian resume bullet points')}>
+        <Briefcase size={14} aria-hidden="true"/>
+        <span>MOS to Civilian Skill Translation</span>
+      </button>
+      <button type="button" className="promptMatrixBtn" onClick={()=>send('Find the nearest VA clinic and emergency mental health resources')}>
+        <MapPin size={14} aria-hidden="true"/>
+        <span>Locate Nearest VA Clinic</span>
+      </button>
+      <button type="button" className="promptMatrixBtn" onClick={()=>send('What education and housing benefits am I eligible for under the Post-9/11 GI Bill?')}>
+        <BookOpen size={14} aria-hidden="true"/>
+        <span>GI Bill & Housing Allowance</span>
+      </button>
+    </div>
+
+    <VoicePanel user={user} onResult={d=>setItems(v=>[...v,{id:`voice-${Date.now()}`,role:'assistant',content:d.response,mission:d.data?.mission,mode:d.mode||d.intent}])}/>
+    <div className="chat" aria-live="polite">
+      {items.map((m,i)=>(
+        <div className={m.role} key={m.id||i}>
+          {m.role==='assistant'?(
+            <div className="assistantReadable"><LinkifiedText text={m.content}/></div>
+          ):(
+            <>
+              <div className="userReadable">{m.content}</div>
+              <button className="editMessageButton" type="button" onClick={()=>beginEdit(i)}>Edit and regenerate</button>
+            </>
+          )}
+          <MissionInline mission={m.mission}/>
+        </div>
+      ))}
+      <div className="composer actionComposer">
+        <input
+          value={msg}
+          onChange={e=>setMsg(e.target.value)}
+          onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit()}}}
+          placeholder={editIndex!==null?'Edit your message, then regenerate...':'Ask ValorBuddy a question or give it a mission...'}
+          aria-label="Message for AI Battle Buddy"
+        />
+        {editIndex!==null&&<button type="button" onClick={()=>{setEditIndex(null);setMsg('')}}>Cancel edit</button>}
+        <button className="primary actionButton" type="button" disabled={busy} onClick={submit}>
+          <Brain size={16} aria-hidden="true"/>
+          <span>{busy?'Working…':editIndex!==null?'Save & regenerate':'Send to ValorBuddy'}</span>
+        </button>
+      </div>
+    </div>
+  </section>;
 }
 
-function Events({user}){const[items,setItems]=useState([]);const[live,setLive]=useState(false);const[query,setQuery]=useState('veteran events VFW American Legion coffee VA clinic parks');const[popupOpen,setPopupOpen]=useState(false);const[locationNotice,setLocationNotice]=useState('');async function load(searchValue=query){const actualQuery=String(searchValue||query).trim();const nearMe=/near me|nearby|around me|close to me/i.test(actualQuery);let loc={source:'profile'};try{if(nearMe)loc=await freshLocation({required:true,maximumAge:0});if(loc?.source==='gps')setLocationNotice(`Using your live GPS location • accuracy ±${Math.round(loc.accuracy||0)}m`);else setLocationNotice(user.city?`Using profile location: ${user.city}, ${user.state||''}`:'Enter a city/state or allow location access.')}catch(e){setItems([]);setLive(false);setPopupOpen(false);setLocationNotice(e.message);return}const geo=loc?.source==='gps'&&loc.lat!=null&&loc.lng!=null?`&lat=${encodeURIComponent(loc.lat)}&lng=${encodeURIComponent(loc.lng)}`:'';const d=await api(`/api/events/search?city=${encodeURIComponent(user.city||'')}&state=${encodeURIComponent(user.state||'')}&keyword=${encodeURIComponent(actualQuery)}${geo}`);setItems(d.items||[]);setLive(d.live);if(d.location?.source==='browser_location')setLocationNotice(`Using your current location${d.location.city?`: ${d.location.city}, ${d.location.state||''}`:''}`);if(d.items?.length)setPopupOpen(true)}useEffect(()=>{load(query)},[]); return <section className="page actionsPage"><h1>Veteran-friendly activities <span className="badge">{live?'LIVE':'CHECK CONNECTION'}</span></h1><p className="pageLead">Search by activity, city, or date. For “near me” searches, ValorBuddy now requires your live location instead of silently falling back to the city saved on your profile.</p><div className="locationSearchRow"><button className="locationButton" type="button" onClick={()=>{const next='veteran events near me';setQuery(next);load(next)}}><MapPin/>Use my live location</button>{locationNotice&&<span className={locationNotice.includes('current')||locationNotice.includes('GPS')?'success':''}>{locationNotice}</span>}</div><div className="composer actionComposer"><input value={query}onChange={e=>setQuery(e.target.value)}placeholder="Try: free veteran events this weekend in Arlington"/><button className="primary actionButton" type="button" onClick={()=>load()}><RefreshCw/>Search activities</button></div><div className="suggestionWrap pageSuggestions">{['Today','This weekend','Free events','Family-friendly','VFW or Legion','Pick the best for me'].map(x=><button key={x} onClick={()=>{const next=`${x} veteran events near me`;setQuery(next);load(next)}}>{x}</button>)}</div><Grid items={items}/>{items.length>0&&<button className="openResultsButton" onClick={()=>setPopupOpen(true)}>Compare and explain these options</button>}<SmartResultPopup open={popupOpen} onClose={()=>setPopupOpen(false)} title="Veteran-friendly options near you" subtitle="Review the reason for each recommendation, current details, and available Google reviewer comments." items={items.slice(0,6)} onChoose={(x)=>window.open(x.maps_url||x.website,'_blank')}/></section>}
+function Events({user}){
+  const[items,setItems]=useState([]);
+  const[live,setLive]=useState(false);
+  const[query,setQuery]=useState('veteran events VFW American Legion coffee VA clinic parks');
+  const[popupOpen,setPopupOpen]=useState(false);
+  const[locationNotice,setLocationNotice]=useState('');
 
+  async function load(searchValue=query){
+    const actualQuery=String(searchValue||query).trim();
+    const nearMe=/near me|nearby|around me|close to me/i.test(actualQuery);
+    let loc={source:'profile'};
+    try{
+      if(nearMe)loc=await freshLocation({required:true,maximumAge:0});
+      if(loc?.source==='gps')setLocationNotice(`Using your live GPS location • accuracy ±${Math.round(loc.accuracy||0)}m`);
+      else setLocationNotice(user.city?`Using profile location: ${user.city}, ${user.state||''}`:'Enter a city/state or allow location access.');
+    }catch(e){
+      setItems([]);setLive(false);setPopupOpen(false);setLocationNotice(e.message);return;
+    }
+    const geo=loc?.source==='gps'&&loc.lat!=null&&loc.lng!=null?`&lat=${encodeURIComponent(loc.lat)}&lng=${encodeURIComponent(loc.lng)}`:'';
+    const d=await api(`/api/events/search?city=${encodeURIComponent(user.city||'')}&state=${encodeURIComponent(user.state||'')}&keyword=${encodeURIComponent(actualQuery)}${geo}`);
+    setItems(d.items||[]);
+    setLive(d.live);
+    if(d.location?.source==='browser_location')setLocationNotice(`Using your current location${d.location.city?`: ${d.location.city}, ${d.location.state||''}`:''}`);
+    if(d.items?.length)setPopupOpen(true);
+  }
+
+  useEffect(()=>{load(query)},[]);
+
+  return <section className="page actionsPage" aria-label="Veteran Community and Activities">
+    <div className="operationsHeader">
+      <div className="operationsEyebrow">
+        <MapPin size={14} aria-hidden="true"/>
+        <span>Community Reconnaissance</span>
+      </div>
+      <h1 className="operationsTitle">Veteran Community & Activities</h1>
+      <p className="operationsLead">Discover local veteran gatherings, VFW and American Legion posts, coffee socials, and verified peer support near your coordinates.</p>
+    </div>
+
+    {/* Tactical GPS Radar Status Banner */}
+    <div className="radarStatusBanner" aria-label="Radar geolocation status">
+      <div className="radarPulseIndicator" aria-hidden="true">
+        <span className="radarPing"/>
+        <span className="radarCore"/>
+      </div>
+      <div className="radarTextGroup">
+        <b>[ TACTICAL GPS RADAR: {live ? 'ACTIVE & VERIFIED' : 'LOCAL CACHE ACTIVE'} ]</b>
+        <small>{locationNotice || `Scanning veteran outposts near ${user.city || 'your registered area'}`}</small>
+      </div>
+      <button className="locationButton" type="button" onClick={()=>{const next='veteran events near me';setQuery(next);load(next)}}>
+        <MapPin size={14} aria-hidden="true"/>
+        <span>Ping GPS Location</span>
+      </button>
+    </div>
+
+    <div className="composer actionComposer">
+      <input
+        value={query}
+        onChange={e=>setQuery(e.target.value)}
+        onKeyDown={e=>e.key==='Enter'&&load()}
+        placeholder="Try: free veteran events this weekend in Arlington"
+        aria-label="Search activities"
+      />
+      <button className="primary actionButton" type="button" onClick={()=>load()}>
+        <RefreshCw size={16} aria-hidden="true"/>
+        <span>Search activities</span>
+      </button>
+    </div>
+
+    <div className="suggestionWrap pageSuggestions" aria-label="Quick topic suggestions">
+      {['Today','This weekend','Free events','Family-friendly','VFW or Legion','Pick the best for me'].map(x=>(
+        <button key={x} type="button" onClick={()=>{const next=`${x} veteran events near me`;setQuery(next);load(next)}}>{x}</button>
+      ))}
+    </div>
+
+    <Grid items={items}/>
+
+    {items.length>0&&<button className="openResultsButton" onClick={()=>setPopupOpen(true)}>Compare and explain these {items.length} options</button>}
+    <SmartResultPopup open={popupOpen} onClose={()=>setPopupOpen(false)} title="Veteran-friendly options near you" subtitle="Review the reason for each recommendation, current details, and available Google reviewer comments." items={items.slice(0,6)} onChoose={(x)=>window.open(x.maps_url||x.website,'_blank')}/>
+  </section>;
+}
 
 function Benefits({user}){
   const[q,setQ]=useState('benefits');
@@ -744,33 +1822,230 @@ function Benefits({user}){
     search(prompt);
   }
 
-  return <section className="page actionsPage benefitsHub">
-    <h1>Benefits, VA Forms & Veteran Programs</h1>
-    <p className="pageLead">Use ValorBuddy for plain-English guidance, then open the official VA source when you are ready. ValorBuddy can prepare checklists and explain forms, but it does not submit a VA claim or sign a government form for you.</p>
-    <div className="composer">
-      <input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="Ask about benefits, eligibility, family support, or a VA program"/>
-      <button className="primary actionButton" type="button" disabled={busy} onClick={()=>search()}><Search/>{busy?'Checking...':'Explain benefits'}</button>
+  return <section className="page actionsPage benefitsHub" aria-label="Benefits and VA Forms Hub">
+    <div className="operationsHeader">
+      <div className="operationsEyebrow">
+        <Search size={14} aria-hidden="true"/>
+        <span>Veteran Operations</span>
+      </div>
+      <h1 className="operationsTitle">Benefits & VA Forms</h1>
+      <p className="operationsLead">Understand your benefits, find relevant VA resources, and take the next step with confidence.</p>
     </div>
-    <div className="suggestionWrap pageSuggestions">{['Disability claim','GI Bill and education','VA home loan','Healthcare','Spouse and dependent benefits','Caregiver support','Which VA form do I need?'].map(x=><button key={x} onClick={()=>{setQ(x);search(x)}}>{x}</button>)}</div>
-    {data?.error&&<div className="profileMessage" role="alert">{data.error}</div>}
-    {data&&<Grid items={(data.items||[]).map(x=>({title:x.title,description:x.summary,location:x.next_step,url:x.url,assistant_explanation:x.assistant_explanation,community_note:x.community_note}))}/>}
-    <div className="officialResourceSearch">
-      <div><h2>Official VA forms and assistance programs</h2><p>Search the built-in official-resource directory. Results link to VA.gov or other official federal resources.</p></div>
-      <div className="composer">
-        <input value={resourceQuery} onChange={e=>setResourceQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&loadOfficial()} placeholder="Try: disability, caregiver, education, home loan, VSO"/>
-        <button className="actionButton" type="button" disabled={resourceBusy} onClick={()=>loadOfficial()}><Search/>{resourceBusy?'Searching...':'Search official resources'}</button>
+
+    {/* Tactical Claim Readiness Protocol Banner */}
+    <div className="claimProtocolBanner" aria-label="VA Claim Lifecycle Roadmap">
+      <div className="protocolHeader">
+        <span className="protocolEyebrow">[ VA CLAIM PROTOCOL // 4-STAGE PIPELINE ]</span>
+        <span className="protocolBadge"><CheckCircle2 size={13} aria-hidden="true"/> PACT ACT INTEL ACTIVE</span>
+      </div>
+      <div className="protocolSteps">
+        <div className="protocolStep active">
+          <span className="stepNum">01</span>
+          <div>
+            <b>Intent to File</b>
+            <small>VA Form 21-0966 (Protected Date)</small>
+          </div>
+        </div>
+        <div className="protocolDivider" aria-hidden="true"/>
+        <div className="protocolStep">
+          <span className="stepNum">02</span>
+          <div>
+            <b>Evidence & Nexus</b>
+            <small>STRs, DBQs & Medical Opinions</small>
+          </div>
+        </div>
+        <div className="protocolDivider" aria-hidden="true"/>
+        <div className="protocolStep">
+          <span className="stepNum">03</span>
+          <div>
+            <b>C&P Examination</b>
+            <small>Disability Assessment Protocol</small>
+          </div>
+        </div>
+        <div className="protocolDivider" aria-hidden="true"/>
+        <div className="protocolStep">
+          <span className="stepNum">04</span>
+          <div>
+            <b>Rating Decision</b>
+            <small>Monthly Award & Direct Deposit</small>
+          </div>
+        </div>
       </div>
     </div>
-    <div className="officialResourceGrid">
-      <section><h2>VA Forms</h2>{forms.map(f=><article className="officialResourceCard" key={f.form}><small>{f.form}</small><h3>{f.title}</h3><p>{f.purpose}</p><div className="resourceActions"><button onClick={()=>explainResource(f)}><Brain/>Ask ValorBuddy to explain</button><a href={f.url} target="_blank" rel="noreferrer">Open official form</a></div></article>)}</section>
-      <section><h2>Veteran Assistance Programs</h2>{programs.map(x=><article className="officialResourceCard" key={x.title}><small>OFFICIAL RESOURCE</small><h3>{x.title}</h3><p>{x.summary}</p><div className="resourceActions"><button onClick={()=>explainResource(x)}><Brain/>Ask ValorBuddy to explain</button><a href={x.url} target="_blank" rel="noreferrer">Open official program</a></div></article>)}</section>
+
+    <div className="benefitsSearchCard">
+      <div className="composer">
+        <input value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>e.key==='Enter'&&search()} placeholder="Ask about benefits, eligibility, family support, or a VA program" aria-label="Search benefits"/>
+        <button className="primary actionButton" type="button" disabled={busy} onClick={()=>search()}>
+          <Search size={16} aria-hidden="true"/>
+          <span>{busy?'Checking...':'Explain benefits'}</span>
+        </button>
+      </div>
+      <div className="suggestionWrap pageSuggestions" aria-label="Suggested topics">
+        {['Disability claim','GI Bill and education','VA home loan','Healthcare','Spouse and dependent benefits','Caregiver support','Which VA form do I need?'].map(x=>(
+          <button key={x} type="button" onClick={()=>{setQ(x);search(x)}}>{x}</button>
+        ))}
+      </div>
     </div>
-    <p className="muted">Informational only. Eligibility and submission requirements must be verified on VA.gov or with a VA-accredited representative.</p>
+
+    {busy && (
+      <div className="calmLoadingIndicator" role="status">
+        <RefreshCw size={15} className="spin" aria-hidden="true"/>
+        <span>Researching benefit programs and eligibility guidelines...</span>
+      </div>
+    )}
+
+    {data?.error&&<div className="profileMessage" role="alert">{data.error}</div>}
+
+    {data && (
+      <section aria-label="Benefits guidance results">
+        <div className="benefitsSectionTitle">
+          <h3>Benefits Overview</h3>
+          {data.items?.length > 0 && <span className="statusPill approved">{data.items.length} verified programs</span>}
+        </div>
+        {data.items?.length > 0 ? (
+          <div className="benefitsGrid">
+            {data.items.map((x, i) => (
+              <article className="benefitCard" key={x.title || `b-${i}`}>
+                <div className="benefitCardTitleRow">
+                  <h3>{x.title}</h3>
+                  <span className="statusPill approved">VA Benefit</span>
+                </div>
+                <p>{x.summary || x.description}</p>
+                {x.next_step && (
+                  <div className="benefitStepCallout">
+                    <b>Recommended next step:</b>
+                    <span>{x.next_step}</span>
+                  </div>
+                )}
+                {(x.assistant_explanation || x.community_note) && (
+                  <p className="muted" style={{fontSize:'12px'}}>
+                    {x.assistant_explanation || x.community_note}
+                  </p>
+                )}
+                <div className="benefitCardActions">
+                  <button type="button" className="actionButton" onClick={() => explainResource(x)}>
+                    <Brain size={14} aria-hidden="true"/>
+                    <span>Explain in detail</span>
+                  </button>
+                  {x.url && (
+                    <a href={x.url} target="_blank" rel="noopener noreferrer">
+                      <span>Official resource ↗</span>
+                    </a>
+                  )}
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : !busy && !data.error && (
+          <div className="upcomingEmpty">
+            <p>No benefit programs matched “{q}”. Try a broader topic such as healthcare, home loan, or disability.</p>
+          </div>
+        )}
+      </section>
+    )}
+
+    <div className="officialResourceBox">
+      <h2>Official VA Forms and Assistance Programs</h2>
+      <p>Search the built-in official-resource directory. Results link to VA.gov or other official federal resources.</p>
+      <div className="composer">
+        <input value={resourceQuery} onChange={e=>setResourceQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&loadOfficial()} placeholder="Try: disability, caregiver, education, home loan, VSO" aria-label="Search official VA resources"/>
+        <button className="actionButton" type="button" disabled={resourceBusy} onClick={()=>loadOfficial()}>
+          <Search size={16} aria-hidden="true"/>
+          <span>{resourceBusy?'Searching...':'Search official resources'}</span>
+        </button>
+      </div>
+    </div>
+
+    {resourceBusy ? (
+      <div className="calmLoadingIndicator" role="status">
+        <RefreshCw size={15} className="spin" aria-hidden="true"/>
+        <span>Loading official VA forms and assistance programs...</span>
+      </div>
+    ) : (
+      <div className="officialResourceGrid">
+        <div className="officialResourceColumn">
+          <h3><FileText size={16} aria-hidden="true"/><span>VA Forms</span></h3>
+          {forms.length === 0 ? (
+            <p className="muted">No official forms currently listed for this query.</p>
+          ) : forms.map(f => (
+            <article className="officialResourceCard" key={f.form}>
+              <span className="officialFormBadge">{f.form}</span>
+              <h4>{f.title}</h4>
+              <p>{f.purpose}</p>
+              <div className="resourceActions">
+                <button type="button" onClick={()=>explainResource(f)}>
+                  <Brain size={14} aria-hidden="true"/>
+                  <span>Ask ValorBuddy to explain</span>
+                </button>
+                <a href={f.url} target="_blank" rel="noreferrer">
+                  <span>Open official form ↗</span>
+                </a>
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="officialResourceColumn">
+          <h3><Shield size={16} aria-hidden="true"/><span>Veteran Assistance Programs</span></h3>
+          {programs.length === 0 ? (
+            <p className="muted">No assistance programs currently listed for this query.</p>
+          ) : programs.map(x => (
+            <article className="officialResourceCard" key={x.title}>
+              <span className="officialFormBadge">OFFICIAL PROGRAM</span>
+              <h4>{x.title}</h4>
+              <p>{x.summary}</p>
+              <div className="resourceActions">
+                <button type="button" onClick={()=>explainResource(x)}>
+                  <Brain size={14} aria-hidden="true"/>
+                  <span>Ask ValorBuddy to explain</span>
+                </button>
+                <a href={x.url} target="_blank" rel="noreferrer">
+                  <span>Open official program ↗</span>
+                </a>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    )}
+
+    <p className="operationsLegalNote">Informational only. Eligibility and submission requirements must be verified on VA.gov or with a VA-accredited representative.</p>
     <SmartResultPopup open={popupOpen} onClose={()=>setPopupOpen(false)} title="Your benefits guidance" subtitle="Plain-English explanations, practical next steps, and clearly labeled community guidance." items={data?.items||[]} kind="benefit"/>
-  </section>
+  </section>;
 }
 
-function Memories(){const[title,setTitle]=useState('');const[note,setNote]=useState('');const[tags,setTags]=useState('personal, memory');const[file,setFile]=useState(null);const[items,setItems]=useState([]);const[busy,setBusy]=useState(false);async function load(){try{setItems(await api('/api/memories'))}catch(e){console.warn(e)}}useEffect(()=>{load()},[]);async function save(){if(!title.trim()){alert('Enter a memory title before saving.');return;}setBusy(true);try{let image_url='';if(file){const fd=new FormData();fd.append('file',file);fd.append('doc_type','memory_photo');const r=await fetch(API+'/api/documents',{method:'POST',headers:authHeaders(),body:fd});const d=await r.json();if(!r.ok)throw new Error(d.detail||'Photo upload failed');image_url=d.file_url||''}await api('/api/memories',{method:'POST',body:JSON.stringify({title:title.trim(),note:note.trim(),tags:tags.split(',').map(x=>x.trim()).filter(Boolean),image_url})});setTitle('');setNote('');setTags('personal, memory');setFile(null);await load()}catch(e){alert(e.message)}finally{setBusy(false)}}async function removeMemory(id,name){if(!window.confirm(`Delete memory “${name}”?`))return;try{await api(`/api/memories/${id}`,{method:'DELETE'});await load()}catch(e){alert(e.message)}}return <section className="page readablePage"><h1>Memory Wall</h1><p className="pageLead">Save meaningful stories, people, places, photos, and moments that ValorBuddy can remember with you.</p><div className="featureForm darkForm"><label><span>Memory title</span><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Example: My retirement ceremony"/></label><label><span>Tags</span><input value={tags} onChange={e=>setTags(e.target.value)} placeholder="family, service, deployment"/></label><label className="wide"><span>Story or note</span><textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Write the story you want ValorBuddy to remember..."/></label><label className="wide"><span>Upload photo or keepsake</span><input type="file" accept="image/*" onChange={e=>setFile(e.target.files?.[0]||null)}/><small>{file?`Selected: ${file.name}`:'Choose a JPG, PNG, or WEBP image.'}</small></label><button className="primary actionButton wideAction" type="button" disabled={busy} onClick={save}><Plus/>{busy?'Saving memory...':'Upload and save memory'}</button></div><div className="contentGrid">{items.length===0&&<div className="emptyState"><Heart/><h3>No memories saved yet</h3><p>Add your first story or photo.</p></div>}{items.map(x=><article className="contentCard memoryCard" key={x.id}>{x.image_url&&<img src={x.image_url.startsWith('http')?x.image_url:API+x.image_url} alt={x.title} className="memoryImage"/>}<h3>{x.title}</h3><p>{x.note}</p><button type="button" className="dangerButton" onClick={()=>removeMemory(x.id,x.title)}><Trash2/>Delete memory</button></article>)}</div></section>}
+function Memories(){
+  const[title,setTitle]=useState('');const[note,setNote]=useState('');const[tags,setTags]=useState('personal, memory');const[file,setFile]=useState(null);const[items,setItems]=useState([]);const[busy,setBusy]=useState(false);
+  async function load(){try{setItems(await api('/api/memories'))}catch(e){console.warn(e)}}
+  useEffect(()=>{load()},[]);
+  async function save(){if(!title.trim()){alert('Enter a memory title before saving.');return;}setBusy(true);try{let image_url='';if(file){const fd=new FormData();fd.append('file',file);fd.append('doc_type','memory_photo');const r=await fetch(API+'/api/documents',{method:'POST',headers:authHeaders(),body:fd});const d=await r.json();if(!r.ok)throw new Error(d.detail||'Photo upload failed');image_url=d.file_url||''}await api('/api/memories',{method:'POST',body:JSON.stringify({title:title.trim(),note:note.trim(),tags:tags.split(',').map(x=>x.trim()).filter(Boolean),image_url})});setTitle('');setNote('');setTags('personal, memory');setFile(null);await load()}catch(e){alert(e.message)}finally{setBusy(false)}}
+  async function removeMemory(id,name){if(!window.confirm(`Delete memory “${name}”?`))return;try{await api(`/api/memories/${id}`,{method:'DELETE'});await load()}catch(e){alert(e.message)}}
+  return <section className="page readablePage" aria-label="Personal Service Memory Wall">
+    <div className="operationsHeader">
+      <div className="operationsEyebrow">
+        <Heart size={14} aria-hidden="true"/>
+        <span>Personal Archive</span>
+      </div>
+      <h1 className="operationsTitle">Personal Service & Memory Wall</h1>
+      <p className="operationsLead">Save meaningful stories, unit citations, comrades, photos, and milestones that ValorBuddy securely remembers with you.</p>
+    </div>
+    <div className="featureForm darkForm">
+      <label><span className="fieldLabel">Memory title</span><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Example: My retirement ceremony" aria-label="Memory title"/></label>
+      <label><span className="fieldLabel">Tags</span><input value={tags} onChange={e=>setTags(e.target.value)} placeholder="family, service, deployment" aria-label="Tags"/></label>
+      <label className="wide"><span className="fieldLabel">Story or note</span><textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Write the story you want ValorBuddy to remember..." aria-label="Story or note"/></label>
+      <label className="wide"><span className="fieldLabel">Upload photo or keepsake</span><input type="file" accept="image/*" onChange={e=>setFile(e.target.files?.[0]||null)}/><small>{file?`Selected: ${file.name}`:'Choose a JPG, PNG, or WEBP image.'}</small></label>
+      <button className="primary actionButton wideAction" type="button" disabled={busy} onClick={save}><Plus size={16} aria-hidden="true"/><span>{busy?'Saving memory...':'Upload and save memory'}</span></button>
+    </div>
+    <div className="benefitsSectionTitle">
+      <h3>Saved Service Memories</h3>
+      {items.length > 0 && <span className="statusPill approved">{items.length} verified archive{items.length === 1 ? '' : 's'}</span>}
+    </div>
+    <div className="contentGrid">
+      {items.length===0&&<div className="emptyState"><Heart size={24} style={{color:'var(--branch-accent)', marginBottom:'8px'}} aria-hidden="true"/><h3>No memories saved yet</h3><p>Add your first story or photo above to start your personal vault archive.</p></div>}
+      {items.map(x=><article className="contentCard memoryCard" key={x.id}>{x.image_url&&<img src={x.image_url.startsWith('http')?x.image_url:API+x.image_url} alt={x.title} className="memoryImage"/>}<h3>{x.title}</h3><p>{x.note}</p><div className="cardActions" style={{marginTop:'auto', paddingTop:'10px'}}><button type="button" className="dangerButton" onClick={()=>removeMemory(x.id,x.title)}><Trash2 size={13} aria-hidden="true"/><span>Delete memory</span></button></div></article>)}
+    </div>
+  </section>;
+}
 
 const reminderTimers=new Map();
 function reminderLocalDate(item){
@@ -825,10 +2100,232 @@ function Reminders(){
     setBusy(true);try{const permission=await requestReminderPermission();const created=await api('/api/reminders',{method:'POST',body:JSON.stringify({title:title.trim(),date,time:time||'09:00',when_text:`${date} ${time||'09:00'}`,note:note.trim(),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'})});scheduleBrowserReminder(created);const nativeScheduled=await scheduleNativeReminder(created);setTitle('');setDate('');setTime('');setNote('');setNotice(nativeScheduled?'Reminder saved with an on-device notification that can fire even when the app is closed.':permission==='denied'?'Reminder saved. Browser notifications are blocked; ValorBuddy will still flag overdue reminders when you return, and server email can deliver when enabled.':'Reminder saved. Browser notification is scheduled while ValorBuddy is open; server email fallback can deliver when enabled.');await load({announce:false})}catch(e){alert(e.message)}finally{setBusy(false)}}
   async function setStatus(id,status){try{await api(`/api/reminders/${id}`,{method:'PATCH',body:JSON.stringify({status})});await load({announce:false})}catch(e){alert(e.message)}}
   async function remove(id,title){if(!window.confirm(`Delete reminder “${title}”?`))return;try{await api(`/api/reminders/${id}`,{method:'DELETE'});const timer=reminderTimers.get(id);if(timer)clearTimeout(timer);reminderTimers.delete(id);await load({announce:false})}catch(e){alert(e.message)}}
-  return <section className="page readablePage"><h1>Reminders</h1><p className="pageLead">Track appointments, benefits deadlines, calls, medications, and personal tasks. ValorBuddy now distinguishes upcoming, due, overdue, and completed reminders instead of leaving expired items marked active.</p>{notice&&<div className="reminderNotice"><Bell/><span>{notice}</span></div>}<div className="featureForm darkForm"><label><span>Reminder title</span><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Example: VA appointment"/></label><label><span>Date</span><input type="date" value={date} min={new Date().toISOString().slice(0,10)} onChange={e=>setDate(e.target.value)}/></label><label><span>Time</span><input type="time" value={time} onChange={e=>setTime(e.target.value)}/><small>If no time is chosen, ValorBuddy uses 9:00 AM.</small></label><label className="wide"><span>Notes</span><textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Location, documents to bring, or other details..."/></label><button className="primary actionButton wideAction" type="button" disabled={busy} onClick={save}><Bell/>{busy?'Scheduling reminder...':'Create and schedule reminder'}</button></div><div className="contentGrid">{items.length===0&&<div className="emptyState"><Bell/><h3>No reminders yet</h3><p>Create a reminder for an appointment, deadline, call, or task.</p></div>}{items.map(item=>{const status=reminderDisplayStatus(item);return <article className={`contentCard reminderCard reminder-${String(status).replace(/\s+/g,'-')}`} key={item.id}><div className="cardTop"><h3>{item.title}</h3><span className="statusPill">{status}</span></div><p className="strongLine">{item.when_text||[item.date,item.time].filter(Boolean).join(' ')||'No date selected'}</p>{item.note&&<p>{item.note}</p>}<small>{item.delivery_state==='email sent'?'Email reminder sent':status==='upcoming'?'Scheduled and being watched by ValorBuddy':status==='overdue'?'This time has passed — complete, dismiss, or reschedule this reminder.':''}</small><div className="reminderActions">{!['completed','cancelled','dismissed'].includes(item.stored_status)&&<button type="button" onClick={()=>setStatus(item.id,'completed')}>Mark complete</button>}{status==='overdue'&&<button type="button" onClick={()=>setStatus(item.id,'dismissed')}>Dismiss</button>}<button type="button" className="dangerButton" onClick={()=>remove(item.id,item.title)}><Trash2/>Delete</button></div></article>})}</div></section>
+  return <section className="page readablePage" aria-label="Reminders and Deadlines">
+    <div className="operationsHeader">
+      <div className="operationsEyebrow">
+        <Bell size={14} aria-hidden="true"/>
+        <span>Mission Timetable</span>
+      </div>
+      <h1 className="operationsTitle">Reminders & Deadlines</h1>
+      <p className="operationsLead">Track critical VA appeal deadlines, C&P exams, medications, and squad check-ins with automatic on-device notifications.</p>
+    </div>
+    {notice&&<div className="reminderNotice"><Bell size={16} aria-hidden="true"/><span>{notice}</span></div>}
+    <div className="featureForm darkForm">
+      <label><span className="fieldLabel">Reminder title</span><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Example: VA C&P Examination appointment" aria-label="Reminder title"/></label>
+      <label><span className="fieldLabel">Date</span><input type="date" value={date} min={new Date().toISOString().slice(0,10)} onChange={e=>setDate(e.target.value)} aria-label="Reminder date"/></label>
+      <label><span className="fieldLabel">Time</span><input type="time" value={time} onChange={e=>setTime(e.target.value)} aria-label="Reminder time"/><small>If no time is chosen, ValorBuddy defaults to 09:00 AM.</small></label>
+      <label className="wide"><span className="fieldLabel">Notes & Instructions</span><textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Location, documents to bring (STRs, DBQs), doctor name..." aria-label="Reminder notes"/></label>
+      <button className="primary actionButton wideAction" type="button" disabled={busy} onClick={save}><Bell size={16} aria-hidden="true"/><span>{busy?'Scheduling reminder...':'Create and schedule reminder'}</span></button>
+    </div>
+    <div className="benefitsSectionTitle">
+      <h3>Active Reminders & Timetable</h3>
+      {items.length > 0 && <span className="statusPill approved">{items.length} reminder{items.length === 1 ? '' : 's'}</span>}
+    </div>
+    <div className="contentGrid">
+      {items.length===0&&<div className="emptyState"><Bell size={24} style={{color:'var(--branch-accent)', marginBottom:'8px'}} aria-hidden="true"/><h3>No reminders yet</h3><p>Create a reminder above for an appointment, deadline, call, or task.</p></div>}
+      {items.map(item=>{const status=reminderDisplayStatus(item);return <article className={`contentCard reminderCard reminder-${String(status).replace(/\s+/g,'-')}`} key={item.id}><div className="cardTop"><h3>{item.title}</h3><span className="statusPill">{status}</span></div><p className="strongLine">{item.when_text||[item.date,item.time].filter(Boolean).join(' ')||'No date selected'}</p>{item.note&&<p>{item.note}</p>}<small>{item.delivery_state==='email sent'?'Email reminder sent':status==='upcoming'?'Scheduled and active':status==='overdue'?'This time has passed — complete or dismiss.':''}</small><div className="reminderActions" style={{marginTop:'auto', paddingTop:'10px'}}>{!['completed','cancelled','dismissed'].includes(item.stored_status)&&<button type="button" onClick={()=>setStatus(item.id,'completed')}>Mark complete</button>}{status==='overdue'&&<button type="button" onClick={()=>setStatus(item.id,'dismissed')}>Dismiss</button>}<button type="button" className="dangerButton" onClick={()=>remove(item.id,item.title)}><Trash2 size={13} aria-hidden="true"/><span>Delete</span></button></div></article>})}
+    </div>
+  </section>;
 }
 
-function Documents(){const[file,setFile]=useState(null);const[type,setType]=useState('general');const[docs,setDocs]=useState([]);const[busy,setBusy]=useState(false);const[result,setResult]=useState(null);async function load(){setDocs(await api('/api/documents'))}async function removeDocument(id,filename){if(!window.confirm(`Delete ${filename}? This permanently removes the document from ValorBuddy.`))return;try{await api(`/api/documents/${id}`,{method:'DELETE'});if(result?.id===id)setResult(null);await load()}catch(e){alert(e.message)}}useEffect(()=>{load()},[]);async function upload(){if(!file)return;setBusy(true);setResult(null);try{const fd=new FormData();fd.append('file',file);fd.append('doc_type',type);const r=await fetch(API+'/api/documents',{method:'POST',headers:authHeaders(),body:fd});const d=await r.json();if(!r.ok)throw new Error(d.detail||'Upload failed');setResult(d);setFile(null);load()}catch(e){alert(e.message)}finally{setBusy(false)}}return <section className="page"><h1>Document Intelligence</h1><p className="pageLead">Upload a resume, DD214, VA record, certification, PDF, DOCX, or text file. The Documents Agent extracts readable text, classifies it, summarizes it, and automatically creates a specialist mission when useful.</p><div className="featureForm darkForm documentUploadForm"><label><span>Document type</span><select value={type} onChange={e=>setType(e.target.value)}><option value="general">Detect automatically</option><option value="resume">Resume</option><option value="dd214">DD214</option><option value="va_record">VA record</option><option value="certification">Certification</option></select></label><label className="wide"><span>Choose file</span><input type="file" accept=".pdf,.docx,.txt,.md,.csv,.jpg,.jpeg,.png" onChange={e=>setFile(e.target.files[0])}/></label><button className="primary" disabled={!file||busy} onClick={upload}><Upload/>{busy?'Agents analyzing...':'Upload and analyze'}</button></div>{result&&<section className="intelPanel"><div><b>{result.filename}</b><span className="statusPill">{result.status}</span></div><p>{result.ai_summary}</p>{result.analysis?.skills?.length>0&&<div className="chipRow">{result.analysis.skills.slice(0,12).map(x=><span key={x}>{x}</span>)}</div>}{result.analysis?.suggested_roles?.length>0&&<><h3>Suggested civilian directions</h3><ul>{result.analysis.suggested_roles.map(x=><li key={x}>{x}</li>)}</ul></>}{result.analysis?.suggested_actions?.length>0&&<><h3>Recommended next actions</h3><ol>{result.analysis.suggested_actions.map(x=><li key={x}>{x}</li>)}</ol></>}{result.mission&&<div className="missionNotice"><Brain/><div><b>Agents started a mission automatically</b><small>{result.mission.participating_agents?.join(' • ')} · {result.mission.progress}% complete</small></div></div>}</section>}<div className="grid">{docs.map(d=><article className="card" key={d.id}><div className="cardTop"><h3>{d.filename}</h3><span className="statusPill">{d.status||d.doc_type}</span></div><p>{d.ai_summary}</p>{d.analysis?.skills?.length>0&&<small>{d.analysis.skills.slice(0,5).join(' • ')}</small>}<div className="documentActions">{d.file_url&&<a href={API+d.file_url} target="_blank" rel="noreferrer">Open secure file</a>}<button type="button" className="dangerButton" onClick={()=>removeDocument(d.id,d.filename)}><Trash2/>Delete document</button></div></article>)}</div></section>}
+function Documents(){
+  const[file,setFile]=useState(null);
+  const[type,setType]=useState('general');
+  const[docs,setDocs]=useState([]);
+  const[busy,setBusy]=useState(false);
+  const[result,setResult]=useState(null);
+  const fileInputRef=useRef(null);
+
+  async function load(){
+    setDocs(await api('/api/documents'));
+  }
+
+  async function removeDocument(id,filename){
+    if(!window.confirm(`Delete ${filename}? This permanently removes the document from ValorBuddy.`))return;
+    try{
+      await api(`/api/documents/${id}`,{method:'DELETE'});
+      if(result?.id===id)setResult(null);
+      await load();
+    }catch(e){alert(e.message)}
+  }
+
+  useEffect(()=>{load()},[]);
+
+  async function upload(){
+    if(!file)return;
+    setBusy(true);
+    setResult(null);
+    try{
+      const fd=new FormData();
+      fd.append('file',file);
+      fd.append('doc_type',type);
+      const r=await fetch(API+'/api/documents',{method:'POST',headers:authHeaders(),body:fd});
+      const d=await r.json();
+      if(!r.ok)throw new Error(d.detail||'Upload failed');
+      setResult(d);
+      setFile(null);
+      load();
+    }catch(e){alert(e.message)}finally{setBusy(false)}
+  }
+
+  return <section className="page" aria-label="Document Intelligence Vault">
+    <div className="operationsHeader">
+      <div className="operationsEyebrow">
+        <Folder size={14} aria-hidden="true"/>
+        <span>Personal Vault</span>
+      </div>
+      <h1 className="operationsTitle">Document Intelligence</h1>
+      <p className="operationsLead">Your secure veteran document vault. Upload military records, resumes, and civilian credentials for automated analysis and classification.</p>
+    </div>
+
+    <div className="vaultUploadCard">
+      <div className="vaultUploadGrid">
+        <label>
+          <span className="fieldLabel">Document type</span>
+          <select value={type} onChange={e=>setType(e.target.value)} disabled={busy} aria-label="Document classification type">
+            <option value="general">Detect automatically</option>
+            <option value="resume">Resume / CV</option>
+            <option value="dd214">DD214 Certificate of Release</option>
+            <option value="va_record">VA Medical / Rating Record</option>
+            <option value="certification">Civilian / Military Certification</option>
+          </select>
+        </label>
+        <div>
+          <span className="fieldLabel">Official Document File</span>
+          <div
+            className="tacticalDropZone"
+            onClick={()=>fileInputRef.current?.click()}
+            role="button"
+            tabIndex={0}
+            onKeyDown={e=>{if(e.key==='Enter'||e.key===' ')fileInputRef.current?.click()}}
+            aria-label="Upload document file"
+          >
+            <input
+              ref={fileInputRef}
+              type="file"
+              style={{display:'none'}}
+              accept=".pdf,.docx,.txt,.md,.csv,.jpg,.jpeg,.png"
+              onChange={e=>setFile(e.target.files?.[0]||null)}
+              disabled={busy}
+            />
+            <div className="dropIcon">
+              {file ? <CheckCircle2 size={24} style={{color:'var(--branch-primary, #10b981)'}}/> : <Upload size={22}/>}
+            </div>
+            <div className="dropText">
+              <span className="dropTitle">{file ? file.name : 'Select or drag military record'}</span>
+              <span className="dropSub">{file ? `${(file.size/1024).toFixed(1)} KB • Ready for AES-256 analysis` : 'Supports DD-214, Medical, VA Letters, Resumes (PDF, DOCX, PNG)'}</span>
+            </div>
+          </div>
+        </div>
+        <button className="primary actionButton" type="button" disabled={!file||busy} onClick={upload}>
+          <Upload size={16} aria-hidden="true"/>
+          <span>{busy?'Agents analyzing...':'Upload & Analyze'}</span>
+        </button>
+      </div>
+      <div className="vaultSecurityNote">
+        <Lock size={13} aria-hidden="true"/>
+        <span>[ AES-256 HARDENED LOCKER • ZERO-KNOWLEDGE VETERAN STORAGE ISOLATION ]</span>
+      </div>
+    </div>
+
+    {busy && (
+      <div className="calmLoadingIndicator" role="status">
+        <RefreshCw size={15} className="spin" aria-hidden="true"/>
+        <span>Documents Agent extracting readable text, classifying data, and analyzing skills...</span>
+      </div>
+    )}
+
+    {result && (
+      <section className="intelPanel" aria-label="Recent Document Analysis">
+        <div className="intelPanelTop">
+          <div>
+            <span className="vaultTypeBadge">{result.doc_type || 'DOCUMENT'}</span>
+            <b>{result.filename}</b>
+          </div>
+          <span className={`statusPill ${result.status || 'completed'}`}>{(result.status || 'analyzed').replaceAll('_', ' ')}</span>
+        </div>
+        <p>{result.ai_summary}</p>
+        {result.analysis?.skills?.length > 0 && (
+          <div>
+            <small className="muted" style={{display:'block', marginBottom:'4px'}}>Extracted Skills & Competencies</small>
+            <div className="chipRow">
+              {result.analysis.skills.slice(0, 12).map(x => <span key={x}>{x}</span>)}
+            </div>
+          </div>
+        )}
+        {result.analysis?.suggested_roles?.length > 0 && (
+          <>
+            <h3>Suggested Civilian Career Directions</h3>
+            <ul>
+              {result.analysis.suggested_roles.map(x => <li key={x}>{x}</li>)}
+            </ul>
+          </>
+        )}
+        {result.analysis?.suggested_actions?.length > 0 && (
+          <>
+            <h3>Recommended Next Actions</h3>
+            <ol>
+              {result.analysis.suggested_actions.map(x => <li key={x}>{x}</li>)}
+            </ol>
+          </>
+        )}
+        {result.mission && (
+          <div className="missionNotice">
+            <Brain size={18} aria-hidden="true"/>
+            <div>
+              <b>Specialist mission initiated automatically</b>
+              <small>{result.mission.participating_agents?.join(' • ')} · {result.mission.progress}% complete</small>
+            </div>
+          </div>
+        )}
+      </section>
+    )}
+
+    <div className="benefitsSectionTitle">
+      <h3>Document Vault</h3>
+      {docs.length > 0 && <span className="statusPill approved">{docs.length} secure document{docs.length === 1 ? '' : 's'}</span>}
+    </div>
+
+    {docs.length === 0 ? (
+      <div className="upcomingEmpty">
+        <Folder size={24} style={{color:'var(--branch-accent)', marginBottom:'8px'}} aria-hidden="true"/>
+        <p><b>No documents yet</b><br/>Upload your first document to begin building your personal veteran document vault.</p>
+      </div>
+    ) : (
+      <div className="vaultGrid">
+        {docs.map(d => (
+          <article className="vaultCard" key={d.id}>
+            <div className="vaultCardTop">
+              <div>
+                <span className="vaultTypeBadge">{d.doc_type || 'GENERAL'}</span>
+                <h3>{d.filename}</h3>
+              </div>
+              <span className={`statusPill ${d.status || 'active'}`}>{(d.status || d.doc_type || 'stored').replaceAll('_', ' ')}</span>
+            </div>
+            {d.ai_summary && <p className="vaultSummary">{d.ai_summary}</p>}
+            {d.analysis?.skills?.length > 0 && (
+              <div className="chipRow">
+                {d.analysis.skills.slice(0, 5).map(s => <span key={s}>{s}</span>)}
+              </div>
+            )}
+            <div className="vaultActions">
+              {d.file_url && (
+                <a className="vaultDownloadLink" href={API + d.file_url} target="_blank" rel="noreferrer">
+                  <Lock size={12} aria-hidden="true"/>
+                  <span>Open secure file</span>
+                </a>
+              )}
+              <button type="button" className="vaultDeleteBtn" onClick={() => removeDocument(d.id, d.filename)}>
+                <Trash2 size={13} aria-hidden="true"/>
+                <span>Delete</span>
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+    )}
+  </section>;
+}
 const mediaProviders={
   'Veteran TV':{kind:'external',home:'https://www.veterantv.com/',search:q=>`https://www.google.com/search?q=${encodeURIComponent(`site:veterantv.com ${q}`)}`,help:'Veteran TV does not currently provide an approved public embedded player. Open it securely in a new tab while ValorBuddy keeps your saved item and place.'},
   Spotify:{kind:'spotify',home:'https://open.spotify.com/',search:q=>`https://open.spotify.com/search/${encodeURIComponent(q)}`,help:'Paste a Spotify track, album, artist, playlist, show, or episode link to use Spotify’s approved embedded player.'},
@@ -861,7 +2358,16 @@ function MusicPage({user,setUser}){
   function openSearch(){const p=mediaProviders[provider];window.open(p.search(query||title||genres[0]||'veteran music'),'_blank','noopener,noreferrer')}
   function previewLink(raw=url,name=provider){const embed=mediaEmbed(name,raw);setError('');if(embed){setPreview({provider:name,source:raw,embed});return}const kind=mediaProviders[name]?.kind;if(kind&&kind!=='external')setError(`That does not look like a supported ${name} content link. Open ${name}, choose a song, playlist, album, show, or video, copy its link, and paste it here.`);else setPreview({provider:name,source:raw||mediaProviders[name]?.home,embed:''})}
   const selected=mediaProviders[provider];
-  return <section className="page readablePage mediaCenterPage"><h1>Music & Entertainment</h1><p className="pageLead">Choose your own genres, add or remove them at any time, play supported media with approved provider players, and save favorites.</p><section className="genreManager"><div><small>YOUR MUSIC PROFILE</small><h2>Music genres</h2><p>Add any genre you enjoy. ValorBuddy can use these preferences when suggesting music.</p></div><div className="genreComposer"><input value={newGenre} onChange={e=>setNewGenre(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addGenre()} placeholder="Add a genre: Gospel, Afrobeats, Jazz, Country..."/><button className="primary" onClick={addGenre} disabled={!newGenre.trim()}><Plus/>Add genre</button></div><div className="genreChips">{genres.length===0?<span className="emptyGenre">No genres added yet.</span>:genres.map(g=><span key={g}>{g}<button aria-label={`Remove ${g}`} onClick={()=>removeGenre(g)}><X/></button></span>)}</div></section><div className="providerTabs" role="tablist" aria-label="Media providers">{Object.keys(mediaProviders).map(name=><button key={name} className={provider===name?'active':''} onClick={()=>{setProvider(name);setError('');setPreview(null)}}>{name}</button>)}</div><div className="mediaWorkspace"><section className="providerPanel"><div className="providerHeading"><div><small>SELECTED SERVICE</small><h2>{provider}</h2></div><span className={`supportBadge ${selected.kind==='external'?'handoff':'embedded'}`}>{selected.kind==='external'?'Secure handoff':'In-app player'}</span></div><p>{selected.help}</p><div className="mediaSearchRow"><input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&openSearch()} placeholder={`Search ${provider} for an artist, song, playlist, or podcast`}/><button onClick={openSearch}><Search/>Search {provider}</button></div><label className="mediaUrlField"><span>Paste a specific {provider} content link</span><input value={url} onChange={e=>setUrl(e.target.value)} placeholder={`Paste the copied ${provider} link here`}/></label>{error&&<div className="mediaError">{error}</div>}<div className="mediaActionRow"><button className="primary" onClick={()=>previewLink()} disabled={!url.trim()&&selected.kind!=='external'}>{selected.kind==='external'?'Open safely':'Preview inside ValorBuddy'}</button><button onClick={()=>window.open(selected.home,'_blank','noopener,noreferrer')}>Visit {provider}</button></div></section><section className="mediaPreviewPanel">{preview?.embed?<><div className="playerTitle"><div><small>NOW READY</small><h3>{preview.provider} player</h3></div><button onClick={()=>setPreview(null)}>Close</button></div><iframe src={preview.embed} title={`${preview.provider} approved player`} allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin"/></>:preview&&!preview.embed?<div className="handoffCard"><Radio/><h3>{preview.provider} protects playback outside embedded websites</h3><p>ValorBuddy will keep your saved title and link. Open the service securely without displaying a broken player.</p><button className="primary" onClick={()=>window.open(preview.source||selected.home,'_blank','noopener,noreferrer')}>Continue to {preview.provider}</button></div>:<div className="playerEmpty"><Music/><h3>No blank player</h3><p>Choose a provider and paste a supported content link. ValorBuddy will only display an approved player when one is available.</p></div>}</section></div><div className="featureForm darkForm saveMediaForm"><label><span>Favorite title</span><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Example: Gospel classics or veteran podcast"/></label><label><span>Direct content link</span><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste the track, playlist, podcast, station, or video link"/></label><label><span>Mood or purpose</span><input value={mood} onChange={e=>setMood(e.target.value)} placeholder="Relax, workout, memories, motivation"/></label><button className="primary" disabled={!title.trim()} onClick={add}><Plus/>Save favorite</button></div><h2>Saved media</h2><div className="contentGrid">{items.length===0&&<div className="emptyState"><Music/><h3>No saved media yet</h3><p>Save a song, playlist, station, podcast, audiobook, or Veteran TV link.</p></div>}{items.map(x=><article className="contentCard" key={x.id}><h3>{x.title}</h3><p>{x.mood||'Saved favorite'}</p><div className="cardActions">{x.url&&<button onClick={()=>{const match=Object.keys(mediaProviders).find(name=>{try{const host=new URL(x.url).hostname;return(name==='Spotify'&&host.includes('spotify'))||((name==='YouTube'||name==='YouTube Music')&&host.includes('youtube'))||(name==='Apple Music'&&host.includes('music.apple'))||(name==='SoundCloud'&&host.includes('soundcloud'))}catch{return false}})||'Veteran TV';setProvider(match);previewLink(x.url,match)}}>Play or open</button>}<button className="dangerButton" onClick={()=>remove(x.id)}><Trash2/>Remove</button></div></article>)}</div></section>
+  return <section className="page readablePage mediaCenterPage" aria-label="Music and Media Center">
+    <div className="operationsHeader">
+      <div className="operationsEyebrow">
+        <Music size={14} aria-hidden="true"/>
+        <span>Morale & Media</span>
+      </div>
+      <h1 className="operationsTitle">Music & Media Center</h1>
+      <p className="operationsLead">Choose your own genres, play supported media with approved provider players, and keep favorite playlists and podcasts organized.</p>
+    </div>
+    <section className="genreManager"><div><small>YOUR MUSIC PROFILE</small><h2>Music genres</h2><p>Add any genre you enjoy. ValorBuddy can use these preferences when suggesting music.</p></div><div className="genreComposer"><input value={newGenre} onChange={e=>setNewGenre(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addGenre()} placeholder="Add a genre: Gospel, Afrobeats, Jazz, Country..."/><button className="primary actionButton" onClick={addGenre} disabled={!newGenre.trim()}><Plus size={14} aria-hidden="true"/><span>Add genre</span></button></div><div className="genreChips">{genres.length===0?<span className="emptyGenre">No genres added yet.</span>:genres.map(g=><span key={g}>{g}<button aria-label={`Remove ${g}`} onClick={()=>removeGenre(g)}><X size={12} aria-hidden="true"/></button></span>)}</div></section><div className="providerTabs" role="tablist" aria-label="Media providers">{Object.keys(mediaProviders).map(name=><button key={name} className={provider===name?'active':''} onClick={()=>{setProvider(name);setError('');setPreview(null)}}>{name}</button>)}</div><div className="mediaWorkspace"><section className="providerPanel"><div className="providerHeading"><div><small>SELECTED SERVICE</small><h2>{provider}</h2></div><span className={`supportBadge ${selected.kind==='external'?'handoff':'embedded'}`}>{selected.kind==='external'?'Secure handoff':'In-app player'}</span></div><p>{selected.help}</p><div className="mediaSearchRow"><input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&openSearch()} placeholder={`Search ${provider} for an artist, song, playlist, or podcast`}/><button onClick={openSearch}><Search size={14} aria-hidden="true"/>Search {provider}</button></div><label className="mediaUrlField"><span>Paste a specific {provider} content link</span><input value={url} onChange={e=>setUrl(e.target.value)} placeholder={`Paste the copied ${provider} link here`}/></label>{error&&<div className="mediaError">{error}</div>}<div className="mediaActionRow"><button className="primary actionButton" onClick={()=>previewLink()} disabled={!url.trim()&&selected.kind!=='external'}>{selected.kind==='external'?'Open safely':'Preview inside ValorBuddy'}</button><button onClick={()=>window.open(selected.home,'_blank','noopener,noreferrer')}>Visit {provider}</button></div></section><section className="mediaPreviewPanel">{preview?.embed?<><div className="playerTitle"><div><small>NOW READY</small><h3>{preview.provider} player</h3></div><button onClick={()=>setPreview(null)}>Close</button></div><iframe src={preview.embed} title={`${preview.provider} approved player`} allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin"/></>:preview&&!preview.embed?<div className="handoffCard"><Radio size={16} aria-hidden="true"/><h3>{preview.provider} protects playback outside embedded websites</h3><p>ValorBuddy will keep your saved title and link. Open the service securely without displaying a broken player.</p><button className="primary actionButton" onClick={()=>window.open(preview.source||selected.home,'_blank','noopener,noreferrer')}>Continue to {preview.provider}</button></div>:<div className="playerEmpty"><Music size={24} aria-hidden="true"/><h3>No blank player</h3><p>Choose a provider and paste a supported content link. ValorBuddy will only display an approved player when one is available.</p></div>}</section></div><div className="featureForm darkForm saveMediaForm"><label><span>Favorite title</span><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Example: Gospel classics or veteran podcast"/></label><label><span>Direct content link</span><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste the track, playlist, podcast, station, or video link"/></label><label><span>Mood or purpose</span><input value={mood} onChange={e=>setMood(e.target.value)} placeholder="Relax, workout, memories, motivation"/></label><button className="primary actionButton" disabled={!title.trim()} onClick={add}><Plus size={14} aria-hidden="true"/><span>Save favorite</span></button></div><h2>Saved media</h2><div className="contentGrid">{items.length===0&&<div className="emptyState"><Music size={24} style={{color:'var(--branch-accent)', marginBottom:'8px'}} aria-hidden="true"/><h3>No saved media yet</h3><p>Save a song, playlist, station, podcast, audiobook, or Veteran TV link.</p></div>}{items.map(x=><article className="contentCard" key={x.id}><h3>{x.title}</h3><p>{x.mood||'Saved favorite'}</p><div className="cardActions">{x.url&&<button onClick={()=>{const match=Object.keys(mediaProviders).find(name=>{try{const host=new URL(x.url).hostname;return(name==='Spotify'&&host.includes('spotify'))||((name==='YouTube'||name==='YouTube Music')&&host.includes('youtube'))||(name==='Apple Music'&&host.includes('music.apple'))||(name==='SoundCloud'&&host.includes('soundcloud'))}catch{return false}})||'Veteran TV';setProvider(match);previewLink(x.url,match)}}>Play or open</button>}<button className="dangerButton" onClick={()=>remove(x.id)}><Trash2 size={13} aria-hidden="true"/>Remove</button></div></article>)}</div></section>;
 }
 
 function ProfileField({label,name,form,onChange,saving,wide=false,area=false,placeholder='',help='',type='text',required=false}){
@@ -885,7 +2391,30 @@ function Profile({user,setUser}){
   function cancel(){setForm(makeForm(user));setMessage('');setEditing(false)}
   const change=(name,value)=>setForm(prev=>({...prev,[name]:value}));
   const fieldProps={form,onChange:change,saving};
-  return <section className="page profilePage"><div className="pageTitleRow"><div><h1>Service & Career Profile</h1><p className="pageLead">Edit your information directly in the fields below. Changes are saved only when you press Save profile.</p></div><div className="profileActions">{editing&&<button type="button" onClick={cancel} disabled={saving}>Cancel</button>}<button className="primary" type="button" disabled={saving} onClick={()=>editing?save():beginEdit()}>{saving?'Saving...':editing?'Save profile':'Edit profile'}</button></div></div>{message&&<div className="profileMessage" role="status">{message}</div>}{editing?<div className="profileEditNotice"><b>Edit mode is on</b><span>Click or tap any field and type normally. Use Tab/Next to move between fields, then Save profile when finished.</span></div>:null}{editing?<div className="profileForm labeledProfileForm highReadabilityProfile"><ProfileField {...fieldProps} label="First name" name="first_name" placeholder="Enter your first name" required/><ProfileField {...fieldProps} label="Last name" name="last_name" placeholder="Enter your last name" required/><ProfileField {...fieldProps} label="Military rank" name="rank" placeholder="Example: SSG, CPT, PO1" help="Your current or highest rank."/><label className="profileField" htmlFor="profile-branch"><span className="fieldLabel">Service branch</span><small className="fieldHelp">Select the branch in which you served.</small><select id="profile-branch" value={form.branch||'Army'} onChange={e=>change('branch',e.target.value)} disabled={saving}>{Object.keys(branches).map(x=><option key={x}>{x}</option>)}</select></label><ProfileField {...fieldProps} label="MOS / AFSC / Rating" name="military_mos" placeholder="Example: 25B, 3D0X2, IT" help="Your military occupational specialty code."/><ProfileField {...fieldProps} label="Military job title" name="military_job_title" placeholder="Example: Information Technology Specialist" help="The plain-English title of your military role."/><ProfileField {...fieldProps} label="Years of service" name="years_of_service" type="number" placeholder="Example: 12" help="Total completed years of military service."/><ProfileField {...fieldProps} label="Security clearance" name="security_clearance" placeholder="Example: Secret" help="Only include a current or previously verified clearance."/><ProfileField {...fieldProps} label="Highest education" name="highest_education" placeholder="Example: Bachelor of Science in Information Technology"/><ProfileField {...fieldProps} label="Civilian certifications" name="civilian_certifications" placeholder="Example: Security+, PMP, AWS Solutions Architect" help="Separate multiple certifications with commas."/><ProfileField {...fieldProps} label="Civilian career goal" name="civilian_career_goal" placeholder="Example: Cybersecurity GRC Analyst" help="The role or career field you want ValorBuddy to target."/><ProfileField {...fieldProps} label="LinkedIn profile URL" name="linkedin_url" type="url" placeholder="https://www.linkedin.com/in/your-name"/><ProfileField {...fieldProps} label="Business interest" name="business_interest" wide area placeholder="Describe the business idea or industry you want to explore." help="Used by the Business Plan Agent."/><ProfileField {...fieldProps} label="Military specialty description" name="military_specialty_description" wide area placeholder="Describe your specialty, mission, unit function, and technical focus." help="Explain your MOS or military occupation in your own words."/><ProfileField {...fieldProps} label="Military duties, tools, leadership, and accomplishments" name="military_experience" wide area placeholder="Describe teams led, systems used, missions supported, measurable results, awards, and major responsibilities." help="Used by the Career Agent to translate military experience into civilian resume language."/><ProfileField {...fieldProps} label="Deployment history" name="deployment_history" wide area placeholder="List deployments, locations, dates, and responsibilities you are comfortable sharing." help="Optional. Do not include classified or sensitive information."/><ProfileField {...fieldProps} label="Current city" name="city" placeholder="Example: Dallas"/><ProfileField {...fieldProps} label="State" name="state" placeholder="Example: TX" help="Use the two-letter state abbreviation."/></div>:<div className="profileSummary">{[['Full name',`${user.first_name} ${user.last_name||''}`],['Rank / Branch',`${user.rank||'—'} / ${user.branch}`],['MOS / AFSC / Rating',user.military_mos||'Not provided'],['Military role',user.military_job_title||'Not provided'],['Years served',user.years_of_service||'Not provided'],['Career goal',user.civilian_career_goal||'Not provided'],['Business interest',user.business_interest||'Not provided'],['Education',user.highest_education||'Not provided'],['Certifications',user.civilian_certifications||'Not provided'],['Location',`${user.city||'—'}, ${user.state||'—'}`]].map(([a,b])=><div key={a}><span>{a}</span><b>{b}</b></div>)}</div>}</section>
+  return <section className="page profilePage" aria-label="Service and Career Dossier">
+    <div className="operationsHeader">
+      <div className="operationsEyebrow">
+        <User size={14} aria-hidden="true"/>
+        <span>Personnel Record</span>
+      </div>
+      <div className="pageTitleRow">
+        <div>
+          <h1 className="operationsTitle">Service Dossier & Career Profile</h1>
+          <p className="operationsLead">Your verified military background, MOS credentials, awards, and transition goals feeding directly into the AI Battle Buddy and Career Agent.</p>
+        </div>
+        <div className="profileActions">
+          {editing&&<button type="button" onClick={cancel} disabled={saving}>Cancel</button>}
+          <button className="primary actionButton" type="button" disabled={saving} onClick={()=>editing?save():beginEdit()}>
+            <User size={14} aria-hidden="true"/>
+            <span>{saving?'Saving...':editing?'Save profile':'Edit profile'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+    {message&&<div className="profileMessage" role="status">{message}</div>}
+    {editing?<div className="profileEditNotice"><b>Edit mode is on</b><span>Click or tap any field and type normally. Use Tab/Next to move between fields, then Save profile when finished.</span></div>:null}
+    {editing?<div className="profileForm labeledProfileForm highReadabilityProfile"><ProfileField {...fieldProps} label="First name" name="first_name" placeholder="Enter your first name" required/><ProfileField {...fieldProps} label="Last name" name="last_name" placeholder="Enter your last name" required/><ProfileField {...fieldProps} label="Military rank" name="rank" placeholder="Example: SSG, CPT, PO1" help="Your current or highest rank."/><label className="profileField" htmlFor="profile-branch"><span className="fieldLabel">Service branch</span><small className="fieldHelp">Select the branch in which you served.</small><select id="profile-branch" value={form.branch||'Army'} onChange={e=>change('branch',e.target.value)} disabled={saving}>{Object.keys(branches).map(x=><option key={x}>{x}</option>)}</select></label><ProfileField {...fieldProps} label="MOS / AFSC / Rating" name="military_mos" placeholder="Example: 25B, 3D0X2, IT" help="Your military occupational specialty code."/><ProfileField {...fieldProps} label="Military job title" name="military_job_title" placeholder="Example: Information Technology Specialist" help="The plain-English title of your military role."/><ProfileField {...fieldProps} label="Years of service" name="years_of_service" type="number" placeholder="Example: 12" help="Total completed years of military service."/><ProfileField {...fieldProps} label="Security clearance" name="security_clearance" placeholder="Example: Secret" help="Only include a current or previously verified clearance."/><ProfileField {...fieldProps} label="Highest education" name="highest_education" placeholder="Example: Bachelor of Science in Information Technology"/><ProfileField {...fieldProps} label="Civilian certifications" name="civilian_certifications" placeholder="Example: Security+, PMP, AWS Solutions Architect" help="Separate multiple certifications with commas."/><ProfileField {...fieldProps} label="Civilian career goal" name="civilian_career_goal" placeholder="Example: Cybersecurity GRC Analyst" help="The role or career field you want ValorBuddy to target."/><ProfileField {...fieldProps} label="LinkedIn profile URL" name="linkedin_url" type="url" placeholder="https://www.linkedin.com/in/your-name"/><ProfileField {...fieldProps} label="Business interest" name="business_interest" wide area placeholder="Describe the business idea or industry you want to explore." help="Used by the Business Plan Agent."/><ProfileField {...fieldProps} label="Military specialty description" name="military_specialty_description" wide area placeholder="Describe your specialty, mission, unit function, and technical focus." help="Explain your MOS or military occupation in your own words."/><ProfileField {...fieldProps} label="Military duties, tools, leadership, and accomplishments" name="military_experience" wide area placeholder="Describe teams led, systems used, missions supported, measurable results, awards, and major responsibilities." help="Used by the Career Agent to translate military experience into civilian resume language."/><ProfileField {...fieldProps} label="Deployment history" name="deployment_history" wide area placeholder="List deployments, locations, dates, and responsibilities you are comfortable sharing." help="Optional. Do not include classified or sensitive information."/><ProfileField {...fieldProps} label="Current city" name="city" placeholder="Example: Dallas"/><ProfileField {...fieldProps} label="State" name="state" placeholder="Example: TX" help="Use the two-letter state abbreviation."/></div>:<div className="profileSummary">{[['Full name',`${user.first_name} ${user.last_name||''}`],['Rank / Branch',`${user.rank||'—'} / ${user.branch}`],['MOS / AFSC / Rating',user.military_mos||'Not provided'],['Military role',user.military_job_title||'Not provided'],['Years served',user.years_of_service||'Not provided'],['Career goal',user.civilian_career_goal||'Not provided'],['Business interest',user.business_interest||'Not provided'],['Education',user.highest_education||'Not provided'],['Certifications',user.civilian_certifications||'Not provided'],['Location',`${user.city||'—'}, ${user.state||'—'}`]].map(([a,b])=><div key={a}><span>{a}</span><b>{b}</b></div>)}</div>}
+  </section>;
 }
 
 function Tutorial({setScreen}){
@@ -898,17 +2427,321 @@ function Tutorial({setScreen}){
     ['Documents and career','Upload documents in Document Intelligence, then use Career & Business or Mission Control for structured help.','documents'],
     ['Personalize music','In Music & Media, add or delete your favorite genres, save specific media, and open supported providers.','music']
   ];
-  return <section className="page tutorialPage"><div className="pageTitleRow"><div><h1>ValorBuddy User Tutorial</h1><p className="pageLead">A quick guided tour of the safest and fastest way to use the system.</p></div><button className="primary" onClick={()=>setScreen('dashboard')}>Back to dashboard</button></div><div className="tutorialGrid">{steps.map(([title,body,target],i)=><article className="tutorialCard" key={title}><span>{i+1}</span><div><h2>{title}</h2><p>{body}</p><button onClick={()=>setScreen(target)}>Open this feature <ChevronRight/></button></div></article>)}</div><div className="tutorialSafety"><Shield/><div><h2>Important</h2><p>ValorBuddy provides informational assistance. For official eligibility, claims, medical care, legal advice, financial decisions, or emergencies, use the appropriate official or licensed professional resource.</p></div></div></section>
+  return <section className="page tutorialPage" aria-label="ValorBuddy Orientation Briefing">
+    <div className="operationsHeader">
+      <div className="operationsEyebrow">
+        <BookOpen size={14} aria-hidden="true"/>
+        <span>Operations Briefing</span>
+      </div>
+      <div className="pageTitleRow">
+        <div>
+          <h1 className="operationsTitle">Mission Orientation & Tutorial</h1>
+          <p className="operationsLead">A 7-step guided briefing on navigating benefits, commanding the AI Battle Buddy, securing documents, and finding local support.</p>
+        </div>
+        <button className="primary actionButton" onClick={()=>setScreen('dashboard')}>
+          <span>Return to Command Center</span>
+        </button>
+      </div>
+    </div>
+    <div className="tutorialGrid">
+      {steps.map(([title,body,target],i)=>(
+        <article className="tutorialCard" key={title}>
+          <span>0{i+1}</span>
+          <div>
+            <h2>{title}</h2>
+            <p>{body}</p>
+            <button type="button" onClick={()=>setScreen(target)}>
+              <span>Open this feature</span>
+              <ChevronRight size={14} aria-hidden="true"/>
+            </button>
+          </div>
+        </article>
+      ))}
+    </div>
+    <div className="tutorialSafety">
+      <Shield size={20} aria-hidden="true"/>
+      <div>
+        <h2>Important Operational Notice</h2>
+        <p>ValorBuddy provides informational assistance. For official eligibility, claims, medical care, legal advice, financial decisions, or emergencies, use the appropriate official or licensed professional resource.</p>
+      </div>
+    </div>
+  </section>;
 }
 
-function MissionControl(){const[goal,setGoal]=useState('');const[missions,setMissions]=useState([]);const[busy,setBusy]=useState(false);async function load(){setMissions(await api('/api/agentic/missions'))}useEffect(()=>{load()},[]);async function start(){if(goal.trim().length<3){alert('Describe the outcome you want ValorBuddy agents to complete.');return;}setBusy(true);try{await api('/api/agentic/missions',{method:'POST',body:JSON.stringify({...locationPayload(),goal,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone})});setGoal('');load()}finally{setBusy(false)}}return <section className="page"><h1>Mission Control</h1><p className="pageLead">Give ValorBuddy an outcome—not just a question. The Supervisor reads your profile and approved memory, selects specialist agents, executes tools, verifies results, and records progress.</p><div className="missionComposer"><textarea value={goal} onChange={e=>setGoal(e.target.value)} placeholder="Example: Analyze my resume, suggest three civilian career paths, and build a tailored resume for a senior operations role."/><button className="primary actionButton" type="button" disabled={busy} onClick={start}><Brain/>{busy?'Agents working...':'Send mission to Supervisor Agent'}</button></div><div className="missionList">{missions.map(m=><article className="missionCard" key={m.id}><div className="missionHead"><div><small>{m.mission_uid}</small><h3>{m.title}</h3></div><span className={`statusPill ${m.status}`}>{m.status}</span></div><p>{m.goal}</p><div className="progressTrack"><i style={{width:`${m.progress||0}%`}}/></div><div className="missionMeta"><b>{m.progress||0}% complete</b><span>{(m.participating_agents||[]).join(' • ')}</span></div>{m.steps?.map(s=><div className="stepRow" key={s.id}><span>{s.status==='completed'?'✓':s.status==='failed'?'!':'○'}</span><div><b>{s.agent_name||s.agent_key}</b><small>{s.title}</small></div></div>)}{m.next_action&&<div className="nextAction"><b>Next action</b><span>{m.next_action}</span></div>}</article>)}</div></section>}
+function MissionControl(){
+  const[goal,setGoal]=useState('');
+  const[missions,setMissions]=useState([]);
+  const[busy,setBusy]=useState(false);
+
+  async function load(){
+    setMissions(await api('/api/agentic/missions'));
+  }
+
+  useEffect(()=>{load()},[]);
+
+  async function start(){
+    if(goal.trim().length<3){
+      alert('Describe the outcome you want ValorBuddy agents to complete.');
+      return;
+    }
+    setBusy(true);
+    try{
+      await api('/api/agentic/missions',{method:'POST',body:JSON.stringify({...locationPayload(),goal,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone})});
+      setGoal('');
+      load();
+    }finally{setBusy(false)}
+  }
+
+  return <section className="page" aria-label="Mission Control Center">
+    <div className="operationsHeader">
+      <div className="operationsEyebrow">
+        <Brain size={14} aria-hidden="true"/>
+        <span>Agentic Operations</span>
+      </div>
+      <h1 className="operationsTitle">Mission Control</h1>
+      <p className="operationsLead">Your active plans and next steps. Give ValorBuddy an outcome—the Supervisor Agent coordinates specialist agents, executes tools, and tracks progress.</p>
+    </div>
+
+    <div className="missionComposerCard">
+      <h2>Launch a Mission</h2>
+      <p>Define an objective. Specialist agents (Career, Benefits, Documents, Community) will collaborate to deliver a verified outcome.</p>
+      <textarea
+        value={goal}
+        onChange={e=>setGoal(e.target.value)}
+        placeholder="Example: Analyze my resume, suggest three civilian career paths, and build a tailored resume for a senior operations role."
+        aria-label="Mission objective"
+      />
+      <button className="primary actionButton" type="button" disabled={busy||!goal.trim()} onClick={start}>
+        <Brain size={16} aria-hidden="true"/>
+        <span>{busy?'Supervisor coordinating agents...':'Send mission to Supervisor Agent'}</span>
+      </button>
+    </div>
+
+    {busy && (
+      <div className="calmLoadingIndicator" role="status">
+        <RefreshCw size={15} className="spin" aria-hidden="true"/>
+        <span>Supervisor Agent coordinating specialist agents and executing mission steps...</span>
+      </div>
+    )}
+
+    <div className="benefitsSectionTitle">
+      <h3>Active Plans & Operations</h3>
+      {missions.length > 0 && <span className="statusPill approved">{missions.length} mission{missions.length === 1 ? '' : 's'}</span>}
+    </div>
+
+    {missions.length === 0 ? (
+      <div className="upcomingEmpty">
+        <Brain size={24} style={{color:'var(--branch-accent)', marginBottom:'8px'}} aria-hidden="true"/>
+        <p><b>No active missions yet</b><br/>Define an outcome above to start an agentic workflow with your personal AI team.</p>
+      </div>
+    ) : (
+      <div className="missionList">
+        {missions.map(m => (
+          <article className="missionCard" key={m.id}>
+            <div className="missionCardTop">
+              <div>
+                <span className="missionUidTag">{m.mission_uid || 'MISSION'}</span>
+                <h3 className="missionTitle">{m.title || 'Mission in progress'}</h3>
+              </div>
+              <span className={`statusPill ${m.status || 'planned'}`}>{(m.status || 'planned').replaceAll('_', ' ')}</span>
+            </div>
+            <p className="missionGoal">{m.goal}</p>
+            <div className="progressTrack">
+              <i style={{width: `${m.progress || 0}%`}}/>
+            </div>
+            <div className="missionMeta">
+              <b>{m.progress || 0}% complete</b>
+              {m.participating_agents?.length > 0 && (
+                <div className="agentStrip">
+                  {m.participating_agents.map(a => (
+                    <span className="agentBadge" key={a}>{a.replaceAll('_', ' ')}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+            {m.steps?.length > 0 && (
+              <div className="agentStepGrid">
+                {m.steps.map((s, idx) => (
+                  <div className="agentStep" key={s.id || `s-${idx}`}>
+                    <span className={`agentStepStatus ${s.status === 'completed' ? 'completed' : s.status === 'running' ? 'running' : s.status === 'failed' ? 'failed' : 'pending'}`}>
+                      {s.status === 'completed' ? '✓' : s.status === 'running' ? '…' : s.status === 'failed' ? '!' : '○'}
+                    </span>
+                    <div>
+                      <b>{s.agent_name || s.agent_key}</b>
+                      <small>{s.title}</small>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {m.next_action && (
+              <div className="nextActionBanner">
+                <ChevronRight size={14} aria-hidden="true"/>
+                <span><b>Next action:</b> {m.next_action}</span>
+              </div>
+            )}
+          </article>
+        ))}
+      </div>
+    )}
+  </section>;
+}
 
 function CareerBusiness({user}){
-  const[type,setType]=useState('resume');const[target,setTarget]=useState(user.civilian_career_goal||user.business_interest||'');const[notes,setNotes]=useState('');const[docs,setDocs]=useState([]);const[current,setCurrent]=useState(null);const[busy,setBusy]=useState(false);
-  async function load(){setDocs(await api('/api/career/documents'))}
+  const[type,setType]=useState('resume');
+  const[target,setTarget]=useState(user.civilian_career_goal||user.business_interest||'');
+  const[notes,setNotes]=useState('');
+  const[docs,setDocs]=useState([]);
+  const[current,setCurrent]=useState(null);
+  const[busy,setBusy]=useState(false);
+
+  async function load(){
+    setDocs(await api('/api/career/documents'));
+  }
+
   useEffect(()=>{load()},[]);
-  async function generate(){if(target.trim().length<2){alert('Enter the target role or business idea before sending this request to the Career Agent.');return;}setBusy(true);try{const d=await api('/api/career/generate',{method:'POST',body:JSON.stringify({document_type:type,target,notes})});setCurrent(d);load()}catch(e){alert(e.message)}finally{setBusy(false)}}
-  return <section className="page readablePage"><h1>Career & Business Studio</h1><p className="pageLead">Use your MOS, military role, uploaded resume, education, certifications, career goal, and business interests to produce a verified draft without invented credentials.</p><div className="careerLayout"><div className="featureForm darkForm"><label><span>What should ValorBuddy build?</span><select value={type} onChange={e=>setType(e.target.value)}><option value="resume">Civilian resume</option><option value="cover_letter">Cover letter</option><option value="career_plan">Career transition plan</option><option value="business_plan">Veteran business plan</option></select></label><label><span>Target role or business idea</span><input value={target} onChange={e=>setTarget(e.target.value)} placeholder="Example: Senior Operations Manager"/></label><label className="wide"><span>Extra instructions</span><textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Include leadership, logistics, team management, certifications, and measurable outcomes..."/></label><button className="primary actionButton wideAction" type="button" disabled={busy} onClick={generate}><Briefcase/>{busy?'Career Agent working...':'Send to Career Agent and generate draft'}</button></div><aside className="readinessCard"><h3>Agent readiness</h3><p><b>MOS:</b> {user.military_mos||'Add to profile'}</p><p><b>Military role:</b> {user.military_job_title||'Add to profile'}</p><p><b>Career goal:</b> {user.civilian_career_goal||'Add to profile'}</p><p><b>Business interest:</b> {user.business_interest||'Add to profile'}</p></aside></div>{current&&<article className="generatedDoc readableDocument"><div className="pageTitleRow"><h2>{current.title}</h2><button onClick={()=>navigator.clipboard?.writeText(current.content)}>Copy</button></div><pre>{current.content}</pre></article>}<h2>Saved drafts</h2><div className="contentGrid">{docs.length===0&&<div className="emptyState"><Briefcase/><h3>No drafts yet</h3><p>Create a resume, transition plan, cover letter, or business plan.</p></div>}{docs.map(d=><article className="contentCard" key={d.id}><h3>{d.title}</h3><p>{d.target}</p><small>{d.document_type} • {d.status}</small><button onClick={()=>setCurrent(d)}>Open draft</button></article>)}</div></section>
+
+  async function generate(){
+    if(target.trim().length<2){
+      alert('Enter the target role or business idea before sending this request to the Career Agent.');
+      return;
+    }
+    setBusy(true);
+    try{
+      const d=await api('/api/career/generate',{method:'POST',body:JSON.stringify({document_type:type,target,notes})});
+      setCurrent(d);
+      load();
+    }catch(e){
+      alert(e.message);
+    }finally{setBusy(false)}
+  }
+
+  return <section className="page readablePage" aria-label="Career and Business Studio">
+    <div className="operationsHeader">
+      <div className="operationsEyebrow">
+        <Briefcase size={14} aria-hidden="true"/>
+        <span>Veteran Operations</span>
+      </div>
+      <h1 className="operationsTitle">Career & Business</h1>
+      <p className="operationsLead">Translate your military experience into civilian opportunities. Use your service record, MOS, and leadership background to build verified career drafts.</p>
+    </div>
+
+    <div className="mosFlowBanner" aria-label="Military to Civilian Translation Workflow">
+      <div className="mosFlowStep">
+        <span>Step 1: Military Experience</span>
+        <b>{user.military_mos ? `${user.military_mos} · ${user.military_job_title || 'Specialist'}` : 'Your MOS & Service Record'}</b>
+      </div>
+      <span className="mosFlowArrow" aria-hidden="true">→</span>
+      <div className="mosFlowStep">
+        <span>Step 2: Transferable Skills</span>
+        <b>Leadership & Technical Alignment</b>
+      </div>
+      <span className="mosFlowArrow" aria-hidden="true">→</span>
+      <div className="mosFlowStep">
+        <span>Step 3: Civilian Opportunities</span>
+        <b>{user.civilian_career_goal || 'Tailored Resume & Planning'}</b>
+      </div>
+    </div>
+
+    <div className="careerLayout">
+      <div className="careerFormCard">
+        <div className="featureForm darkForm">
+          <label>
+            <span className="fieldLabel">Document type</span>
+            <select value={type} onChange={e=>setType(e.target.value)} disabled={busy} aria-label="Select career document type">
+              <option value="resume">Civilian resume</option>
+              <option value="cover_letter">Cover letter</option>
+              <option value="career_plan">Career transition plan</option>
+              <option value="business_plan">Veteran business plan</option>
+            </select>
+          </label>
+          <label>
+            <span className="fieldLabel">Target role or business idea</span>
+            <input value={target} onChange={e=>setTarget(e.target.value)} placeholder="Example: Senior Operations Manager" disabled={busy} aria-label="Target role or business idea"/>
+          </label>
+          <label className="wide">
+            <span className="fieldLabel">Extra instructions & focus areas</span>
+            <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Include leadership, logistics, team management, certifications, and measurable outcomes..." disabled={busy} aria-label="Extra instructions"/>
+          </label>
+          <button className="primary actionButton wideAction" type="button" disabled={busy} onClick={generate}>
+            <Briefcase size={16} aria-hidden="true"/>
+            <span>{busy?'Career Agent working...':'Generate Verified Draft'}</span>
+          </button>
+        </div>
+      </div>
+
+      <aside className="readinessCard" aria-label="Profile Context Readiness">
+        <h3><Shield size={16} aria-hidden="true"/><span>Agent Readiness</span></h3>
+        <p className="muted" style={{fontSize:'12px', margin:'0 0 8px'}}>Verified profile context supplied to the Career Agent:</p>
+        <div className="mosReadinessItem">
+          <span>MOS / AFSC / Rating</span>
+          <b>{user.military_mos || 'Not provided — update in Profile'}</b>
+        </div>
+        <div className="mosReadinessItem">
+          <span>Military Job Title</span>
+          <b>{user.military_job_title || 'Not provided — update in Profile'}</b>
+        </div>
+        <div className="mosReadinessItem">
+          <span>Civilian Career Goal</span>
+          <b>{user.civilian_career_goal || 'Not provided — update in Profile'}</b>
+        </div>
+        <div className="mosReadinessItem">
+          <span>Business Interest</span>
+          <b>{user.business_interest || 'Not provided — update in Profile'}</b>
+        </div>
+      </aside>
+    </div>
+
+    {busy && (
+      <div className="calmLoadingIndicator" role="status">
+        <RefreshCw size={15} className="spin" aria-hidden="true"/>
+        <span>Career Agent translating military duties, formatting accomplishments, and generating verified draft...</span>
+      </div>
+    )}
+
+    {current && (
+      <article className="generatedDoc readableDocument" aria-label="Generated Draft Output">
+        <div className="generatedDocHeader">
+          <h2>{current.title}</h2>
+          <button type="button" className="actionButton" onClick={()=>navigator.clipboard?.writeText(current.content)}>
+            <FileText size={14} aria-hidden="true"/>
+            <span>Copy to clipboard</span>
+          </button>
+        </div>
+        <pre>{current.content}</pre>
+      </article>
+    )}
+
+    <div className="benefitsSectionTitle">
+      <h3>Saved Drafts & Career Documents</h3>
+      {docs.length > 0 && <span className="statusPill approved">{docs.length} draft{docs.length === 1 ? '' : 's'}</span>}
+    </div>
+
+    {docs.length === 0 ? (
+      <div className="upcomingEmpty">
+        <Briefcase size={24} style={{color:'var(--branch-accent)', marginBottom:'8px'}} aria-hidden="true"/>
+        <p><b>No drafts yet</b><br/>Create your first civilian resume, transition plan, cover letter, or business plan above.</p>
+      </div>
+    ) : (
+      <div className="contentGrid">
+        {docs.map(d => (
+          <article className="contentCard" key={d.id}>
+            <div className="cardTop">
+              <h3>{d.title}</h3>
+              <span className="statusPill approved">{(d.status || d.document_type || 'draft').replaceAll('_', ' ')}</span>
+            </div>
+            <p><b>Target:</b> {d.target}</p>
+            <small className="muted">{d.document_type?.replaceAll('_', ' ')}</small>
+            <div className="cardActions" style={{marginTop:'auto', paddingTop:'10px'}}>
+              <button type="button" onClick={() => setCurrent(d)}>
+                <span>Open draft</span>
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+    )}
+  </section>;
 }
 
 function Admin({onPreview,vendorOnly=false}){

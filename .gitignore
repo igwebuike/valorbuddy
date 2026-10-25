@@ -10,3 +10,11 @@ venv/
 frontend/node_modules/
 frontend/dist/
 backend/uploads/
+*.db
+*.sqlite
+*.sqlite3
+scratch/
+frontend/src/style.legacy.css
+frontend/test_*.mjs
+frontend/inspect_other_pages.mjs
+docs/screenshots/
