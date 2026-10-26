@@ -44,7 +44,10 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./valorbuddy.db")
 SECRET_KEY = os.getenv("SECRET_KEY", "")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"))
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")
+CORS_ORIGINS = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173,https://valorbuddy-frontend-staging.onrender.com",
+)
 # Prefer the dedicated ValorBuddy Gemini key.
 # GOOGLE_API_KEY remains a backward-compatible fallback only.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -1576,6 +1579,8 @@ async def apply_security_controls(request: Request, call_next):
 
 
 origins = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()]
+if "https://valorbuddy-frontend-staging.onrender.com" not in origins:
+    origins.append("https://valorbuddy-frontend-staging.onrender.com")
 allowed_origins = origins or ["http://localhost:5173", "http://127.0.0.1:5173"]
 app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(SECURITY_SETTINGS.allowed_hosts))
 app.add_middleware(
