@@ -116,12 +116,40 @@ main {
   font-size: 10px;
   font-weight: var(--vb-font-weight-bold);
   letter-spacing: 0.08em;
-  padding: 2px 7px;
+  padding: 3px 8px;
   border-radius: var(--vb-radius-sm);
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.5);
   color: #fca5a5;
   text-transform: uppercase;
+  flex-shrink: 0;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.15);
+}
+
+.healthSafetyAlert {
+  color: #fecaca;
+  background: rgba(220, 38, 38, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.38);
+  border-radius: var(--vb-radius-sm);
+  padding: 3px 10px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.06), 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.healthSafetyAlert .healthSafetyImportant {
+  color: #ff6b6b;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  background: rgba(239, 68, 68, 0.28);
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  display: inline-block;
 }
 
 .healthSafetyActions {

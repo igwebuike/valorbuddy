@@ -518,7 +518,9 @@ function HealthSafetyNotice(){
   return <aside className="healthSafetyNotice" role="note" aria-label="Veterans Crisis and Emergency Support">
     <div className="healthSafetyInfo">
       <span className="healthSafetyBadge">CRISIS SUPPORT</span>
-      <span><b>Important:</b> Informational & organizational support only. Not emergency or medical service. Free confidential support 24/7:</span>
+      <span className="healthSafetyAlert">
+        <b className="healthSafetyImportant">Important:</b> Informational & organizational support only. Not emergency or medical service. Free confidential support 24/7:
+      </span>
     </div>
     <div className="healthSafetyActions">
       <a className="crisisAction emergencyAction" href="tel:911" aria-label="Call 911 for emergencies">Emergency: 911</a>
