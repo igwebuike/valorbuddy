@@ -17,8 +17,8 @@ body {
   background-color: var(--vb-bg-canvas);
   color: var(--vb-text-primary);
   font-family: var(--vb-font-sans);
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: var(--vb-font-size-base, 16px);
+  line-height: 1.55;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
@@ -958,30 +958,41 @@ aside.sidebar {
 }
 
 .tacticalAvatar {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: var(--vb-radius-full);
   background: #0b1a12;
   border: 1.5px solid var(--vb-accent-emerald);
   color: var(--vb-accent-gold);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   flex-shrink: 0;
+  user-select: none;
+}
+
+.tacticalAvatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: var(--vb-radius-full);
+  display: block;
 }
 
 .tacticalStatusDot {
   position: absolute;
   bottom: -1px;
   right: -1px;
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: var(--vb-accent-emerald);
   border: 1.5px solid var(--vb-bg-canvas);
+  box-shadow: 0 0 6px var(--vb-accent-emerald);
+  z-index: 2;
 }
 
 .tacticalUserInfo {

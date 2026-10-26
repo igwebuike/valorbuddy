@@ -1011,7 +1011,7 @@ function Sidebar({user,screen,setScreen,mobileOpen,onLogout}){
         ['companion','AI Battle Buddy',Brain],
         ['benefits','Benefits & VA Claims',Search],
         ['events','Veteran Community',MapPin],
-        ['documents','DD-214 & Secure Vault',Lock],
+        ['documents','Document vault',Lock],
         ['career','Career & Business',Briefcase]
       ]
     },
@@ -1069,7 +1069,15 @@ function Sidebar({user,screen,setScreen,mobileOpen,onLogout}){
           aria-label="Open profile"
         >
           <div className="tacticalAvatar">
-            <span>{initials}</span>
+            {(user.avatar_url || user.profile_data?.avatar_url || localStorage.getItem('valor_user_avatar')) ? (
+              <img
+                className="tacticalAvatarImg"
+                src={user.avatar_url || user.profile_data?.avatar_url || localStorage.getItem('valor_user_avatar')}
+                alt={`${user.first_name || 'User'} avatar`}
+              />
+            ) : (
+              <span>{initials}</span>
+            )}
             <div className="tacticalStatusDot" title="Active Battle Ready" />
           </div>
           <div className="tacticalUserInfo">
@@ -1246,10 +1254,6 @@ function Hero({user, setScreen}){
           <p className="tacticalSubtitle">
             {b.motto || 'Duty. Honor. Support.'} Your AI Battle Buddy is ready to assist with benefits, claims, and transition.
           </p>
-        </div>
-        <div className="heroBranchBadge">
-          <img className="heroBranchEmblem" src={b.emblem} alt="" aria-hidden="true"/>
-          <span>{branchName} COMMUNITY</span>
         </div>
       </div>
 
@@ -1946,14 +1950,14 @@ function Dashboard({user,setScreen}){
                 tabIndex={0}
                 onClick={() => setScreen('documents')}
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') setScreen('documents'); }}
-                aria-label="Personal Document Vault Studio"
+                aria-label="Document Vault Studio"
               >
                 <div>
                   <div className="studioCardTop">
-                    <span className="studioEyebrow">SECURE VAULT</span>
+                    <span className="studioEyebrow">DOCUMENT VAULT</span>
                     <Folder size={16} color="var(--branch-accent)" aria-hidden="true"/>
                   </div>
-                  <h4 className="studioTitle">Personal Document Vault</h4>
+                  <h4 className="studioTitle">Document vault</h4>
                   <p className="studioDesc">
                     Organize, encrypt, and inspect your DD-214 discharge papers, medical records, and civilian documents.
                   </p>
@@ -1967,47 +1971,9 @@ function Dashboard({user,setScreen}){
           </section>
         </div>
 
-        {/* Right Column: Voice Battle Buddy + Crisis Support */}
+        {/* Right Column: Voice Battle Buddy */}
         <div className="dashboardRightCol">
           <VoicePanel user={user}/>
-
-          <aside className="dashboardSupportCard" aria-label="Support and confidentiality information">
-            <div className="supportCardHeader">
-              <Shield size={16} aria-hidden="true"/>
-              <h4>Veteran Support & Safety</h4>
-            </div>
-            <p>
-              ValorBuddy enforces strict client-side data isolation. If you or a fellow veteran need immediate assistance, crisis resources are available 24/7.
-            </p>
-            <div className="supportEmergencyRow">
-              <a
-                href="tel:988"
-                className="supportEmergencyBtn crisis"
-                aria-label="Veterans Crisis Line: Dial 988, then press 1"
-              >
-                📞 988, Press 1 (Crisis)
-              </a>
-              <a
-                href="tel:911"
-                className="supportEmergencyBtn emergency"
-                aria-label="Emergency Services: Dial 911"
-              >
-                🚨 911 Emergency
-              </a>
-            </div>
-            <div className="supportCardActions">
-              <button
-                type="button"
-                className="supportLinkBtn"
-                onClick={() => setScreen('tutorial')}
-                aria-label="Open ValorBuddy Tutorial"
-              >
-                <BookOpen size={14} aria-hidden="true"/>
-                <span>New to ValorBuddy? Open Tutorial</span>
-                <ChevronRight size={14} aria-hidden="true"/>
-              </button>
-            </div>
-          </aside>
         </div>
       </div>
     </div>
@@ -2841,7 +2807,41 @@ function getYouTubeEmbed(raw){try{const u=new URL(raw);let id='';if(u.hostname==
 function getSpotifyEmbed(raw){try{const u=new URL(raw);if(!u.hostname.endsWith('spotify.com'))return '';const parts=u.pathname.split('/').filter(Boolean);const allowed=['track','album','artist','playlist','episode','show'];const index=parts.findIndex(x=>allowed.includes(x));if(index<0||!parts[index+1])return '';return `https://open.spotify.com/embed/${parts[index]}/${parts[index+1]}?utm_source=generator&theme=0`}catch{return ''}}
 function getAppleMusicEmbed(raw){try{const u=new URL(raw);if(u.hostname!=='music.apple.com')return '';return `https://embed.music.apple.com${u.pathname}${u.search}`}catch{return ''}}
 function getSoundCloudEmbed(raw){try{const u=new URL(raw);if(!u.hostname.endsWith('soundcloud.com'))return '';return `https://w.soundcloud.com/player/?url=${encodeURIComponent(raw)}&color=%2357e86e&auto_play=false&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=true`}catch{return ''}}
-function mediaEmbed(provider,raw){const kind=mediaProviders[provider]?.kind;if(!raw)return '';if(kind==='youtube')return getYouTubeEmbed(raw);if(kind==='spotify')return getSpotifyEmbed(raw);if(kind==='apple')return getAppleMusicEmbed(raw);if(kind==='soundcloud')return getSoundCloudEmbed(raw);return ''}
+function ProviderLogo({name, size=18}){
+  switch(name){
+    case 'Spotify':
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="#1DB954"><circle cx="12" cy="12" r="12"/><path fill="#121212" d="M17.5 16.2c-.2.3-.5.4-.8.2-2.3-1.4-5.2-1.7-8.6-.9-.3.1-.7-.1-.8-.4-.1-.3.1-.7.4-.8 3.7-.8 7-.5 9.6 1.1.3.2.4.5.2.8zm1.2-2.7c-.3.4-.8.5-1.1.3-2.6-1.6-6.6-2.1-9.7-1.1-.4.1-.9-.1-1-.5-.1-.4.1-.9.5-1 3.5-1.1 7.9-.5 10.9 1.3.4.2.5.7.4 1zm.1-2.8c-3.1-1.9-8.3-2-11.3-1.1-.5.1-1-.1-1.2-.6-.1-.5.1-1 .6-1.2 3.5-1.1 9.2-.9 12.8 1.3.4.3.6.9.3 1.3-.2.5-.8.6-1.2.3z"/></svg>;
+    case 'YouTube Music':
+      return <svg width={size} height={size} viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#FF0000"/><circle cx="12" cy="12" r="6" fill="#181818"/><polygon points="10,9 15,12 10,15" fill="#FFFFFF"/></svg>;
+    case 'YouTube':
+      return <svg width={size} height={size} viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#FF0000"/><polygon points="9.5,7.5 16.5,12 9.5,16.5" fill="#FFFFFF"/></svg>;
+    case 'Apple Music':
+      return <svg width={size} height={size} viewBox="0 0 24 24"><defs><linearGradient id="apG" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#FA243C"/><stop offset="100%" stopColor="#FC3C44"/></linearGradient></defs><rect width="24" height="24" rx="5" fill="url(#apG)"/><path fill="#FFFFFF" d="M17.3 6.8c-.8.1-4.7.9-6 1.2v6.6c-.4-.3-.9-.4-1.5-.4-1.5 0-2.8 1.1-2.8 2.5 0 1.4 1.2 2.5 2.8 2.5 1.5 0 2.7-1.1 2.7-2.5V10.8l4.4-.9v3.4c-.4-.3-1-.4-1.5-.4-1.5 0-2.8 1.1-2.8 2.5 0 1.4 1.2 2.5 2.8 2.5 1.5 0 2.7-1.1 2.7-2.5V7.6c0-.5-.4-.9-.8-.8z"/></svg>;
+    case 'SoundCloud':
+      return <svg width={size} height={size} viewBox="0 0 24 24" fill="#FF5500"><path d="M18.5 11c-.3 0-.6.1-.9.2C17.1 8.8 14.8 7 12 7c-2.3 0-4.3 1.2-5.3 3.1-.4-.1-.8-.1-1.2-.1-2.5 0-4.5 2-4.5 4.5S3 19 5.5 19h13c2.5 0 4.5-2 4.5-4.5s-2-3.5-4.5-3.5z"/></svg>;
+    case 'Veteran TV':
+      return <svg width={size} height={size} viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#102f18"/><polygon points="12,5 14.2,9.4 19,10.1 15.5,13.5 16.3,18.3 12,16 7.7,18.3 8.5,13.5 5,10.1 9.8,9.4" fill="#E5C158"/></svg>;
+    case 'iHeartRadio':
+      return <svg width={size} height={size} viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#C6002B"/><path fill="#FFFFFF" d="M12 18.5l-1.3-1.2C5.9 12.9 3 10.2 3 7c0-2.2 1.8-4 4-4 1.3 0 2.5.6 3.3 1.5.8-.9 2-1.5 3.3-1.5 2.2 0 4 1.8 4 4 0 3.2-2.9 5.9-7.7 10.3L12 18.5z"/></svg>;
+    case 'SiriusXM':
+      return <svg width={size} height={size} viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#0000EB"/><circle cx="12" cy="12" r="7" stroke="#FFFFFF" strokeWidth="2" fill="none"/><polygon points="12,8 13.2,10.8 16.2,11.2 14,13.3 14.5,16.2 12,14.8 9.5,16.2 10,13.3 7.8,11.2 10.8,10.8" fill="#FFFFFF"/></svg>;
+    case 'Amazon Music':
+      return <svg width={size} height={size} viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#00A8E1"/><path fill="#FFFFFF" d="M7 16c3 2 7 2 10 0 .3-.2.6.1.4.4-3.5 2.5-7.5 2.5-11 0-.2-.2.2-.6.6-.4z"/><circle cx="9" cy="10" r="2.5" fill="#FFFFFF"/><circle cx="15" cy="8" r="2.5" fill="#FFFFFF"/></svg>;
+    case 'Pandora':
+      return <svg width={size} height={size} viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#005483"/><path fill="#FFFFFF" d="M7 5h6.5c3.6 0 6 2.2 6 5.5s-2.4 5.5-6 5.5H11v3H7V5zm4 7.5h2.2c1.6 0 2.8-.9 2.8-2.5s-1.2-2.5-2.8-2.5H11v5z"/></svg>;
+    case 'TIDAL':
+      return <svg width={size} height={size} viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#000000"/><polygon points="7,8 9.5,5.5 12,8 9.5,10.5" fill="#00FFFF"/><polygon points="2,8 4.5,5.5 7,8 4.5,10.5" fill="#00FFFF"/><polygon points="12,8 14.5,5.5 17,8 14.5,10.5" fill="#00FFFF"/><polygon points="7,13 9.5,10.5 12,13 9.5,15.5" fill="#00FFFF"/></svg>;
+    case 'Deezer':
+      return <svg width={size} height={size} viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#1a1829"/><rect x="4" y="14" width="2.5" height="5" rx="1" fill="#FF0000"/><rect x="8" y="10" width="2.5" height="9" rx="1" fill="#FF7F00"/><rect x="12" y="6" width="2.5" height="13" rx="1" fill="#FFFF00"/><rect x="16" y="9" width="2.5" height="10" rx="1" fill="#00FF00"/><rect x="20" y="13" width="2.5" height="6" rx="1" fill="#0000FF"/></svg>;
+    case 'Audiomack':
+      return <svg width={size} height={size} viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#FFA200"/><polygon points="8,16 12,7 16,16 13.5,16 12,12.5 10.5,16" fill="#000000"/></svg>;
+    case 'TuneIn':
+      return <svg width={size} height={size} viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#1C2038"/><circle cx="12" cy="12" r="5" stroke="#36B4A7" strokeWidth="2.5" fill="none"/><line x1="12" y1="4" x2="12" y2="7" stroke="#36B4A7" strokeWidth="2.5" strokeLinecap="round"/></svg>;
+    default:
+      return <Music size={size}/>;
+  }
+}
+
 function MusicPage({user,setUser}){
   const[title,setTitle]=useState('');const[url,setUrl]=useState('');const[mood,setMood]=useState('');const[items,setItems]=useState([]);const[provider,setProvider]=useState('Spotify');const[query,setQuery]=useState('');const[preview,setPreview]=useState(null);const[error,setError]=useState('');const[genres,setGenres]=useState([]);const[newGenre,setNewGenre]=useState('');
   async function load(){setItems(await api('/api/music/favorites'));try{const d=await api('/api/music/genres');setGenres(d.items||[])}catch{setGenres(user?.preferred_music_genres||[])}}
@@ -2862,7 +2862,166 @@ function MusicPage({user,setUser}){
       <h1 className="operationsTitle">Music & Media Center</h1>
       <p className="operationsLead">Choose your own genres, play supported media with approved provider players, and keep favorite playlists and podcasts organized.</p>
     </div>
-    <section className="genreManager"><div><small>YOUR MUSIC PROFILE</small><h2>Music genres</h2><p>Add any genre you enjoy. ValorBuddy can use these preferences when suggesting music.</p></div><div className="genreComposer"><input value={newGenre} onChange={e=>setNewGenre(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addGenre()} placeholder="Add a genre: Gospel, Afrobeats, Jazz, Country..."/><button className="primary actionButton" onClick={addGenre} disabled={!newGenre.trim()}><Plus size={14} aria-hidden="true"/><span>Add genre</span></button></div><div className="genreChips">{genres.length===0?<span className="emptyGenre">No genres added yet.</span>:genres.map(g=><span key={g}>{g}<button aria-label={`Remove ${g}`} onClick={()=>removeGenre(g)}><X size={12} aria-hidden="true"/></button></span>)}</div></section><div className="providerTabs" role="tablist" aria-label="Media providers">{Object.keys(mediaProviders).map(name=><button key={name} className={provider===name?'active':''} onClick={()=>{setProvider(name);setError('');setPreview(null)}}>{name}</button>)}</div><div className="mediaWorkspace"><section className="providerPanel"><div className="providerHeading"><div><small>SELECTED SERVICE</small><h2>{provider}</h2></div><span className={`supportBadge ${selected.kind==='external'?'handoff':'embedded'}`}>{selected.kind==='external'?'Secure handoff':'In-app player'}</span></div><p>{selected.help}</p><div className="mediaSearchRow"><input value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>e.key==='Enter'&&openSearch()} placeholder={`Search ${provider} for an artist, song, playlist, or podcast`}/><button onClick={openSearch}><Search size={14} aria-hidden="true"/>Search {provider}</button></div><label className="mediaUrlField"><span>Paste a specific {provider} content link</span><input value={url} onChange={e=>setUrl(e.target.value)} placeholder={`Paste the copied ${provider} link here`}/></label>{error&&<div className="mediaError">{error}</div>}<div className="mediaActionRow"><button className="primary actionButton" onClick={()=>previewLink()} disabled={!url.trim()&&selected.kind!=='external'}>{selected.kind==='external'?'Open safely':'Preview inside ValorBuddy'}</button><button onClick={()=>window.open(selected.home,'_blank','noopener,noreferrer')}>Visit {provider}</button></div></section><section className="mediaPreviewPanel">{preview?.embed?<><div className="playerTitle"><div><small>NOW READY</small><h3>{preview.provider} player</h3></div><button onClick={()=>setPreview(null)}>Close</button></div><iframe src={preview.embed} title={`${preview.provider} approved player`} allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" allowFullScreen referrerPolicy="strict-origin-when-cross-origin"/></>:preview&&!preview.embed?<div className="handoffCard"><Radio size={16} aria-hidden="true"/><h3>{preview.provider} protects playback outside embedded websites</h3><p>ValorBuddy will keep your saved title and link. Open the service securely without displaying a broken player.</p><button className="primary actionButton" onClick={()=>window.open(preview.source||selected.home,'_blank','noopener,noreferrer')}>Continue to {preview.provider}</button></div>:<div className="playerEmpty"><Music size={24} aria-hidden="true"/><h3>No blank player</h3><p>Choose a provider and paste a supported content link. ValorBuddy will only display an approved player when one is available.</p></div>}</section></div><div className="featureForm darkForm saveMediaForm"><label><span>Favorite title</span><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Example: Gospel classics or veteran podcast"/></label><label><span>Direct content link</span><input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste the track, playlist, podcast, station, or video link"/></label><label><span>Mood or purpose</span><input value={mood} onChange={e=>setMood(e.target.value)} placeholder="Relax, workout, memories, motivation"/></label><button className="primary actionButton" disabled={!title.trim()} onClick={add}><Plus size={14} aria-hidden="true"/><span>Save favorite</span></button></div><h2>Saved media</h2><div className="contentGrid">{items.length===0&&<div className="emptyState"><Music size={24} style={{color:'var(--branch-accent)', marginBottom:'8px'}} aria-hidden="true"/><h3>No saved media yet</h3><p>Save a song, playlist, station, podcast, audiobook, or Veteran TV link.</p></div>}{items.map(x=><article className="contentCard" key={x.id}><h3>{x.title}</h3><p>{x.mood||'Saved favorite'}</p><div className="cardActions">{x.url&&<button onClick={()=>{const match=Object.keys(mediaProviders).find(name=>{try{const host=new URL(x.url).hostname;return(name==='Spotify'&&host.includes('spotify'))||((name==='YouTube'||name==='YouTube Music')&&host.includes('youtube'))||(name==='Apple Music'&&host.includes('music.apple'))||(name==='SoundCloud'&&host.includes('soundcloud'))}catch{return false}})||'Veteran TV';setProvider(match);previewLink(x.url,match)}}>Play or open</button>}<button className="dangerButton" onClick={()=>remove(x.id)}><Trash2 size={13} aria-hidden="true"/>Remove</button></div></article>)}</div></section>;
+    <section className="genreManager">
+      <div>
+        <small>YOUR MUSIC PROFILE</small>
+        <h2>Music genres</h2>
+        <p>Add any genre you enjoy. ValorBuddy can use these preferences when suggesting music.</p>
+      </div>
+      <div className="genreComposer">
+        <input value={newGenre} onChange={e=>setNewGenre(e.target.value)} onKeyDown={e=>e.key==='Enter'&&addGenre()} placeholder="Add a genre: Gospel, Afrobeats, Jazz, Country..."/>
+        <button className="primary actionButton" type="button" onClick={addGenre} disabled={!newGenre.trim()}>
+          <Plus size={14} aria-hidden="true"/>
+          <span>Add genre</span>
+        </button>
+      </div>
+      <div className="genreChips">
+        {genres.length===0?<span className="emptyGenre">No genres added yet.</span>:genres.map(g=><span key={g}>{g}<button type="button" aria-label={`Remove ${g}`} onClick={()=>removeGenre(g)}><X size={12} aria-hidden="true"/></button></span>)}
+      </div>
+    </section>
+    <div className="providerTabs" role="tablist" aria-label="Media providers">
+      {Object.keys(mediaProviders).map(name=>(
+        <button
+          key={name}
+          type="button"
+          className={provider===name?'active':''}
+          onClick={()=>{setProvider(name);setError('');setPreview(null)}}
+        >
+          <span className="providerTabLogo" aria-hidden="true">
+            <ProviderLogo name={name} size={18}/>
+          </span>
+          <span>{name}</span>
+        </button>
+      ))}
+    </div>
+    <div className="mediaWorkspace">
+      <section className="providerPanel">
+        <div className="providerHeading">
+          <div className="providerHeadingLeft">
+            <span className="providerPanelLogo" aria-hidden="true">
+              <ProviderLogo name={provider} size={34}/>
+            </span>
+            <div>
+              <small>SELECTED SERVICE</small>
+              <h2>{provider}</h2>
+            </div>
+          </div>
+          <span className={`supportBadge ${selected.kind==='external'?'handoff':'embedded'}`}>
+            {selected.kind==='external'?'Secure handoff':'In-app player'}
+          </span>
+        </div>
+        <p>{selected.help}</p>
+        <div className="mediaSearchRow">
+          <input
+            value={query}
+            onChange={e=>setQuery(e.target.value)}
+            onKeyDown={e=>e.key==='Enter'&&openSearch()}
+            placeholder={`Search ${provider} for an artist, song, playlist, or podcast`}
+            aria-label={`Search ${provider}`}
+          />
+          <button type="button" onClick={openSearch}>
+            <Search size={15} aria-hidden="true"/>
+            <span>Search {provider}</span>
+          </button>
+        </div>
+        <label className="mediaUrlField">
+          <span>Paste a specific {provider} content link</span>
+          <input
+            value={url}
+            onChange={e=>setUrl(e.target.value)}
+            placeholder={`Paste the copied ${provider} link here`}
+            aria-label={`Specific ${provider} content link`}
+          />
+        </label>
+        {error&&<div className="mediaError">{error}</div>}
+        <div className="mediaActionRow">
+          <button
+            className="primary actionButton"
+            type="button"
+            onClick={()=>previewLink()}
+            disabled={!url.trim()&&selected.kind!=='external'}
+          >
+            {selected.kind==='external'?'Open safely':'Preview inside ValorBuddy'}
+          </button>
+          <button
+            type="button"
+            onClick={()=>window.open(selected.home,'_blank','noopener,noreferrer')}
+          >
+            Visit {provider}
+          </button>
+        </div>
+      </section>
+      <section className="mediaPreviewPanel">
+        {preview?.embed?(
+          <>
+            <div className="playerTitle">
+              <div>
+                <small>NOW READY</small>
+                <h3>{preview.provider} player</h3>
+              </div>
+              <button type="button" onClick={()=>setPreview(null)}>Close</button>
+            </div>
+            <iframe
+              src={preview.embed}
+              title={`${preview.provider} approved player`}
+              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          </>
+        ):preview&&!preview.embed?(
+          <div className="handoffCard">
+            <Radio size={16} aria-hidden="true"/>
+            <h3>{preview.provider} protects playback outside embedded websites</h3>
+            <p>ValorBuddy will keep your saved title and link. Open the service securely without displaying a broken player.</p>
+            <button
+              className="primary actionButton"
+              type="button"
+              onClick={()=>window.open(preview.source||selected.home,'_blank','noopener,noreferrer')}
+            >
+              Continue to {preview.provider}
+            </button>
+          </div>
+        ):(
+          <div className="playerEmpty">
+            <Music size={24} aria-hidden="true"/>
+            <h3>No blank player</h3>
+            <p>Choose a provider and paste a supported content link. ValorBuddy will only display an approved player when one is available.</p>
+          </div>
+        )}
+      </section>
+    </div>
+    <div className="featureForm darkForm saveMediaForm">
+      <label>
+        <span>Favorite title</span>
+        <input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Example: Gospel classics or veteran podcast"/>
+      </label>
+      <label>
+        <span>Direct content link</span>
+        <input value={url} onChange={e=>setUrl(e.target.value)} placeholder="Paste the track, playlist, podcast, station, or video link"/>
+      </label>
+      <label>
+        <span>Mood or purpose</span>
+        <input value={mood} onChange={e=>setMood(e.target.value)} placeholder="Relax, workout, memories, motivation"/>
+      </label>
+      <button className="primary actionButton" type="button" disabled={!title.trim()} onClick={add}>
+        <Plus size={14} aria-hidden="true"/>
+        <span>Save favorite</span>
+      </button>
+    </div>
+    <h2>Saved media</h2>
+    <div className="contentGrid">
+      {items.length===0&&<div className="emptyState"><Music size={24} style={{color:'var(--branch-accent)', marginBottom:'8px'}} aria-hidden="true"/><h3>No saved media yet</h3><p>Save a song, playlist, station, podcast, audiobook, or Veteran TV link.</p></div>}
+      {items.map(x=><article className="contentCard" key={x.id}>
+        <h3>{x.title}</h3>
+        <p>{x.mood||'Saved favorite'}</p>
+        <div className="cardActions">
+          {x.url&&<button type="button" onClick={()=>{const match=Object.keys(mediaProviders).find(name=>{try{const host=new URL(x.url).hostname;return(name==='Spotify'&&host.includes('spotify'))||((name==='YouTube'||name==='YouTube Music')&&host.includes('youtube'))||(name==='Apple Music'&&host.includes('music.apple'))||(name==='SoundCloud'&&host.includes('soundcloud'))}catch{return false}})||'Veteran TV';setProvider(match);previewLink(x.url,match)}}>Play or open</button>}
+          <button type="button" className="dangerButton" onClick={()=>remove(x.id)}><Trash2 size={13} aria-hidden="true"/>Remove</button>
+        </div>
+      </article>)}
+    </div>
+  </section>;
 }
 
 function ProfileField({label,name,form,onChange,saving,wide=false,area=false,placeholder='',help='',type='text',required=false}){
@@ -2878,9 +3037,89 @@ function ProfileField({label,name,form,onChange,saving,wide=false,area=false,pla
 
 function Profile({user,setUser}){
   const[editing,setEditing]=useState(false);const[saving,setSaving]=useState(false);const[message,setMessage]=useState('');
+  const fileInputRef=useRef(null);
   const makeForm=(u)=>({...u,interests:u?.interests||[],accessibility_needs:u?.accessibility_needs||[],preferred_music_genres:u?.preferred_music_genres||[]});
   const[form,setForm]=useState(()=>makeForm(user));
   useEffect(()=>{if(!editing)setForm(makeForm(user))},[user,editing]);
+
+  const currentAvatar = user.avatar_url || user.profile_data?.avatar_url || localStorage.getItem('valor_user_avatar') || '';
+  const initials = `${(user.first_name||'V')[0]||'V'}${(user.last_name||'B')[0]||'B'}`.toUpperCase();
+
+  function handleAvatarUpload(e){
+    const file = e.target.files?.[0];
+    if(!file) return;
+    if(!file.type.startsWith('image/')){
+      alert('Please select a valid image file (JPEG, PNG, WebP).');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDim = 320;
+        let w = img.width;
+        let h = img.height;
+        if(w > h){
+          if(w > maxDim){
+            h = Math.round((h * maxDim) / w);
+            w = maxDim;
+          }
+        } else {
+          if(h > maxDim){
+            w = Math.round((w * maxDim) / h);
+            h = maxDim;
+          }
+        }
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        try {
+          localStorage.setItem('valor_user_avatar', dataUrl);
+        } catch {}
+        const updatedProfileData = { ...(user.profile_data || {}), avatar_url: dataUrl };
+        const updatedUser = { ...user, avatar_url: dataUrl, profile_data: updatedProfileData };
+        if(setUser) setUser(updatedUser);
+        setForm(prev => ({ ...prev, avatar_url: dataUrl, profile_data: updatedProfileData }));
+        api('/api/profile', {
+          method: 'POST',
+          body: JSON.stringify({
+            ...form,
+            first_name: String(form.first_name || user.first_name || 'Veteran').trim(),
+            avatar_url: dataUrl,
+            profile_data: updatedProfileData
+          })
+        }).catch(() => {});
+        setMessage('Profile photo updated successfully.');
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  }
+
+  function handleRemoveAvatar(){
+    try {
+      localStorage.removeItem('valor_user_avatar');
+    } catch {}
+    const updatedProfileData = { ...(user.profile_data || {}), avatar_url: '' };
+    const updatedUser = { ...user, avatar_url: '', profile_data: updatedProfileData };
+    if(setUser) setUser(updatedUser);
+    setForm(prev => ({ ...prev, avatar_url: '', profile_data: updatedProfileData }));
+    api('/api/profile', {
+      method: 'POST',
+      body: JSON.stringify({
+        ...form,
+        first_name: String(form.first_name || user.first_name || 'Veteran').trim(),
+        avatar_url: '',
+        profile_data: updatedProfileData
+      })
+    }).catch(() => {});
+    setMessage('Profile photo removed.');
+  }
+
   async function beginEdit(){setMessage('');try{const fresh=await api('/api/profile');setForm(makeForm(fresh))}catch{setForm(makeForm(user))}setEditing(true)}
   async function save(){if(!String(form.first_name||'').trim()){setMessage('First name is required.');return}setSaving(true);setMessage('');try{const d=await api('/api/profile',{method:'POST',body:JSON.stringify({...form,first_name:String(form.first_name||'').trim(),last_name:String(form.last_name||'').trim(),years_of_service:form.years_of_service!==''&&form.years_of_service!=null?Number(form.years_of_service):null})});setUser(d);setForm(makeForm(d));setEditing(false);setMessage('Profile saved successfully.')}catch(e){setMessage(e.message||'Profile could not be saved.')}finally{setSaving(false)}}
   function cancel(){setForm(makeForm(user));setMessage('');setEditing(false)}
@@ -2907,6 +3146,55 @@ function Profile({user,setUser}){
       </div>
     </div>
     {message&&<div className="profileMessage" role="status">{message}</div>}
+
+    {/* Tactical Profile Picture Manager */}
+    <div className="profileAvatarSection" aria-label="Profile Picture Manager">
+      <div className="profileAvatarPreviewWrap">
+        <div className="profileAvatarCircle">
+          {currentAvatar ? (
+            <img src={currentAvatar} alt={`${user.first_name || 'Veteran'} portrait`} />
+          ) : (
+            <span>{initials}</span>
+          )}
+        </div>
+        <div className="profileAvatarStatusDot" title="Command Ready" />
+      </div>
+
+      <div className="profileAvatarDetails">
+        <h3 className="profileAvatarTitle">Profile Picture</h3>
+        <p className="profileAvatarDesc">
+          Attach a military portrait or photo. Your photo appears on your battle card, command center avatar, and team credentials.
+        </p>
+        <div className="profileAvatarButtons">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            style={{ display: 'none' }}
+            onChange={handleAvatarUpload}
+          />
+          <button
+            type="button"
+            className="primary actionButton profileAvatarUploadBtn"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Upload size={14} aria-hidden="true" />
+            <span>{currentAvatar ? 'Change profile picture' : 'Upload profile picture'}</span>
+          </button>
+          {currentAvatar && (
+            <button
+              type="button"
+              className="profileAvatarRemoveBtn"
+              onClick={handleRemoveAvatar}
+            >
+              <Trash2 size={13} aria-hidden="true" />
+              <span>Remove</span>
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+
     {editing?<div className="profileEditNotice"><b>Edit mode is on</b><span>Click or tap any field and type normally. Use Tab/Next to move between fields, then Save profile when finished.</span></div>:null}
     {editing?<div className="profileForm labeledProfileForm highReadabilityProfile"><ProfileField {...fieldProps} label="First name" name="first_name" placeholder="Enter your first name" required/><ProfileField {...fieldProps} label="Last name" name="last_name" placeholder="Enter your last name" required/><ProfileField {...fieldProps} label="Military rank" name="rank" placeholder="Example: SSG, CPT, PO1" help="Your current or highest rank."/><label className="profileField" htmlFor="profile-branch"><span className="fieldLabel">Service branch</span><small className="fieldHelp">Select the branch in which you served.</small><select id="profile-branch" value={form.branch||'Army'} onChange={e=>change('branch',e.target.value)} disabled={saving}>{Object.keys(branches).map(x=><option key={x}>{x}</option>)}</select></label><ProfileField {...fieldProps} label="MOS / AFSC / Rating" name="military_mos" placeholder="Example: 25B, 3D0X2, IT" help="Your military occupational specialty code."/><ProfileField {...fieldProps} label="Military job title" name="military_job_title" placeholder="Example: Information Technology Specialist" help="The plain-English title of your military role."/><ProfileField {...fieldProps} label="Years of service" name="years_of_service" type="number" placeholder="Example: 12" help="Total completed years of military service."/><ProfileField {...fieldProps} label="Security clearance" name="security_clearance" placeholder="Example: Secret" help="Only include a current or previously verified clearance."/><ProfileField {...fieldProps} label="Highest education" name="highest_education" placeholder="Example: Bachelor of Science in Information Technology"/><ProfileField {...fieldProps} label="Civilian certifications" name="civilian_certifications" placeholder="Example: Security+, PMP, AWS Solutions Architect" help="Separate multiple certifications with commas."/><ProfileField {...fieldProps} label="Civilian career goal" name="civilian_career_goal" placeholder="Example: Cybersecurity GRC Analyst" help="The role or career field you want ValorBuddy to target."/><ProfileField {...fieldProps} label="LinkedIn profile URL" name="linkedin_url" type="url" placeholder="https://www.linkedin.com/in/your-name"/><ProfileField {...fieldProps} label="Business interest" name="business_interest" wide area placeholder="Describe the business idea or industry you want to explore." help="Used by the Business Plan Agent."/><ProfileField {...fieldProps} label="Military specialty description" name="military_specialty_description" wide area placeholder="Describe your specialty, mission, unit function, and technical focus." help="Explain your MOS or military occupation in your own words."/><ProfileField {...fieldProps} label="Military duties, tools, leadership, and accomplishments" name="military_experience" wide area placeholder="Describe teams led, systems used, missions supported, measurable results, awards, and major responsibilities." help="Used by the Career Agent to translate military experience into civilian resume language."/><ProfileField {...fieldProps} label="Deployment history" name="deployment_history" wide area placeholder="List deployments, locations, dates, and responsibilities you are comfortable sharing." help="Optional. Do not include classified or sensitive information."/><ProfileField {...fieldProps} label="Current city" name="city" placeholder="Example: Dallas"/><ProfileField {...fieldProps} label="State" name="state" placeholder="Example: TX" help="Use the two-letter state abbreviation."/></div>:<div className="profileSummary">{[['Full name',`${user.first_name} ${user.last_name||''}`],['Rank / Branch',`${user.rank||'—'} / ${user.branch}`],['MOS / AFSC / Rating',user.military_mos||'Not provided'],['Military role',user.military_job_title||'Not provided'],['Years served',user.years_of_service||'Not provided'],['Career goal',user.civilian_career_goal||'Not provided'],['Business interest',user.business_interest||'Not provided'],['Education',user.highest_education||'Not provided'],['Certifications',user.civilian_certifications||'Not provided'],['Location',`${user.city||'—'}, ${user.state||'—'}`]].map(([a,b])=><div key={a}><span>{a}</span><b>{b}</b></div>)}</div>}
   </section>;
@@ -2919,7 +3207,7 @@ function Tutorial({setScreen}){
     ['Benefits and VA forms','Open Benefits to search benefit topics, official VA forms, and veteran assistance programs. Ask ValorBuddy to explain any form before opening the official source.','benefits'],
     ['Find nearby activities','Activities uses your current location when permitted and can compare veteran-friendly options, VFW/American Legion locations, and family-friendly activities.','events'],
     ['Save memories and reminders','Use Memories for stories/photos and Reminders for appointments, medications, deadlines, calls, and tasks.','reminders'],
-    ['Documents and career','Upload documents in Document Intelligence, then use Career & Business or Mission Control for structured help.','documents'],
+    ['Document vault and career','Upload documents in Document vault, then use Career & Business or Mission Control for structured help.','documents'],
     ['Personalize music','In Music & Media, add or delete your favorite genres, save specific media, and open supported providers.','music']
   ];
   return <section className="page tutorialPage" aria-label="ValorBuddy Orientation Briefing">

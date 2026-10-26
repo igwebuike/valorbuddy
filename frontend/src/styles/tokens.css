@@ -88,10 +88,20 @@
   --vb-font-weight-black: 800;
   --vb-tracking-tight: -0.02em;
   --vb-tracking-wide: 0.05em;
+
+  /* Enhanced Font Size Scale (WCAG AA & High Readability for Veterans) */
+  --vb-font-size-xs: 12.5px;
+  --vb-font-size-sm: 14px;
+  --vb-font-size-base: 16px;
+  --vb-font-size-md: 17.5px;
+  --vb-font-size-lg: 20px;
+  --vb-font-size-xl: 24px;
+  --vb-font-size-2xl: 28px;
+  --vb-font-size-3xl: 34px;
   
   /* Metrics Scale */
-  --vb-metric-val-size: 2rem;
-  --vb-metric-label-size: 13px;
+  --vb-metric-val-size: 2.25rem;
+  --vb-metric-label-size: 14.5px;
   
   /* Transitions */
   --vb-transition-fast: 150ms ease;

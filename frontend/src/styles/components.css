@@ -7,22 +7,41 @@
 /* --- Buttons --- */
 button {
   font-family: inherit;
-}
-
-.primary,
-.actionButton {
-  min-height: 42px;
+  font-size: var(--vb-font-size-sm, 14.5px);
+  color: var(--vb-text-primary);
+  background: var(--vb-bg-surface-elevated, #12241b);
+  border: 1px solid var(--vb-border-medium, rgba(16, 185, 129, 0.28));
+  border-radius: var(--vb-radius-md);
+  padding: 8px var(--vb-space-14);
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--vb-space-8);
-  padding: 8px var(--vb-space-16);
+  transition: all var(--vb-transition-fast);
+}
+
+button:hover {
+  background: var(--branch-panel-elevated, #183325);
+  border-color: var(--branch-accent, #E5C158);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+.primary,
+.actionButton {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vb-space-8);
+  padding: 9px var(--vb-space-18);
   border-radius: var(--vb-radius-md);
   border: 1px solid var(--branch-primary, #10b981);
   background: var(--branch-primary, #10b981);
   color: #070e0a;
   font-weight: 700;
-  font-size: 13.5px;
+  font-size: 15px;
   letter-spacing: 0.02em;
   cursor: pointer;
   box-shadow: 0 0 14px var(--branch-glow, rgba(16, 185, 129, 0.2));
@@ -168,12 +187,13 @@ input,
 select,
 textarea {
   font-family: inherit;
-  font-size: 14px;
+  font-size: var(--vb-font-size-base, 15.5px);
   color: var(--vb-text-primary);
   background: var(--vb-bg-surface-subtle);
   border: 1px solid var(--vb-border-medium);
   border-radius: var(--vb-radius-sm);
-  padding: 10px var(--vb-space-12);
+  padding: 11px var(--vb-space-14);
+  min-height: 44px;
   transition: border-color var(--vb-transition-fast), box-shadow var(--vb-transition-fast);
 }
 
@@ -225,8 +245,8 @@ textarea::placeholder {
 .darkForm label {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
+  gap: 7px;
+  font-size: var(--vb-font-size-sm, 14px);
   font-weight: var(--vb-font-weight-medium);
   color: var(--vb-text-secondary);
 }
