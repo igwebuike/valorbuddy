@@ -25,10 +25,11 @@ class SecurityTests(unittest.TestCase):
             "SECURITY_ENFORCE_CONFIG": "true",
             "FORCE_HTTPS": "true",
             "ALLOWED_HOSTS": "*",
+            "DATA_ENCRYPTION_KEY": "short",
         }
         with patch.dict(os.environ, env, clear=False):
             settings = SecuritySettings.from_env()
-        findings = configuration_findings(settings, "short", "*")
+            findings = configuration_findings(settings, "short", "*")
         self.assertGreaterEqual(len(findings), 4)
 
     def test_rate_limit_blocks_after_limit(self):

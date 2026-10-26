@@ -127,12 +127,105 @@ function getDemoFallback(path,opts={}){
       ]
     };
   }
-  if(path==='/api/reminders'){
-    return[
-      {id:'r1',title:'VA Telehealth Appointment',due_date:'2026-11-05T14:00:00Z',notes:'Routine check-in with Dr. Miller',completed:false},
-      {id:'r2',title:'Submit DD-214 verification for State Tuition Exemption',due_date:'2026-11-12T17:00:00Z',notes:'Texas Hazlewood Act documentation',completed:false},
-      {id:'r3',title:'VFW Post 8787 Monthly Assembly',due_date:'2026-11-18T18:30:00Z',notes:'Community outreach planning',completed:false}
-    ];
+  if(path==='/api/reminders'||path.startsWith('/api/reminders/')){
+    let stored = [];
+    try {
+      const raw = localStorage.getItem('valor_reminders');
+      if (raw) stored = JSON.parse(raw);
+    } catch {}
+    if (!Array.isArray(stored) || stored.length === 0) {
+      const now = new Date();
+      const tomorrow = new Date(now.getTime() + 24 * 3600 * 1000);
+      const nextWeek = new Date(now.getTime() + 7 * 24 * 3600 * 1000);
+      const inTwoWeeks = new Date(now.getTime() + 14 * 24 * 3600 * 1000);
+      const fmt = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      stored = [
+        {
+          id: 'r1',
+          title: 'VA Telehealth Appointment',
+          date: fmt(tomorrow),
+          time: '14:00',
+          when_text: `Tomorrow at 14:00`,
+          note: 'Routine check-in with Dr. Miller',
+          status: 'upcoming',
+          stored_status: 'active',
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          due_at: tomorrow.toISOString(),
+          delivery_state: 'scheduled'
+        },
+        {
+          id: 'r2',
+          title: 'Submit DD-214 verification for State Tuition Exemption',
+          date: fmt(nextWeek),
+          time: '17:00',
+          when_text: `${fmt(nextWeek)} at 17:00`,
+          note: 'Texas Hazlewood Act documentation',
+          status: 'upcoming',
+          stored_status: 'active',
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          due_at: nextWeek.toISOString(),
+          delivery_state: 'scheduled'
+        },
+        {
+          id: 'r3',
+          title: 'VFW Post 8787 Monthly Assembly',
+          date: fmt(inTwoWeeks),
+          time: '18:30',
+          when_text: `${fmt(inTwoWeeks)} at 18:30`,
+          note: 'Community outreach planning and transition roundtable',
+          status: 'upcoming',
+          stored_status: 'active',
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          due_at: inTwoWeeks.toISOString(),
+          delivery_state: 'scheduled'
+        }
+      ];
+      try { localStorage.setItem('valor_reminders', JSON.stringify(stored)); } catch {}
+    }
+
+    if (opts.method === 'POST') {
+      let body = {};
+      try { body = typeof opts.body === 'string' ? JSON.parse(opts.body) : (opts.body || {}); } catch {}
+      const newReminder = {
+        id: 'r-' + Date.now(),
+        title: body.title || 'Untitled Reminder',
+        date: body.date || '',
+        time: body.time || '09:00',
+        when_text: body.when_text || `${body.date || ''} ${body.time || '09:00'}`.trim(),
+        note: body.note || '',
+        status: 'upcoming',
+        stored_status: 'active',
+        timezone: body.timezone || 'UTC',
+        due_at: body.date ? new Date(`${body.date}T${(body.time || '09:00').slice(0, 5)}:00`).toISOString() : null,
+        delivery_state: 'scheduled'
+      };
+      stored.unshift(newReminder);
+      try { localStorage.setItem('valor_reminders', JSON.stringify(stored)); } catch {}
+      return newReminder;
+    }
+
+    if (opts.method === 'PATCH') {
+      const reminderId = path.replace('/api/reminders/', '');
+      let body = {};
+      try { body = typeof opts.body === 'string' ? JSON.parse(opts.body) : (opts.body || {}); } catch {}
+      const target = stored.find(x => String(x.id) === String(reminderId));
+      if (target) {
+        target.status = body.status || target.status;
+        target.stored_status = body.status || target.stored_status;
+        try { localStorage.setItem('valor_reminders', JSON.stringify(stored)); } catch {}
+        return target;
+      }
+      return { status: 'ok' };
+    }
+
+    if (opts.method === 'DELETE') {
+      const reminderId = path.replace('/api/reminders/', '');
+      stored = stored.filter(x => String(x.id) !== String(reminderId));
+      try { localStorage.setItem('valor_reminders', JSON.stringify(stored)); } catch {}
+      return { ok: true };
+    }
+
+    return stored;
   }
   if(path==='/api/memories'){
     return[
@@ -2379,14 +2472,40 @@ function Memories(){
 
 const reminderTimers=new Map();
 function reminderLocalDate(item){
-  if(!item?.date)return null;
-  const timeValue=(item.time||'09:00').slice(0,5);
-  const d=new Date(`${item.date}T${timeValue}:00`);
-  return Number.isNaN(d.getTime())?null:d;
+  if(!item)return null;
+  if(item.due_at){
+    const d=new Date(item.due_at);
+    if(!Number.isNaN(d.getTime()))return d;
+  }
+  if(item.due_date){
+    const d=new Date(item.due_date);
+    if(!Number.isNaN(d.getTime()))return d;
+  }
+  if(item.date){
+    let timeStr = (item.time || '09:00').trim().toLowerCase();
+    const isPm = timeStr.includes('pm');
+    const isAm = timeStr.includes('am');
+    const cleanTime = timeStr.replace(/am|pm/g, '').trim();
+    const parts = cleanTime.split(':');
+    let h = 9, m = 0;
+    if(parts.length >= 2){
+      h = parseInt(parts[0], 10) || 0;
+      m = parseInt(parts[1], 10) || 0;
+      if(isPm && h < 12) h += 12;
+      else if(isAm && h === 12) h = 0;
+    }
+    const hh = String(h).padStart(2, '0');
+    const mm = String(m).padStart(2, '0');
+    const d = new Date(`${item.date}T${hh}:${mm}:00`);
+    if(!Number.isNaN(d.getTime()))return d;
+  }
+  return null;
 }
 function reminderDisplayStatus(item){
-  if(['completed','cancelled','dismissed'].includes(item?.stored_status||item?.status))return item.stored_status||item.status;
-  const due=reminderLocalDate(item);if(!due)return item?.status||'scheduled';
+  const rawStatus = (item?.stored_status || item?.status || '').toLowerCase();
+  if(['completed','cancelled','dismissed'].includes(rawStatus))return rawStatus;
+  const due=reminderLocalDate(item);
+  if(!due)return item?.status||'upcoming';
   const diff=due.getTime()-Date.now();
   if(diff>5*60*1000)return'upcoming';
   if(diff>=-5*60*1000)return'due now';
@@ -2397,15 +2516,17 @@ async function requestReminderPermission(){
 }
 function fireBrowserReminder(item,missed=false){
   try{
-    if('Notification'in window&&Notification.permission==='granted')new Notification(missed?'ValorBuddy missed reminder':'ValorBuddy Reminder',{body:`${item.title}${item.note?` — ${item.note}`:''}`,tag:`valor-reminder-${item.id}`,renotify:true});
+    if('Notification'in window&&Notification.permission==='granted')new Notification(missed?'ValorBuddy missed reminder':'ValorBuddy Reminder',{body:`${item.title}${item.note||item.notes?` — ${item.note||item.notes}`:''}`,tag:`valor-reminder-${item.id}`,renotify:true});
   }catch{}
 }
 function scheduleBrowserReminder(item){
+  if(!item?.id)return;
   const existing=reminderTimers.get(item.id);if(existing)clearTimeout(existing);
-  if(['completed','cancelled','dismissed'].includes(item.stored_status||''))return;
+  const rawStatus=(item.stored_status||item.status||'').toLowerCase();
+  if(['completed','cancelled','dismissed'].includes(rawStatus))return;
   const due=reminderLocalDate(item);if(!due)return;
   const ms=due.getTime()-Date.now();
-  if(ms<=0){fireBrowserReminder(item,true);return}
+  if(ms<=0)return;
   const maxDelay=2147480000;
   if(ms<=maxDelay){const timer=setTimeout(()=>fireBrowserReminder(item,false),ms);reminderTimers.set(item.id,timer)}
 }
@@ -2414,22 +2535,46 @@ async function scheduleNativeReminder(item){
     const plugin=window.Capacitor?.Plugins?.LocalNotifications;if(!plugin)return false;
     let perm=await plugin.checkPermissions();if(perm?.display!=='granted')perm=await plugin.requestPermissions();if(perm?.display!=='granted')return false;
     const at=reminderLocalDate(item);if(!at||at.getTime()<=Date.now())return false;
-    await plugin.schedule({notifications:[{id:Number(item.id)%2147483647,title:'ValorBuddy Reminder',body:`${item.title}${item.note?` — ${item.note}`:''}`,schedule:{at},extra:{reminderId:item.id}}]});
+    await plugin.schedule({notifications:[{id:Number(item.id)%2147483647,title:'ValorBuddy Reminder',body:`${item.title}${item.note||item.notes?` — ${item.note||item.notes}`:''}`,schedule:{at},extra:{reminderId:item.id}}]});
     return true;
   }catch(e){console.warn('Native reminder scheduling failed',e);return false}
 }
 
 function Reminders(){
   const[title,setTitle]=useState('');const[date,setDate]=useState('');const[time,setTime]=useState('');const[note,setNote]=useState('');const[items,setItems]=useState([]);const[busy,setBusy]=useState(false);const[notice,setNotice]=useState('');
-  async function load({announce=true}={}){try{const rows=await api('/api/reminders');setItems(rows);rows.forEach(x=>{scheduleBrowserReminder(x);scheduleNativeReminder(x)});const overdue=rows.filter(x=>reminderDisplayStatus(x)==='overdue'&&!['completed','cancelled','dismissed'].includes(x.stored_status));if(announce&&overdue.length){setNotice(`${overdue.length} reminder${overdue.length===1?' is':'s are'} overdue. Review ${overdue.length===1?'it':'them'} now.`);overdue.slice(0,3).forEach(x=>fireBrowserReminder(x,true))}else if(!overdue.length)setNotice('')}catch(e){console.warn(e)}}
+  const getLocalTodayDate=()=>{const d=new Date();return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+  async function load({announce=true}={}){try{const rows=await api('/api/reminders');const safeRows=Array.isArray(rows)?rows:(rows?.items||[]);setItems(safeRows);safeRows.forEach(x=>{scheduleBrowserReminder(x);scheduleNativeReminder(x)});const overdue=safeRows.filter(x=>reminderDisplayStatus(x)==='overdue'&&!['completed','cancelled','dismissed'].includes((x.stored_status||x.status||'').toLowerCase()));if(announce&&overdue.length){setNotice(`${overdue.length} reminder${overdue.length===1?' is':'s are'} overdue. Review ${overdue.length===1?'it':'them'} now.`);overdue.slice(0,3).forEach(x=>fireBrowserReminder(x,true))}else if(!overdue.length)setNotice('')}catch(e){console.warn(e)}}
   useEffect(()=>{load();const timer=setInterval(()=>load({announce:false}),60000);return()=>clearInterval(timer)},[]);
   async function save(){
     if(!title.trim()){alert('Enter a reminder title before saving.');return}
     if(!date){alert('Choose a reminder date.');return}
-    const localDue=new Date(`${date}T${(time||'09:00').slice(0,5)}:00`);if(Number.isNaN(localDue.getTime())||localDue.getTime()<=Date.now()){alert('Choose a future date and time for this reminder.');return}
-    setBusy(true);try{const permission=await requestReminderPermission();const created=await api('/api/reminders',{method:'POST',body:JSON.stringify({title:title.trim(),date,time:time||'09:00',when_text:`${date} ${time||'09:00'}`,note:note.trim(),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'})});scheduleBrowserReminder(created);const nativeScheduled=await scheduleNativeReminder(created);setTitle('');setDate('');setTime('');setNote('');setNotice(nativeScheduled?'Reminder saved with an on-device notification that can fire even when the app is closed.':permission==='denied'?'Reminder saved. Browser notifications are blocked; ValorBuddy will still flag overdue reminders when you return, and server email can deliver when enabled.':'Reminder saved. Browser notification is scheduled while ValorBuddy is open; server email fallback can deliver when enabled.');await load({announce:false})}catch(e){alert(e.message)}finally{setBusy(false)}}
+    const todayStr=getLocalTodayDate();
+    if(date<todayStr){alert('Please choose today or a future date for this reminder.');return}
+    let chosenTime=(time||'').trim();
+    if(!chosenTime){
+      if(date===todayStr){
+        const nextHour=new Date(Date.now()+60*60*1000);
+        chosenTime=`${String(nextHour.getHours()).padStart(2,'0')}:00`;
+      }else{
+        chosenTime='09:00';
+      }
+    }
+    const localDue=new Date(`${date}T${chosenTime.slice(0,5)}:00`);
+    if(Number.isNaN(localDue.getTime())){alert('Please choose a valid reminder date and time.');return}
+    setBusy(true);
+    try{
+      const permission=await requestReminderPermission();
+      const created=await api('/api/reminders',{method:'POST',body:JSON.stringify({title:title.trim(),date,time:chosenTime,when_text:`${date} ${chosenTime}`,note:note.trim(),timezone:Intl.DateTimeFormat().resolvedOptions().timeZone||'UTC'})});
+      if(created&&created.id){scheduleBrowserReminder(created);await scheduleNativeReminder(created)}
+      setTitle('');setDate('');setTime('');setNote('');
+      setNotice(permission==='denied'?'Reminder saved. Browser notifications are blocked; ValorBuddy will still flag overdue reminders when you return, and server email can deliver when enabled.':'Reminder saved and scheduled. ValorBuddy will notify you when it is due.');
+      await load({announce:false});
+    }catch(e){alert(e.message||'Could not schedule reminder.')}
+    finally{setBusy(false)}
+  }
   async function setStatus(id,status){try{await api(`/api/reminders/${id}`,{method:'PATCH',body:JSON.stringify({status})});await load({announce:false})}catch(e){alert(e.message)}}
   async function remove(id,title){if(!window.confirm(`Delete reminder “${title}”?`))return;try{await api(`/api/reminders/${id}`,{method:'DELETE'});const timer=reminderTimers.get(id);if(timer)clearTimeout(timer);reminderTimers.delete(id);await load({announce:false})}catch(e){alert(e.message)}}
+  const todayStr=getLocalTodayDate();
   return <section className="page readablePage" aria-label="Reminders and Deadlines">
     <div className="operationsHeader">
       <div className="operationsEyebrow">
@@ -2442,8 +2587,8 @@ function Reminders(){
     {notice&&<div className="reminderNotice"><Bell size={16} aria-hidden="true"/><span>{notice}</span></div>}
     <div className="featureForm darkForm">
       <label><span className="fieldLabel">Reminder title</span><input value={title} onChange={e=>setTitle(e.target.value)} placeholder="Example: VA C&P Examination appointment" aria-label="Reminder title"/></label>
-      <label><span className="fieldLabel">Date</span><input type="date" value={date} min={new Date().toISOString().slice(0,10)} onChange={e=>setDate(e.target.value)} aria-label="Reminder date"/></label>
-      <label><span className="fieldLabel">Time</span><input type="time" value={time} onChange={e=>setTime(e.target.value)} aria-label="Reminder time"/><small>If no time is chosen, ValorBuddy defaults to 09:00 AM.</small></label>
+      <label><span className="fieldLabel">Date</span><input type="date" value={date} min={todayStr} onChange={e=>setDate(e.target.value)} aria-label="Reminder date"/></label>
+      <label><span className="fieldLabel">Time</span><input type="time" value={time} onChange={e=>setTime(e.target.value)} aria-label="Reminder time"/><small>{date===todayStr?'If no time is chosen, ValorBuddy defaults to 1 hour from now.':'If no time is chosen, ValorBuddy defaults to 09:00 AM.'}</small></label>
       <label className="wide"><span className="fieldLabel">Notes & Instructions</span><textarea value={note} onChange={e=>setNote(e.target.value)} placeholder="Location, documents to bring (STRs, DBQs), doctor name..." aria-label="Reminder notes"/></label>
       <button className="primary actionButton wideAction" type="button" disabled={busy} onClick={save}><Bell size={16} aria-hidden="true"/><span>{busy?'Scheduling reminder...':'Create and schedule reminder'}</span></button>
     </div>
@@ -2453,7 +2598,27 @@ function Reminders(){
     </div>
     <div className="contentGrid">
       {items.length===0&&<div className="emptyState"><Bell size={24} style={{color:'var(--branch-accent)', marginBottom:'8px'}} aria-hidden="true"/><h3>No reminders yet</h3><p>Create a reminder above for an appointment, deadline, call, or task.</p></div>}
-      {items.map(item=>{const status=reminderDisplayStatus(item);return <article className={`contentCard reminderCard reminder-${String(status).replace(/\s+/g,'-')}`} key={item.id}><div className="cardTop"><h3>{item.title}</h3><span className="statusPill">{status}</span></div><p className="strongLine">{item.when_text||[item.date,item.time].filter(Boolean).join(' ')||'No date selected'}</p>{item.note&&<p>{item.note}</p>}<small>{item.delivery_state==='email sent'?'Email reminder sent':status==='upcoming'?'Scheduled and active':status==='overdue'?'This time has passed — complete or dismiss.':''}</small><div className="reminderActions" style={{marginTop:'auto', paddingTop:'10px'}}>{!['completed','cancelled','dismissed'].includes(item.stored_status)&&<button type="button" onClick={()=>setStatus(item.id,'completed')}>Mark complete</button>}{status==='overdue'&&<button type="button" onClick={()=>setStatus(item.id,'dismissed')}>Dismiss</button>}<button type="button" className="dangerButton" onClick={()=>remove(item.id,item.title)}><Trash2 size={13} aria-hidden="true"/><span>Delete</span></button></div></article>})}
+      {items.map(item=>{
+        const status=reminderDisplayStatus(item);
+        const rawStatus=(item.stored_status||item.status||'').toLowerCase();
+        const isActionable=!['completed','cancelled','dismissed'].includes(rawStatus);
+        const displayWhen=item.when_text||(item.date?[item.date,item.time].filter(Boolean).join(' '):(item.due_at?new Date(item.due_at).toLocaleString():(item.due_date?new Date(item.due_date).toLocaleString():'Scheduled reminder')));
+        const displayNote=item.note||item.notes||'';
+        return <article className={`contentCard reminderCard reminder-${String(status).replace(/\s+/g,'-')}`} key={item.id}>
+          <div className="cardTop">
+            <h3>{item.title}</h3>
+            <span className="statusPill">{status}</span>
+          </div>
+          <p className="strongLine">{displayWhen}</p>
+          {displayNote&&<p>{displayNote}</p>}
+          <small>{item.delivery_state==='email sent'?'Email reminder sent':status==='upcoming'?'Scheduled and active':status==='overdue'?'This time has passed — complete or dismiss.':''}</small>
+          <div className="reminderActions" style={{marginTop:'auto', paddingTop:'10px'}}>
+            {isActionable&&<button type="button" onClick={()=>setStatus(item.id,'completed')}>Mark complete</button>}
+            {status==='overdue'&&isActionable&&<button type="button" onClick={()=>setStatus(item.id,'dismissed')}>Dismiss</button>}
+            <button type="button" className="dangerButton" onClick={()=>remove(item.id,item.title)}><Trash2 size={13} aria-hidden="true"/><span>Delete</span></button>
+          </div>
+        </article>
+      })}
     </div>
   </section>;
 }

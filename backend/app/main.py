@@ -1398,7 +1398,7 @@ Answer naturally and specifically. Include spouse, child, dependent, caregiver, 
         if not reminder_date or not reminder_time:
             return {"response": f"{first_name}, I can save that reminder, but I need the exact date and time first.", "intent": "clarification", "data": {"awaiting_clarification": True, "default_query": message}}
         due_at = reminder_due_at(reminder_date, reminder_time, reminder_tz)
-        if not due_at or due_at <= datetime.now(timezone.utc):
+        if not due_at or due_at <= datetime.now(timezone.utc) - timedelta(minutes=15):
             return {"response": f"{first_name}, that reminder time has already passed or could not be understood. Give me a future date and time and I’ll schedule it.", "intent": "clarification", "data": {"awaiting_clarification": True, "default_query": message}}
         when_text = f"{reminder_date} {reminder_time}"
         reminder_id = None
@@ -1470,17 +1470,58 @@ Answer the user's actual request directly and stay on that single topic. Do not 
     return {"response": response, "intent": intent, "data": {"plan": plan, "grounded": use_grounding}}
 
 
+def resolve_timezone(timezone_name: str, dt: datetime | None = None) -> timezone | ZoneInfo:
+    tz_str = (timezone_name or "").strip()
+    if not tz_str or tz_str.upper() == "UTC":
+        return timezone.utc
+    try:
+        return ZoneInfo(tz_str)
+    except Exception:
+        pass
+    lower = tz_str.lower()
+    is_dst = True
+    if dt:
+        m, d = dt.month, dt.day
+        is_dst = (m > 3 or (m == 3 and d >= 8)) and (m < 11 or (m == 11 and d <= 7))
+    if any(k in lower for k in ["eastern", "new_york", "est", "edt"]):
+        return timezone(timedelta(hours=-4 if is_dst else -5))
+    if any(k in lower for k in ["central", "chicago", "cst", "cdt"]):
+        return timezone(timedelta(hours=-5 if is_dst else -6))
+    if any(k in lower for k in ["mountain", "denver", "mst", "mdt"]):
+        return timezone(timedelta(hours=-6 if is_dst else -7))
+    if any(k in lower for k in ["phoenix", "arizona"]):
+        return timezone(timedelta(hours=-7))
+    if any(k in lower for k in ["pacific", "los_angeles", "pst", "pdt"]):
+        return timezone(timedelta(hours=-7 if is_dst else -8))
+    if any(k in lower for k in ["alaska", "anchorage", "akst", "akdt"]):
+        return timezone(timedelta(hours=-8 if is_dst else -9))
+    if any(k in lower for k in ["hawaii", "honolulu", "hst"]):
+        return timezone(timedelta(hours=-10))
+    return timezone.utc
+
+
 def reminder_due_at(date_text: str, time_text: str, timezone_name: str = "UTC") -> datetime | None:
     date_text = (date_text or "").strip()
     time_text = (time_text or "").strip() or "09:00"
     if not date_text:
         return None
     try:
-        local_dt = datetime.fromisoformat(f"{date_text}T{time_text[:5]}:00")
-        try:
-            tz = ZoneInfo((timezone_name or "UTC").strip())
-        except Exception:
-            tz = timezone.utc
+        is_pm = "pm" in time_text.lower()
+        is_am = "am" in time_text.lower()
+        clean = time_text.lower().replace("am", "").replace("pm", "").strip()
+        parts = clean.split(":")
+        if len(parts) >= 2:
+            h = int(parts[0].strip())
+            m = int(parts[1].strip()[:2])
+            if is_pm and h < 12:
+                h += 12
+            elif is_am and h == 12:
+                h = 0
+            time_normalized = f"{h:02d}:{m:02d}"
+        else:
+            time_normalized = "09:00"
+        local_dt = datetime.fromisoformat(f"{date_text}T{time_normalized}:00")
+        tz = resolve_timezone(timezone_name or "UTC", dt=local_dt)
         return local_dt.replace(tzinfo=tz).astimezone(timezone.utc)
     except Exception:
         return None
@@ -2323,8 +2364,8 @@ def create_reminder(payload: ReminderIn, user: User = Depends(get_current_user),
     due_at = reminder_due_at(payload.date, payload.time, payload.timezone)
     if payload.date and not due_at:
         raise HTTPException(status_code=400, detail="Please choose a valid reminder date and time")
-    if due_at and due_at <= datetime.now(timezone.utc):
-        raise HTTPException(status_code=400, detail="Reminder time must be in the future")
+    if due_at and due_at <= datetime.now(timezone.utc) - timedelta(minutes=15):
+        raise HTTPException(status_code=400, detail="Reminder date and time must be today or in the future")
     row = Reminder(
         user_id=user.id, title=title, date=payload.date, time=payload.time,
         when_text=payload.when_text or f"{payload.date} {payload.time}".strip(), note=payload.note,
