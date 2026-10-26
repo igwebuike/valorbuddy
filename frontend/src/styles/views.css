@@ -3107,8 +3107,6 @@
   border-radius: 3px;
   border: 1px solid rgba(255, 255, 255, 0.35);
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.4), 0 0 8px var(--vb-accent-emerald-glow);
-  transform-origin: left center;
-  animation: flagFlutter 3.6s ease-in-out infinite, flagSheen 3.6s ease-in-out infinite;
   flex-shrink: 0;
 }
 

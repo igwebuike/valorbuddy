@@ -309,37 +309,6 @@ header.topbar {
   flex-shrink: 0;
 }
 
-/* Patriotic Flag Flutter & Sheen Animations */
-@keyframes flagFlutter {
-  0% {
-    transform: perspective(350px) rotateY(0deg) rotateZ(0deg) skewY(0deg) translateY(0);
-  }
-  22% {
-    transform: perspective(350px) rotateY(-13deg) rotateZ(1deg) skewY(2.2deg) translateY(-1px);
-  }
-  48% {
-    transform: perspective(350px) rotateY(8deg) rotateZ(-0.8deg) skewY(-1.6deg) translateY(0.8px);
-  }
-  74% {
-    transform: perspective(350px) rotateY(-7deg) rotateZ(0.6deg) skewY(1.3deg) translateY(-0.5px);
-  }
-  100% {
-    transform: perspective(350px) rotateY(0deg) rotateZ(0deg) skewY(0deg) translateY(0);
-  }
-}
-
-@keyframes flagSheen {
-  0%, 100% {
-    filter: brightness(0.98) contrast(1.05) drop-shadow(0 2px 4px rgba(0, 0, 0, 0.45));
-  }
-  30% {
-    filter: brightness(1.22) contrast(1.12) drop-shadow(3px 3px 6px rgba(0, 0, 0, 0.6));
-  }
-  65% {
-    filter: brightness(0.9) contrast(1.04) drop-shadow(1px 2px 4px rgba(0, 0, 0, 0.5));
-  }
-}
-
 .topbarBranchEmblem {
   width: 54px;
   height: 35px;
@@ -347,15 +316,12 @@ header.topbar {
   border-radius: 4px;
   border: 1.5px solid rgba(255, 255, 255, 0.4);
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55), 0 0 16px var(--vb-accent-emerald-glow);
-  transform-origin: 0% 50%;
-  animation: flagFlutter 3.4s ease-in-out infinite, flagSheen 3.4s ease-in-out infinite;
   flex-shrink: 0;
-  transition: transform 0.3s ease, filter 0.3s ease;
+  transition: transform 0.25s ease, filter 0.25s ease;
 }
 
 .topbarBranchEmblem:hover {
-  animation-duration: 1.8s;
-  transform: scale(1.08);
+  transform: scale(1.04);
 }
 
 .topbarMissionTitle {
@@ -430,8 +396,6 @@ header.topbar {
   border-radius: 3.5px;
   border: 1.2px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
-  transform-origin: 0% 50%;
-  animation: flagFlutter 3.8s ease-in-out infinite, flagSheen 3.8s ease-in-out infinite;
   flex-shrink: 0;
   transition: 
     width 0.32s cubic-bezier(0.16, 1, 0.3, 1),
@@ -440,14 +404,6 @@ header.topbar {
     border-color 0.25s ease,
     box-shadow 0.25s ease;
 }
-
-/* Staggered Patriotic Waving Animation Delays for Natural Wind Dynamic */
-.branchPill--army .pillBranchEmblem { animation-delay: 0s; }
-.branchPill--navy .pillBranchEmblem { animation-delay: -0.65s; }
-.branchPill--airforce .pillBranchEmblem { animation-delay: -1.3s; }
-.branchPill--marines .pillBranchEmblem { animation-delay: -1.95s; }
-.branchPill--coastguard .pillBranchEmblem { animation-delay: -2.6s; }
-.branchPill--spaceforce .pillBranchEmblem { animation-delay: -3.25s; }
 
 .branchPip {
   width: 6px;
@@ -528,10 +484,9 @@ header.topbar {
 }
 
 .branchPill:hover .pillBranchEmblem {
-  transform: scale(1.12);
-  border-color: rgba(255, 255, 255, 0.7);
-  animation-duration: 1.6s;
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.4), 0 2px 6px rgba(0, 0, 0, 0.5);
+  transform: scale(1.06);
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.3), 0 2px 5px rgba(0, 0, 0, 0.5);
 }
 
 .branchPill:hover .branchPip {
@@ -603,7 +558,6 @@ header.topbar {
   border-radius: 4px;
   border: 1.5px solid #ffffff;
   box-shadow: 0 0 12px rgba(255, 255, 255, 0.5), 0 3px 8px rgba(0, 0, 0, 0.65);
-  animation: flagFlutter 2.8s ease-in-out infinite, flagSheen 2.8s ease-in-out infinite;
 }
 
 .branchPill.active .branchPip {
@@ -1080,15 +1034,12 @@ aside.sidebar {
   border-radius: 3px;
   border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
-  transform-origin: left center;
-  animation: flagFlutter 4s ease-in-out infinite, flagSheen 4s ease-in-out infinite;
   flex-shrink: 0;
   transition: transform 0.25s ease;
 }
 
 .branchIdentityBanner:hover .branchEmblemMini {
-  animation-duration: 2s;
-  transform: scale(1.06);
+  transform: scale(1.04);
 }
 
 .branchIdentityDetails {
@@ -1423,12 +1374,4 @@ aside.sidebar {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .topbarBranchEmblem,
-  .pillBranchEmblem,
-  .branchEmblemMini,
-  .heroBranchEmblem {
-    animation: none !important;
-    transform: none !important;
-  }
-}
+
