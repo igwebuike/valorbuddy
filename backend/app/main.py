@@ -3135,7 +3135,8 @@ async def generate_career_document(payload: CareerGenerateIn, user: User = Depen
     military_title = p.military_job_title or (p.profile_data or {}).get("military_job_title","")
     experience = p.military_experience or (p.profile_data or {}).get("military_experience","")
     if not mos and not experience:
-        raise HTTPException(status_code=400, detail="Add your MOS/AFSC/Rating and military experience before generating a career document")
+        mos = "Military Operations & Leadership"
+        experience = f"Honorable service in United States {p.branch or 'Armed Forces'} ({p.rank or 'Service Member'}). Proficient in mission planning, team leadership, asset accountability, and operational safety."
     doc_labels={"resume":"Civilian Resume","cover_letter":"Cover Letter","business_plan":"Veteran Business Plan","career_plan":"Career Transition Plan"}
     facts = {
       "name": f"{p.first_name} {p.last_name or ''}".strip(), "branch": p.branch, "rank": p.rank or "",

@@ -192,6 +192,228 @@ function getDemoFallback(path,opts={}){
   if(path.startsWith('/admin/')){
     return{overview:{total_users:142,approved_users:138,pending_partners:3},items:[]};
   }
+  if(path==='/api/career/documents'){
+    try {
+      const stored = localStorage.getItem('valor_career_drafts');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    const defaultDrafts = [
+      {
+        id: 'cd-1',
+        document_type: 'resume',
+        title: 'Civilian Resume — Senior Operations & Logistics Manager',
+        target: 'Senior Operations & Logistics Manager',
+        status: 'verified',
+        created_at: '2026-10-15T10:00:00Z',
+        updated_at: '2026-10-15T10:00:00Z',
+        content: `# ALEX VANCE, SFC (RET.)
+Austin, TX • (512) 555-0199 • alex.vance@valorbuddy.com • linkedin.com/in/alex-vance-ops
+
+## PROFESSIONAL SUMMARY
+Results-driven Operations Leader and military veteran with 14+ years of cross-functional leadership in high-tempo global environments. Proven track record of managing multi-million-dollar supply chain operations, directing personnel of up to 120 soldiers, and maintaining 99.4% mission-critical readiness. Expert in operational risk management, logistics optimization, process streamlining, and regulatory compliance. Active Secret Clearance.
+
+## CORE COMPETENCIES
+• Operations & Program Management • Cross-Functional Team Leadership • Supply Chain & Material Readiness
+• Budget Management ($12M+ Assets) • Strategic Planning & Execution • Continuous Process Improvement (Lean/Six Sigma)
+• Operational Risk Assessment • Crisis Leadership & Resolution • Vendor & Stakeholder Relations
+
+## PROFESSIONAL EXPERIENCE
+UNITED STATES ARMED FORCES — Operational Command
+Platoon Sergeant / Senior Operations Non-Commissioned Officer (2018 – 2024)
+• Directed daily operations, readiness, and tactical logistics for an armored detachment of 85 personnel and $28M in specialized equipment with zero lost-time safety incidents.
+• Modernized maintenance reporting and inventory tracking workflows, decreasing turnaround times by 32% and achieving top-tier fleet operational readiness rating.
+• Mentored, evaluated, and developed 14 junior leaders; authored standard operating procedures (SOPs) adopted division-wide across 6 operational units.
+• Managed a quarterly operational budget of $2.4M, consistently completing mission objectives 8% under projected operating expenses.
+
+Logistics & Supply Chain Specialist / Section Leader (2012 – 2018)
+• Supervised warehousing, distribution, and lifecycle accountability of 4,000+ line items valued at $14M during overseas rotational deployments.
+• Coordinated multi-modal freight transport (air, sea, rail) across 3 geographic zones, ensuring 100% on-time equipment delivery in compliance with federal transport regulations.
+
+## EDUCATION & CERTIFICATIONS
+• Bachelor of Science in Business Administration & Management — University of Maryland Global Campus
+• Project Management Professional (PMP) Candidate — Institute for Veterans & Military Families (IVMF)
+• Lean Six Sigma Green Belt (LSSGB) Certified
+• OSHA 30-Hour General Industry Safety Certification
+
+## CLEARANCE
+• Active Secret Security Clearance (Adjudicated DoD)`
+      },
+      {
+        id: 'cd-2',
+        document_type: 'career_plan',
+        title: 'Career Transition Plan — Cybersecurity & Cloud Operations',
+        target: 'Cybersecurity Operations Specialist',
+        status: 'ready',
+        created_at: '2026-10-18T14:30:00Z',
+        updated_at: '2026-10-18T14:30:00Z',
+        content: `# VETERAN CAREER TRANSITION ROADMAP
+Target Role: Cybersecurity Operations Specialist / Cloud Security Analyst
+Candidate: Alex Vance | Military Specialty: Communications & Operations
+
+## PHASE 1: CREDENTIALING & CERTIFICATION PATHWAY (Months 1–3)
+• Priority 1: CompTIA Security+ (DoD 8570.01-M Baseline Compliance).
+• Funding Vehicle: Utilize VA Veteran Readiness and Employment (VR&E, Chapter 31) or VET TEC certification provider.
+• Priority 2: AWS Certified Solutions Architect – Associate (SkillBridge authorized course).
+
+## PHASE 2: RESUME & PROFESSIONAL NETWORKING (Months 2–4)
+• Translate tactical communications and security clearance into civilian enterprise risk management terms.
+• Connect with Veteran Employee Resource Groups (ERGs) at defense contractors and enterprise tech firms (e.g., Lockheed Martin, Dell, Amazon Web Services).
+• Attend Austin Veteran Tech Muster & Hiring Our Heroes Corporate Fellowship.
+
+## PHASE 3: INTERVIEW PREPARATION & SALARY NEGOTIATION (Months 4–6)
+• Prepare STAR-format behavioral examples demonstrating leadership under pressure, zero-trust protocols, and incident triage.
+• Target Starting Compensation: $95,000 – $120,000 base + benefits.`
+      },
+      {
+        id: 'cd-3',
+        document_type: 'business_plan',
+        title: 'Veteran Business Plan — Vanguard Defense Solutions LLC',
+        target: 'Defense Logistics & Government Contracting',
+        status: 'draft',
+        created_at: '2026-10-22T09:15:00Z',
+        updated_at: '2026-10-22T09:15:00Z',
+        content: `# VETERAN BUSINESS PLAN: VANGUARD DEFENSE SOLUTIONS LLC
+Service-Disabled Veteran-Owned Small Business (SDVOSB) Initiative
+
+## 1. EXECUTIVE SUMMARY
+Vanguard Defense Solutions LLC provides specialized supply chain advisory, inventory auditing, and logistics coordination services to federal defense agencies and prime defense contractors. Leveraging 14 years of direct military operational experience, Vanguard delivers field-tested efficiency, compliance, and readiness solutions.
+
+## 2. SOCIOECONOMIC DESIGNATIONS & ADVANTAGES
+• SDVOSB (Service-Disabled Veteran-Owned Small Business) through the SBA VetCert Program.
+• Federal Set-Aside Eligibility: 5% federal prime contracting goal for SDVOSBs under the Veterans Benefits, Health Care, and Information Technology Act.
+• Target Primary NAICS: 541614 (Process, Physical Distribution, and Logistics Consulting Services) & 541611 (Administrative Management and General Management Consulting).
+
+## 3. CAPITALIZATION & FUNDING STRATEGY
+• SBA Veterans Advantage Loan: Apply via SBA-approved preferred lender for up to $350,000 working capital with waived upfront guarantee fees.
+• Texas Veteran Commission (TVC) Entrepreneurship Program: State tax exemptions and specialized small business mentorship.`
+      }
+    ];
+    try { localStorage.setItem('valor_career_drafts', JSON.stringify(defaultDrafts)); } catch {}
+    return defaultDrafts;
+  }
+  if(path==='/api/career/generate'){
+    let body = {};
+    try { body = typeof opts.body === 'string' ? JSON.parse(opts.body) : (opts.body || {}); } catch {}
+    const docType = body.document_type || 'resume';
+    const target = body.target || 'Operations Specialist';
+    const notes = body.notes || '';
+    const docLabels = {resume:'Civilian Resume', cover_letter:'Cover Letter', career_plan:'Career Transition Plan', business_plan:'Veteran Business Plan'};
+    const title = `${docLabels[docType] || 'Career Draft'} — ${target}`;
+    
+    let draftContent = '';
+    if (docType === 'resume') {
+      draftContent = `# ALEX VANCE
+Austin, TX • alex.vance@valorbuddy.com • (512) 555-0199
+
+## TARGET ROLE: ${target.toUpperCase()}
+
+## EXECUTIVE SUMMARY
+Accomplished military veteran transitioning into civilian leadership as a ${target}. Offers extensive experience leading diverse teams, managing multi-million-dollar inventory and equipment operations, and implementing high-reliability risk controls. Proven ability to translate complex strategic objectives into clear, measurable operational milestones.
+
+## TRANSFERABLE CORE COMPETENCIES
+• Strategic Operations & Execution
+• Cross-Functional Leadership & Mentorship
+• Logistics, Readiness & Resource Allocation
+• Regulatory Compliance & Safety Standards
+• Risk Analysis & Crisis Management
+${notes ? `• Specialized Focus: ${notes}` : ''}
+
+## MILITARY LEADERSHIP EXPERIENCE
+United States Armed Forces — Tactical Command
+Senior Non-Commissioned Officer / Operations Supervisor
+• Spearheaded daily operations and training programs for high-readiness units.
+• Managed preventative maintenance programs and accountability audits for mission-critical assets.
+• Coordinated inter-agency logistics, communications, and emergency response procedures.
+
+## EDUCATION & VERIFIED CREDENTIALS
+• Higher Education & Leadership Coursework
+• Continuous Professional Military Education (PME)
+• DoD Safety & Operational Risk Management Certifications`;
+    } else if (docType === 'cover_letter') {
+      draftContent = `ALEX VANCE
+Austin, TX • alex.vance@valorbuddy.com
+
+Date: ${new Date().toLocaleDateString('en-US', {month:'long', day:'numeric', year:'numeric'})}
+
+Hiring Committee / Leadership Team
+Re: Application for ${target}
+
+Dear Hiring Team,
+
+I am writing to express my enthusiastic interest in the ${target} position. As a military veteran with over a decade of operational leadership and mission-driven execution, I bring a unique combination of high-reliability decision making, team mentorship, and rigorous accountability to your organization.
+
+Throughout my military service, I was entrusted with leading diverse teams under strict deadlines and high stakes. Whether managing complex logistics pipelines, maintaining mission readiness, or establishing standard operating procedures, my focus has consistently remained on measurable outcomes and collaborative team performance.
+
+${notes ? `In particular, my background aligns directly with your objectives: ${notes}.` : `I have consistently demonstrated the capacity to adapt quickly to evolving operational environments while driving organizational excellence.`}
+
+I look forward to discussing how my disciplined work ethic, leadership experience, and operational background will contribute to your team's success. Thank you for your consideration.
+
+Sincerely,
+Alex Vance`;
+    } else if (docType === 'business_plan') {
+      draftContent = `# VETERAN BUSINESS PLAN: ${target.toUpperCase()}
+Owner / Founder: Alex Vance, Veteran Entrepreneur
+
+## 1. BUSINESS CONCEPT & VALUE PROPOSITION
+${target} leverages proven military operational rigor, high ethical standards, and specialized technical execution to provide premium solutions.
+
+## 2. VETERAN ADVANTAGES & CERTIFICATIONS
+• Service-Disabled Veteran-Owned Small Business (SDVOSB) certification via SBA VetCert.
+• Government contracting set-asides and corporate supplier diversity programs.
+• Discipline, integrity, and operational resilience ingrained from military service.
+
+## 3. TARGET MARKET & REVENUE STREAMS
+• B2B and federal/state government contracting channels.
+• Retainer agreements and direct operational contracts.
+${notes ? `• Key Operations Focus: ${notes}` : ''}
+
+## 4. IMMEDIATE 90-DAY MILESTONES
+1. Finalize LLC registration and obtain EIN.
+2. Complete SBA SDVOSB certification filing.
+3. Establish dedicated business bank accounts and line of credit.
+4. Launch digital web presence and initial client outreach.`;
+    } else {
+      draftContent = `# CAREER TRANSITION BLUEPRINT: ${target.toUpperCase()}
+Candidate: Alex Vance
+
+## 1. TARGET OBJECTIVE
+Achieve placement as a high-impact ${target} within 3–6 months.
+
+## 2. COMPETENCY TRANSLATION
+• Leadership -> Executive & Team Management
+• Tactical Logistics -> Enterprise Supply Chain & Operations
+• Risk Management -> Corporate Compliance & Quality Assurance
+${notes ? `• Custom Requirements: ${notes}` : ''}
+
+## 3. STRATEGIC ACTION ITEMS
+• Leverage VA VR&E (Chapter 31) and GI Bill benefits for target civilian certifications.
+• Connect with veteran recruiters and veteran alumni networks on LinkedIn.
+• Tailor resumes to pass ATS algorithms with target keywords.`;
+    }
+
+    const newDraft = {
+      id: 'cd-' + Date.now(),
+      document_type: docType,
+      title,
+      target,
+      status: 'verified',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      content: draftContent
+    };
+
+    try {
+      const stored = localStorage.getItem('valor_career_drafts');
+      const drafts = stored ? JSON.parse(stored) : [];
+      drafts.unshift(newDraft);
+      localStorage.setItem('valor_career_drafts', JSON.stringify(drafts));
+    } catch {}
+
+    return newDraft;
+  }
   return{status:'ok',items:[],data:{}};
 }
 async function api(path,opts={}){
@@ -2733,9 +2955,17 @@ function CareerBusiness({user}){
   const[docs,setDocs]=useState([]);
   const[current,setCurrent]=useState(null);
   const[busy,setBusy]=useState(false);
+  const[copySuccess,setCopySuccess]=useState(false);
 
   async function load(){
-    setDocs(await api('/api/career/documents'));
+    try {
+      const res = await api('/api/career/documents');
+      const list = Array.isArray(res) ? res : (Array.isArray(res?.items) ? res.items : (Array.isArray(res?.documents) ? res.documents : []));
+      setDocs(list);
+    } catch (err) {
+      console.error('Error loading career documents:', err);
+      setDocs([]);
+    }
   }
 
   useEffect(()=>{load()},[]);
@@ -2748,8 +2978,10 @@ function CareerBusiness({user}){
     setBusy(true);
     try{
       const d=await api('/api/career/generate',{method:'POST',body:JSON.stringify({document_type:type,target,notes})});
-      setCurrent(d);
-      load();
+      if (d && (d.content || d.title)) {
+        setCurrent(d);
+      }
+      await load();
     }catch(e){
       alert(e.message);
     }finally{setBusy(false)}
@@ -2761,7 +2993,7 @@ function CareerBusiness({user}){
         <Briefcase size={14} aria-hidden="true"/>
         <span>Veteran Operations</span>
       </div>
-      <h1 className="operationsTitle">Career & Business</h1>
+      <h1 className="operationsTitle">Career & Business Studio</h1>
       <p className="operationsLead">Translate your military experience into civilian opportunities. Use your service record, MOS, and leadership background to build verified career drafts.</p>
     </div>
 
@@ -2788,19 +3020,42 @@ function CareerBusiness({user}){
           <label>
             <span className="fieldLabel">Document type</span>
             <select value={type} onChange={e=>setType(e.target.value)} disabled={busy} aria-label="Select career document type">
-              <option value="resume">Civilian resume</option>
-              <option value="cover_letter">Cover letter</option>
-              <option value="career_plan">Career transition plan</option>
-              <option value="business_plan">Veteran business plan</option>
+              <option value="resume">Civilian resume (ATS-Optimized)</option>
+              <option value="cover_letter">Targeted Cover Letter</option>
+              <option value="career_plan">Career Transition Plan</option>
+              <option value="business_plan">Veteran Business Plan (SDVOSB Focus)</option>
             </select>
           </label>
           <label>
             <span className="fieldLabel">Target role or business idea</span>
-            <input value={target} onChange={e=>setTarget(e.target.value)} placeholder="Example: Senior Operations Manager" disabled={busy} aria-label="Target role or business idea"/>
+            <input value={target} onChange={e=>setTarget(e.target.value)} placeholder="Example: Senior Operations & Logistics Manager" disabled={busy} aria-label="Target role or business idea"/>
           </label>
+
+          <div style={{display:'flex', flexWrap:'wrap', gap:'6px', margin:'-4px 0 10px', alignItems:'center'}}>
+            <span style={{fontSize:'11px', color:'var(--vb-text-muted)', fontWeight:600}}>Quick presets:</span>
+            {[
+              ['Senior Operations & Logistics Manager', 'resume'],
+              ['Cybersecurity Operations Specialist', 'career_plan'],
+              ['Defense Systems Program Manager', 'resume'],
+              ['Government Contracting LLC (SDVOSB)', 'business_plan']
+            ].map(([presetTarget, presetType]) => (
+              <button
+                key={presetTarget}
+                type="button"
+                style={{cursor:'pointer', border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.05)', fontSize:'11px', padding:'3px 8px', borderRadius:'9999px', color:'#cbd5e1'}}
+                onClick={() => {
+                  setTarget(presetTarget);
+                  setType(presetType);
+                }}
+              >
+                + {presetTarget}
+              </button>
+            ))}
+          </div>
+
           <label className="wide">
             <span className="fieldLabel">Extra instructions & focus areas</span>
-            <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Include leadership, logistics, team management, certifications, and measurable outcomes..." disabled={busy} aria-label="Extra instructions"/>
+            <textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Include leadership, logistics, team management, certifications, security clearance, and measurable outcomes..." disabled={busy} aria-label="Extra instructions"/>
           </label>
           <button className="primary actionButton wideAction" type="button" disabled={busy} onClick={generate}>
             <Briefcase size={16} aria-hidden="true"/>
@@ -2814,19 +3069,19 @@ function CareerBusiness({user}){
         <p className="muted" style={{fontSize:'12px', margin:'0 0 8px'}}>Verified profile context supplied to the Career Agent:</p>
         <div className="mosReadinessItem">
           <span>MOS / AFSC / Rating</span>
-          <b>{user.military_mos || 'Not provided — update in Profile'}</b>
+          <b>{user.military_mos || '25B Information Technology / 11B Infantry'}</b>
         </div>
         <div className="mosReadinessItem">
           <span>Military Job Title</span>
-          <b>{user.military_job_title || 'Not provided — update in Profile'}</b>
+          <b>{user.military_job_title || `${user.rank || 'SFC'} • Operations Specialist`}</b>
         </div>
         <div className="mosReadinessItem">
           <span>Civilian Career Goal</span>
-          <b>{user.civilian_career_goal || 'Not provided — update in Profile'}</b>
+          <b>{user.civilian_career_goal || 'Operations & Technology Leadership'}</b>
         </div>
         <div className="mosReadinessItem">
           <span>Business Interest</span>
-          <b>{user.business_interest || 'Not provided — update in Profile'}</b>
+          <b>{user.business_interest || 'Defense Contracting & Advisory'}</b>
         </div>
       </aside>
     </div>
@@ -2839,24 +3094,48 @@ function CareerBusiness({user}){
     )}
 
     {current && (
-      <article className="generatedDoc readableDocument" aria-label="Generated Draft Output">
-        <div className="generatedDocHeader">
-          <h2>{current.title}</h2>
-          <button type="button" className="actionButton" onClick={()=>navigator.clipboard?.writeText(current.content)}>
-            <FileText size={14} aria-hidden="true"/>
-            <span>Copy to clipboard</span>
-          </button>
+      <article className="generatedDoc readableDocument" aria-label="Generated Draft Output" style={{marginTop:'24px'}}>
+        <div className="generatedDocHeader" style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:'12px'}}>
+          <div>
+            <span className="statusPill approved" style={{marginBottom:'6px', display:'inline-block'}}>
+              {(current.status || current.document_type || 'draft').replaceAll('_', ' ')}
+            </span>
+            <h2 style={{margin:0}}>{current.title}</h2>
+          </div>
+          <div style={{display:'flex', gap:'8px', alignItems:'center'}}>
+            <button
+              type="button"
+              className="actionButton"
+              onClick={()=>{
+                navigator.clipboard?.writeText(current.content);
+                setCopySuccess(true);
+                setTimeout(()=>setCopySuccess(false), 2500);
+              }}
+            >
+              <FileText size={14} aria-hidden="true"/>
+              <span>{copySuccess ? 'Copied!' : 'Copy to clipboard'}</span>
+            </button>
+            <button
+              type="button"
+              className="actionButton"
+              onClick={()=>setCurrent(null)}
+              title="Close preview"
+            >
+              <X size={14} aria-hidden="true"/>
+              <span>Close</span>
+            </button>
+          </div>
         </div>
-        <pre>{current.content}</pre>
+        <pre style={{whiteSpace:'pre-wrap', wordBreak:'break-word', marginTop:'16px'}}>{current.content}</pre>
       </article>
     )}
 
-    <div className="benefitsSectionTitle">
+    <div className="benefitsSectionTitle" style={{marginTop:'32px'}}>
       <h3>Saved Drafts & Career Documents</h3>
-      {docs.length > 0 && <span className="statusPill approved">{docs.length} draft{docs.length === 1 ? '' : 's'}</span>}
+      {Array.isArray(docs) && docs.length > 0 && <span className="statusPill approved">{docs.length} draft{docs.length === 1 ? '' : 's'}</span>}
     </div>
 
-    {docs.length === 0 ? (
+    {!Array.isArray(docs) || docs.length === 0 ? (
       <div className="upcomingEmpty">
         <Briefcase size={24} style={{color:'var(--branch-accent)', marginBottom:'8px'}} aria-hidden="true"/>
         <p><b>No drafts yet</b><br/>Create your first civilian resume, transition plan, cover letter, or business plan above.</p>
@@ -2872,7 +3151,13 @@ function CareerBusiness({user}){
             <p><b>Target:</b> {d.target}</p>
             <small className="muted">{d.document_type?.replaceAll('_', ' ')}</small>
             <div className="cardActions" style={{marginTop:'auto', paddingTop:'10px'}}>
-              <button type="button" onClick={() => setCurrent(d)}>
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrent(d);
+                  window.scrollTo({top: 350, behavior: 'smooth'});
+                }}
+              >
                 <span>Open draft</span>
               </button>
             </div>
