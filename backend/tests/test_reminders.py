@@ -75,8 +75,9 @@ class ReminderTests(unittest.TestCase):
 class ReminderApiTests(unittest.TestCase):
     def setUp(self):
         from fastapi.testclient import TestClient
-        from app.main import app, get_current_user, User, SessionLocal, Reminder
+        from app.main import app, get_current_user, User, SessionLocal, Reminder, Base, engine
 
+        Base.metadata.create_all(bind=engine)
         self.client = TestClient(app)
         self.db = SessionLocal()
         # Find or create a test user
