@@ -902,39 +902,6 @@ function Auth({onLogin}){
         {message&&<p className="authSuccess" role="status">{message}</p>}
         <button className="primary" disabled={busy}>{busy?'Please wait…':tab==='partner'?(partnerMode==='apply'?'Submit partner application':'Enter Partner Portal'):tab==='login'?'Enter Mission Control':'Create Account'}</button>
         {tab==='login'&&<button className="textButton" type="button" onClick={()=>{setRecoveryMode('forgot');setErr('');setMessage('')}}>Forgot password?</button>}
-        <div className="stagingDemoBanner" style={{marginTop:'1.2rem',paddingTop:'1rem',borderTop:'1px solid rgba(255,255,255,0.12)',textAlign:'center'}}>
-          <button
-            type="button"
-            className="stagingExploreBtn"
-            style={{
-              width:'100%',
-              padding:'0.75rem 1rem',
-              background:'linear-gradient(135deg, rgba(16,185,129,0.22), rgba(56,189,248,0.22))',
-              border:'1px solid rgba(56,189,248,0.4)',
-              borderRadius:'8px',
-              color:'#38bdf8',
-              fontWeight:'700',
-              fontSize:'0.92rem',
-              cursor:'pointer',
-              display:'flex',
-              alignItems:'center',
-              justifyContent:'center',
-              gap:'0.5rem',
-              boxShadow:'0 2px 10px rgba(0,0,0,0.3)',
-              transition:'all 0.2s ease'
-            }}
-            onClick={()=>{
-              const demoUser=getDemoFallback('/auth/me');
-              demoUser.branch=form.branch||demoUser.branch;
-              onLogin('demo-preview-token',demoUser);
-            }}
-          >
-            <span>⚡ Explore Staging Preview (Instant Demo Access)</span>
-          </button>
-          <small style={{display:'block',marginTop:'0.45rem',color:'#94a3b8',fontSize:'0.75rem'}}>
-            Instant access to view all v7 screens, branch switcher, AI Battle Buddy & tactical mode
-          </small>
-        </div>
         {tab==='partner'&&<small className="partnerLegal">Applications require verification. Submitting does not activate billing or grant access to private Veteran information.</small>}
       </form>
       <div className="tagusProductLine">ValorBuddy is a product of <b>Tagus Technologies LLC</b></div>
