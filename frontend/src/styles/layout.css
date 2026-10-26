@@ -243,7 +243,7 @@ header.topbar {
   justify-content: center;
   flex: 1;
   min-width: 0;
-  margin: 0 var(--vb-space-12);
+  margin: 0 var(--vb-space-6);
 }
 
 .topbarCenter .globalSearch {
@@ -306,16 +306,22 @@ header.topbar {
 .topbarBranchPills {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  background: rgba(3, 8, 6, 0.75);
-  padding: 2px 3px;
-  border-radius: var(--vb-radius-full);
-  border: 1px solid var(--vb-border-subtle);
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.25);
-  overflow: hidden;
+  gap: 3px;
+  background: rgba(6, 12, 19, 0.88);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  padding: 3px 5px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 
+    0 4px 20px rgba(0, 0, 0, 0.45),
+    inset 0 1px 1px rgba(255, 255, 255, 0.12),
+    inset 0 -1px 2px rgba(0, 0, 0, 0.5);
+  overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
   flex-shrink: 0;
+  max-width: 100%;
 }
 
 .topbarBranchPills::-webkit-scrollbar {
@@ -327,62 +333,156 @@ header.topbar {
 .branchPill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  min-height: 26px;
-  padding: 3px 8px;
-  border-radius: var(--vb-radius-full);
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--vb-text-muted);
-  font-size: 11px;
-  font-weight: 500;
+  gap: 6px;
+  min-height: 34px;
+  padding: 5px 11px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.015em;
   cursor: pointer;
   white-space: nowrap;
-  transition: all var(--vb-transition-fast);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
+  position: relative;
+}
+
+.pillBranchEmblem {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+  flex-shrink: 0;
+  transition: transform 0.2s ease, filter 0.2s ease;
 }
 
 .branchPip {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--pip-color, #10b981);
-  box-shadow: 0 0 5px var(--pip-color, #10b981);
+  box-shadow: 0 0 7px var(--pip-color, #10b981), 0 0 2px #ffffff;
   flex-shrink: 0;
-  opacity: 0.85;
-  transition: transform var(--vb-transition-fast), opacity var(--vb-transition-fast);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+/* Individual Branch Identities & Colors */
+.branchPill--army {
+  --pill-color: #22c55e;
+  --pill-glow: rgba(34, 197, 94, 0.4);
+  --pill-bg-hover: rgba(34, 197, 94, 0.14);
+}
+
+.branchPill--navy {
+  --pill-color: #38bdf8;
+  --pill-glow: rgba(56, 189, 248, 0.45);
+  --pill-bg-hover: rgba(56, 189, 248, 0.16);
+}
+
+.branchPill--airforce {
+  --pill-color: #60a5fa;
+  --pill-glow: rgba(96, 165, 250, 0.45);
+  --pill-bg-hover: rgba(96, 165, 250, 0.16);
+}
+
+.branchPill--marines {
+  --pill-color: #ef4444;
+  --pill-glow: rgba(239, 68, 68, 0.45);
+  --pill-bg-hover: rgba(239, 68, 68, 0.16);
+}
+
+.branchPill--coastguard {
+  --pill-color: #06b6d4;
+  --pill-glow: rgba(6, 182, 212, 0.45);
+  --pill-bg-hover: rgba(6, 182, 212, 0.16);
+}
+
+.branchPill--spaceforce {
+  --pill-color: #c084fc;
+  --pill-glow: rgba(192, 132, 252, 0.45);
+  --pill-bg-hover: rgba(192, 132, 252, 0.16);
+}
+
+/* Inactive Hover Effect */
 .branchPill:hover {
-  color: var(--vb-text-primary);
-  background: rgba(255, 255, 255, 0.07);
+  background: var(--pill-bg-hover, rgba(255, 255, 255, 0.08));
+  border-color: var(--pill-color, rgba(255, 255, 255, 0.25));
+  color: #ffffff;
+  box-shadow: 0 0 14px var(--pill-glow, rgba(255, 255, 255, 0.15));
+  transform: translateY(-1px);
+}
+
+.branchPill:hover .pillBranchEmblem {
+  transform: scale(1.15);
 }
 
 .branchPill:hover .branchPip {
   transform: scale(1.3);
-  opacity: 1;
+  box-shadow: 0 0 12px var(--pip-color, #10b981);
 }
 
+/* Active State Defaults */
 .branchPill.active {
-  background: var(--vb-accent-emerald);
-  color: #030712;
-  border-color: transparent;
+  color: #ffffff;
   font-weight: 700;
-  padding: 3px 10px;
-  box-shadow: 0 0 12px var(--vb-accent-emerald-glow);
+  padding: 6px 14px;
+  transform: translateY(0);
 }
 
-.branchPill--marines.active,
+/* Dedicated Active Gradients & Authentic Borders per Branch */
+.branchPill--army.active {
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  border-color: #4ade80;
+  box-shadow: 0 0 16px rgba(34, 197, 94, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+}
+
+.branchPill--navy.active {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  border-color: #38bdf8;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+}
+
+.branchPill--airforce.active {
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  border-color: #60a5fa;
+  box-shadow: 0 0 16px rgba(96, 165, 250, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+}
+
+.branchPill--marines.active {
+  background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+  border-color: #f87171;
+  box-shadow: 0 0 16px rgba(239, 68, 68, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+}
+
+.branchPill--coastguard.active {
+  background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+  border-color: #22d3ee;
+  box-shadow: 0 0 16px rgba(6, 182, 212, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.35);
+  color: #ffffff;
+}
+
 .branchPill--spaceforce.active {
+  background: linear-gradient(135deg, #8b5cf6 0%, #6b21a8 100%);
+  border-color: #c084fc;
+  box-shadow: 0 0 16px rgba(168, 85, 247, 0.5), inset 0 1px 1px rgba(255, 255, 255, 0.35);
   color: #ffffff;
 }
 
 .branchPill.active .pillBranchEmblem {
-  width: 14px;
-  height: 14px;
-  object-fit: contain;
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
-  flex-shrink: 0;
+  transform: scale(1.12);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+}
+
+.branchPill.active .branchPip {
+  background: #ffffff;
+  box-shadow: 0 0 8px #ffffff;
 }
 
 .branchNameFull {
@@ -393,7 +493,19 @@ header.topbar {
   display: none;
 }
 
-@media (max-width: 1360px) {
+@media (max-width: 1400px) {
+  .branchPill {
+    padding: 5px 10px;
+    font-size: 11.5px;
+    gap: 6px;
+  }
+  .pillBranchEmblem {
+    width: 17px;
+    height: 17px;
+  }
+}
+
+@media (max-width: 1150px) {
   .branchNameFull {
     display: none;
   }
@@ -401,12 +513,9 @@ header.topbar {
     display: inline;
   }
   .branchPill {
-    padding: 3px 6px;
-    font-size: 10.5px;
-    gap: 4px;
-  }
-  .branchPill.active {
-    padding: 3px 8px;
+    padding: 5px 8px;
+    font-size: 11px;
+    gap: 5px;
   }
 }
 

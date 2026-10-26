@@ -870,11 +870,8 @@ function Topbar({user,b,screen,setScreen,setUser,setBranchTheme,onLogout,onMenu,
                 aria-pressed={isSelected}
                 title={`Switch to ${name} Command Center`}
               >
-                {isSelected ? (
-                  <img className="pillBranchEmblem" src={branches[name].emblem} alt="" aria-hidden="true" />
-                ) : (
-                  <span className="branchPip" style={{ '--pip-color': branches[name].color }} aria-hidden="true" />
-                )}
+                <img className="pillBranchEmblem" src={branches[name].emblem} alt="" aria-hidden="true" />
+                <span className="branchPip" style={{ '--pip-color': branches[name].color }} aria-hidden="true" />
                 <span className="branchNameFull">{name}</span>
                 <span className="branchNameShort">{branches[name].short}</span>
               </button>
