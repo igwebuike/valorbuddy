@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - staging
+      - security/v6-standardization
   workflow_dispatch:
 
 permissions:
@@ -17,11 +18,11 @@ concurrency:
 
 jobs:
   build-and-deploy:
-    name: Build & Deploy Staging Preview
+    name: Build & Publish Staging
+    runs-on: ubuntu-latest
     environment:
       name: staging
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+      url: https://igwebuike.github.io/valorbuddy/
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -47,19 +48,7 @@ jobs:
           cp dist/index.html dist/404.html
           touch dist/.nojekyll
 
-      - name: Setup GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: frontend/dist
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-      - name: Publish to gh-pages branch (Dual Support)
+      - name: Publish to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -67,3 +56,21 @@ jobs:
           publish_branch: gh-pages
           user_name: 'github-actions[bot]'
           user_email: 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Setup GitHub Pages (if GitHub Actions mode is enabled)
+        id: pages
+        uses: actions/configure-pages@v5
+        continue-on-error: true
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        if: steps.pages.outcome == 'success'
+        continue-on-error: true
+        with:
+          path: frontend/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        if: steps.pages.outcome == 'success'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
