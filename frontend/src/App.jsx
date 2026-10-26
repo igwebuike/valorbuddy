@@ -838,7 +838,16 @@ function Sidebar({user,screen,setScreen,mobileOpen,onLogout}){
 function Topbar({user,b,screen,setScreen,setUser,setBranchTheme,onLogout,onMenu,mobileOpen}){
   async function changeBranch(branch){
     const normalized=applyBranchTheme(branch);setBranchTheme(normalized);setUser(u=>({...u,branch:normalized}));
-    requestAnimationFrame(()=>applyBranchTheme(normalized));setTimeout(()=>applyBranchTheme(normalized),80);
+    requestAnimationFrame(()=>{
+      applyBranchTheme(normalized);
+      const el = document.getElementById(`branch-pill-${branches[normalized]?.cls}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    });
+    setTimeout(()=>{
+      applyBranchTheme(normalized);
+      const el = document.getElementById(`branch-pill-${branches[normalized]?.cls}`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    },80);
     try{await api('/api/profile/branch',{method:'POST',body:JSON.stringify({branch:normalized})})}catch(e){console.warn('Branch theme save failed; keeping local theme',e)}
   }
 
@@ -864,6 +873,7 @@ function Topbar({user,b,screen,setScreen,setUser,setBranchTheme,onLogout,onMenu,
             return (
               <button
                 key={name}
+                id={`branch-pill-${branches[name].cls}`}
                 type="button"
                 className={`branchPill branchPill--${branches[name].cls} ${isSelected ? 'active' : ''}`}
                 onClick={() => changeBranch(name)}
@@ -872,8 +882,10 @@ function Topbar({user,b,screen,setScreen,setUser,setBranchTheme,onLogout,onMenu,
               >
                 <img className="pillBranchEmblem" src={branches[name].emblem} alt="" aria-hidden="true" />
                 <span className="branchPip" style={{ '--pip-color': branches[name].color }} aria-hidden="true" />
-                <span className="branchNameFull">{name}</span>
-                <span className="branchNameShort">{branches[name].short}</span>
+                <span className="branchLabel">
+                  <span className="branchNameFull">{name}</span>
+                  <span className="branchNameShort">{branches[name].short}</span>
+                </span>
               </button>
             );
           })}
