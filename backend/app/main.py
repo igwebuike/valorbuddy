@@ -19,6 +19,10 @@ import logging
 import secrets
 import time
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import httpx
 from google import genai
 from google.genai import types
