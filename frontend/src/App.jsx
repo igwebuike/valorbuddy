@@ -107,14 +107,104 @@ function friendlyVoiceLabel(v){
   return region && !name.toLowerCase().includes(region.toLowerCase()) ? `${name} • ${region}` : name;
 }
 function authHeaders(){const t=localStorage.getItem('valor_token');return t?{Authorization:`Bearer ${t}`}:{} }
+function getDemoFallback(path,opts={}){
+  const currentBranch=normalizeBranch(localStorage.getItem('valor_branch_theme')||'Army');
+  if(path==='/auth/me'){
+    return{id:'demo-veteran-001',email:'veteran.preview@valorbuddy.com',first_name:'Alex',last_name:'Vance',role:'member',branch:currentBranch,city:'Austin',state:'TX',rank:'SFC',service_status:'Veteran',approval_status:'approved',is_demo:true};
+  }
+  if(path==='/api/briefing'){
+    return{
+      headline:'Tactical Staging Command • Operational',
+      briefing:'Enterprise v7 UI loaded. Multi-branch theme switcher active. DD-214 vault, claims intel, and battle buddy ready.',
+      tasks:[
+        {id:'1',title:'Review VA Disability claim evidence (VA Form 21-526EZ)',done:false,priority:'high'},
+        {id:'2',title:'Confirm next VAMC primary care checkup in Austin',done:true,priority:'medium'},
+        {id:'3',title:'Verify Texas Hazlewood Act tuition exemption documents',done:false,priority:'medium'}
+      ],
+      intel:[
+        {type:'PACT Act',note:'Toxic exposure screening open daily at Austin VA Clinic without prior appointment.'},
+        {type:'Branch Alert',note:`${currentBranch} regional community muster scheduled for this Saturday.`}
+      ]
+    };
+  }
+  if(path==='/api/reminders'){
+    return[
+      {id:'r1',title:'VA Telehealth Appointment',due_date:'2026-11-05T14:00:00Z',notes:'Routine check-in with Dr. Miller',completed:false},
+      {id:'r2',title:'Submit DD-214 verification for State Tuition Exemption',due_date:'2026-11-12T17:00:00Z',notes:'Texas Hazlewood Act documentation',completed:false},
+      {id:'r3',title:'VFW Post 8787 Monthly Assembly',due_date:'2026-11-18T18:30:00Z',notes:'Community outreach planning',completed:false}
+    ];
+  }
+  if(path==='/api/memories'){
+    return[
+      {id:'m1',title:'Deployment at Fort Cavazos (Hood)',date:'2019-06-15',note:'3rd Armored Brigade Combat Team field operations exercise.',branch:currentBranch},
+      {id:'m2',title:'Promotion to Sergeant First Class',date:'2022-03-01',note:'Surrounded by brothers and sisters in arms. Honor to lead.',branch:currentBranch}
+    ];
+  }
+  if(path==='/api/documents'){
+    return[
+      {id:'d1',title:'DD Form 214 - Certificate of Release',document_type:'DD-214',date:'2024-04-30',status:'verified',classification:'Personal Vault'},
+      {id:'d2',title:'VA Benefits Summary & Service Verification Letter',document_type:'VA Rating',date:'2024-06-15',status:'verified',classification:'Personal Vault'},
+      {id:'d3',title:'Joint Services Transcript (JST)',document_type:'Education',date:'2024-05-10',status:'verified',classification:'Career Dossier'}
+    ];
+  }
+  if(path==='/api/music/genres'){
+    return{genres:['Military Cadences & Anthems','Country & Southern Rock','Classic Rock','Lo-Fi Chill & Focus','Inspirational & Healing']};
+  }
+  if(path==='/api/music/favorites')return[];
+  if(path==='/api/agentic/missions'){
+    return[
+      {id:'mis-1',title:'VA Claim Evidence Assembly',status:'in_progress',target:'VA Form 21-526EZ',description:'Cross-referencing service treatment records with nexus letters.'},
+      {id:'mis-2',title:'Military MOS to Tech Resume Translation',status:'ready',target:'Cybersecurity Analyst',description:'Converted 25B Information Technology Specialist skills into civilian competencies.'}
+    ];
+  }
+  if(path==='/api/companion/chat'||path==='/api/vapi/action'){
+    return{
+      response:`Battle Buddy standing by in Staging Preview mode. I can help explore VA claims, translate military specialties, find nearby VAMC clinics, and assist your transition.`,
+      intent:'assistant_help',
+      data:{
+        items:[
+          {
+            title:"Austin VA Outpatient Clinic",
+            location:"7901 Metropolis Dr, Austin, TX 78744",
+            description:"Primary care, mental health, specialty clinics and PACT Act coordinators.",
+            rating:4.8,
+            review_count:312,
+            open_now:true,
+            phone:"512-823-4000",
+            maps_url:"https://maps.google.com/?q=Austin+VA+Clinic",
+            assistant_explanation:"Top rated regional facility with walk-in triage and full VA benefits assistance."
+          },
+          {
+            title:"Texas Veterans Commission - State Office",
+            location:"1700 N Congress Ave, Austin, TX 78701",
+            description:"Accredited Veteran Service Officers (VSO) ready to represent your claim.",
+            rating:4.9,
+            review_count:145,
+            open_now:true,
+            phone:"512-463-6564",
+            maps_url:"https://maps.google.com/?q=Texas+Veterans+Commission+Austin",
+            assistant_explanation:"Direct advocacy for claims, appeals, Hazelwood exemption, and veteran employment."
+          }
+        ]
+      }
+    };
+  }
+  if(path.startsWith('/admin/')){
+    return{overview:{total_users:142,approved_users:138,pending_partners:3},items:[]};
+  }
+  return{status:'ok',items:[],data:{}};
+}
 async function api(path,opts={}){
+  const isDemo=localStorage.getItem('valor_token')==='demo-preview-token';
   let r;
   try{
     r=await fetch(API+path,{...opts,headers:{'Content-Type':'application/json',...authHeaders(),...(opts.headers||{})}});
   }catch(err){
+    if(isDemo)return getDemoFallback(path,opts);
     throw new Error('ValorBuddy could not reach the server. Please check your connection and try again in a few seconds.');
   }
   if(!r.ok){
+    if(isDemo)return getDemoFallback(path,opts);
     let e=`Request failed (${r.status})`;
     try{
       const body=await r.json();
@@ -458,6 +548,13 @@ function ValorBuddyApplication(){
   },[token]);
   useEffect(()=>{
     if(!token){setLoading(false);return}
+    if(token==='demo-preview-token'){
+      const u=getDemoFallback('/auth/me');
+      const normalized=normalizeBranch(localStorage.getItem('valor_branch_theme')||u.branch);
+      setUser({...u,branch:normalized});setBranchTheme(normalized);
+      setLoading(false);
+      return;
+    }
     api('/auth/me').then(u=>{
       const normalized=normalizeBranch(localStorage.getItem('valor_branch_theme')||u.branch);
       setUser({...u,branch:normalized});setBranchTheme(normalized)
@@ -581,6 +678,39 @@ function Auth({onLogin}){
         {message&&<p className="authSuccess" role="status">{message}</p>}
         <button className="primary" disabled={busy}>{busy?'Please wait…':tab==='partner'?(partnerMode==='apply'?'Submit partner application':'Enter Partner Portal'):tab==='login'?'Enter Mission Control':'Create Account'}</button>
         {tab==='login'&&<button className="textButton" type="button" onClick={()=>{setRecoveryMode('forgot');setErr('');setMessage('')}}>Forgot password?</button>}
+        <div className="stagingDemoBanner" style={{marginTop:'1.2rem',paddingTop:'1rem',borderTop:'1px solid rgba(255,255,255,0.12)',textAlign:'center'}}>
+          <button
+            type="button"
+            className="stagingExploreBtn"
+            style={{
+              width:'100%',
+              padding:'0.75rem 1rem',
+              background:'linear-gradient(135deg, rgba(16,185,129,0.22), rgba(56,189,248,0.22))',
+              border:'1px solid rgba(56,189,248,0.4)',
+              borderRadius:'8px',
+              color:'#38bdf8',
+              fontWeight:'700',
+              fontSize:'0.92rem',
+              cursor:'pointer',
+              display:'flex',
+              alignItems:'center',
+              justifyContent:'center',
+              gap:'0.5rem',
+              boxShadow:'0 2px 10px rgba(0,0,0,0.3)',
+              transition:'all 0.2s ease'
+            }}
+            onClick={()=>{
+              const demoUser=getDemoFallback('/auth/me');
+              demoUser.branch=form.branch||demoUser.branch;
+              onLogin('demo-preview-token',demoUser);
+            }}
+          >
+            <span>⚡ Explore Staging Preview (Instant Demo Access)</span>
+          </button>
+          <small style={{display:'block',marginTop:'0.45rem',color:'#94a3b8',fontSize:'0.75rem'}}>
+            Instant access to view all v7 screens, branch switcher, AI Battle Buddy & tactical mode
+          </small>
+        </div>
         {tab==='partner'&&<small className="partnerLegal">Applications require verification. Submitting does not activate billing or grant access to private Veteran information.</small>}
       </form>
       <div className="tagusProductLine">ValorBuddy is a product of <b>Tagus Technologies LLC</b></div>
