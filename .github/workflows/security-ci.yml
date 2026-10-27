@@ -6,6 +6,8 @@ on:
     branches:
       - main
       - develop
+      - staging
+      - security/v6-standardization
 
 permissions:
   contents: read

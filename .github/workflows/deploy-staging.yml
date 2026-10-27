@@ -1,0 +1,76 @@
+name: Deploy Staging Environment
+
+on:
+  push:
+    branches:
+      - staging
+      - security/v6-standardization
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages-staging"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    name: Build & Publish Staging
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://igwebuike.github.io/valorbuddy/
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci --no-audit --no-fund
+
+      - name: Build frontend for Staging
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: https://valorbuddy-staging.onrender.com
+          VITE_BASE_URL: ./
+        run: |
+          npm run build
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
+
+      - name: Publish to gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./frontend/dist
+          publish_branch: gh-pages
+          user_name: 'github-actions[bot]'
+          user_email: 'github-actions[bot]@users.noreply.github.com'
+
+      - name: Setup GitHub Pages (if GitHub Actions mode is enabled)
+        id: pages
+        uses: actions/configure-pages@v5
+        continue-on-error: true
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        if: steps.pages.outcome == 'success'
+        continue-on-error: true
+        with:
+          path: frontend/dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        if: steps.pages.outcome == 'success'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true

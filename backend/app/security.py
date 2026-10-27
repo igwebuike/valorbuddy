@@ -42,8 +42,8 @@ class SecuritySettings:
             enforce_config=env_bool("SECURITY_ENFORCE_CONFIG", environment == "production"),
             force_https=env_bool("FORCE_HTTPS", environment == "production"),
             max_body_bytes=max(1_048_576, int(os.getenv("MAX_REQUEST_BODY_BYTES", "10485760"))),
-            request_limit_per_minute=max(30, int(os.getenv("REQUEST_LIMIT_PER_MINUTE", "300"))),
-            auth_limit_per_15_minutes=max(3, int(os.getenv("AUTH_LIMIT_PER_15_MINUTES", "10"))),
+            request_limit_per_minute=max(30, int(os.getenv("REQUEST_LIMIT_PER_MINUTE", "1000" if environment == "development" else "300"))),
+            auth_limit_per_15_minutes=max(3, int(os.getenv("AUTH_LIMIT_PER_15_MINUTES", "1000" if environment == "development" else "10"))),
             allowed_hosts=tuple(x.strip().lower() for x in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,testserver").split(",") if x.strip()),
         )
 

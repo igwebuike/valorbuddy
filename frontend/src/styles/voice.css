@@ -1,0 +1,538 @@
+/* ==========================================================================
+   VALORBUDDY DESIGN SYSTEM — VOICE (voice.css)
+   Voice Assistant States, Waveform Indicators & Calm Mic Controls
+   Zero !important declarations
+   ========================================================================== */
+
+/* --- Voice Assistant Card --- */
+.voiceBox {
+  background: var(--vb-bg-surface-elevated);
+  border: 1px solid var(--branch-border-subtle, rgba(16, 185, 129, 0.2));
+  border-radius: var(--vb-radius-lg);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--vb-space-12);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45);
+}
+
+.voiceHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--vb-space-4);
+}
+
+.voiceHeading h3 {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--vb-space-8);
+  font-size: 16px;
+  font-weight: var(--vb-font-weight-semibold);
+  color: var(--vb-text-primary);
+}
+
+.liveBadge {
+  font-size: 10px;
+  font-weight: var(--vb-font-weight-bold);
+  letter-spacing: 0.08em;
+  padding: 2px var(--vb-space-8);
+  border-radius: var(--vb-radius-full);
+  background: var(--vb-status-success-bg);
+  border: 1px solid var(--vb-status-success-border);
+  color: var(--vb-status-success);
+  transition: all var(--vb-transition-fast);
+}
+
+.liveBadge--idle,
+.liveBadge.idle {
+  background: var(--vb-bg-surface-elevated);
+  border-color: var(--vb-border-subtle);
+  color: var(--vb-text-secondary);
+}
+
+.liveBadge--listening,
+.liveBadge.listening {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+
+.liveBadge--processing,
+.liveBadge.processing {
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: #93c5fd;
+}
+
+.liveBadge--speaking,
+.liveBadge.speaking {
+  background: var(--branch-tint);
+  border-color: var(--branch-border);
+  color: var(--branch-accent);
+}
+
+.liveBadge--error,
+.liveBadge.error {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.voiceStateBanner {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.voiceStatePrompt {
+  font-size: 14px;
+  font-weight: var(--vb-font-weight-semibold);
+  color: var(--vb-text-primary);
+}
+
+.voiceIntro {
+  margin: 0;
+  color: var(--vb-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* --- Tactical Audio Waveform Visualizer --- */
+.waveformVisualizer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 28px;
+  padding: 4px 0;
+  margin: 8px 0;
+}
+
+.waveformBar {
+  width: 3.5px;
+  height: 18%;
+  background: var(--branch-primary, #10b981);
+  border-radius: 2px;
+  opacity: 0.45;
+  transition: height 0.2s ease, opacity 0.2s ease;
+}
+
+.waveformVisualizer.listening .waveformBar {
+  opacity: 0.95;
+  background: #ef4444;
+  animation: waveformBounce 0.8s ease-in-out infinite alternate;
+}
+
+.waveformVisualizer.speaking .waveformBar {
+  opacity: 0.95;
+  background: var(--branch-primary, #10b981);
+  animation: waveformBounce 0.7s ease-in-out infinite alternate;
+}
+
+@keyframes waveformBounce {
+  0% { transform: scaleY(0.25); }
+  100% { transform: scaleY(1.35); }
+}
+
+/* --- Voice Controls & Settings --- */
+.voiceSettings {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: var(--vb-space-12);
+  align-items: flex-end;
+  margin-top: var(--vb-space-4);
+}
+
+.voiceSettings label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: var(--vb-font-weight-medium);
+  color: var(--vb-text-secondary);
+}
+
+.voiceSettings select {
+  min-height: 34px;
+  padding: 4px var(--vb-space-8);
+}
+
+.voiceSettings button {
+  min-height: 34px;
+  padding: 4px var(--vb-space-10);
+  border-radius: var(--vb-radius-sm);
+  border: 1px solid var(--vb-border-medium);
+  background: var(--vb-bg-surface-elevated);
+  color: var(--vb-text-primary);
+  font-size: 11.5px;
+  font-weight: var(--vb-font-weight-medium);
+  cursor: pointer;
+}
+
+.voiceSettings button:hover:not(:disabled) {
+  border-color: var(--branch-accent);
+}
+
+.voicePreferenceRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--vb-space-6) 0;
+  border-top: 1px solid var(--vb-border-subtle);
+  border-bottom: 1px solid var(--vb-border-subtle);
+  font-size: 11.5px;
+  color: var(--vb-text-secondary);
+}
+
+.voicePreferenceRow label {
+  display: flex;
+  align-items: center;
+  gap: var(--vb-space-8);
+  cursor: pointer;
+}
+
+.voicePreferenceRow button {
+  min-height: 32px;
+  padding: 4px var(--vb-space-12);
+  border-radius: var(--vb-radius-sm);
+  border: 1px solid var(--vb-border-medium);
+  background: var(--vb-bg-surface-subtle);
+  color: var(--vb-text-primary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.voiceUtilityRow {
+  display: flex;
+  gap: var(--vb-space-6);
+  flex-wrap: wrap;
+}
+
+.voiceUtilityRow button {
+  min-height: 28px;
+  padding: 3px var(--vb-space-8);
+  border-radius: var(--vb-radius-sm);
+  border: 1px solid var(--vb-border-subtle);
+  background: var(--vb-bg-surface-subtle);
+  color: var(--vb-text-secondary);
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: all var(--vb-transition-fast);
+}
+
+.voiceUtilityRow button:hover:not(:disabled) {
+  background: var(--vb-bg-surface-elevated);
+  color: var(--vb-text-primary);
+}
+
+.voiceUtilityRow button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stopVoiceButton {
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #fca5a5;
+}
+
+.stopVoiceButton:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fff;
+}
+
+.locationButton {
+  border-color: var(--branch-border);
+  color: var(--branch-accent);
+}
+
+.locationStatus {
+  font-size: 12px;
+  padding: 6px var(--vb-space-12);
+  border-radius: var(--vb-radius-sm);
+  background: var(--vb-bg-surface-subtle);
+  border: 1px solid var(--vb-border-subtle);
+  color: var(--vb-text-secondary);
+}
+
+.locationStatus.success {
+  background: var(--vb-status-success-bg);
+  border-color: var(--vb-status-success-border);
+  color: var(--vb-status-success);
+}
+
+/* --- Microphone Trigger Button --- */
+.mic {
+  width: 74px;
+  height: 74px;
+  border-radius: var(--vb-radius-full);
+  margin: var(--vb-space-10) auto;
+  border: 2px solid var(--branch-primary, #10b981);
+  background: var(--vb-bg-surface-subtle);
+  color: var(--vb-text-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  box-shadow: 0 0 16px var(--branch-glow, rgba(16, 185, 129, 0.2));
+  transition: all var(--vb-transition-normal);
+}
+
+.mic svg {
+  width: 22px;
+  height: 22px;
+  color: var(--branch-primary, #10b981);
+  transition: transform var(--vb-transition-fast);
+}
+
+.mic span {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--vb-text-secondary);
+}
+
+.mic:hover {
+  transform: scale(1.05);
+  border-color: var(--branch-primary, #10b981);
+  box-shadow: 0 0 24px var(--branch-glow, rgba(16, 185, 129, 0.45));
+}
+
+.mic.listening {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  animation: micListenPulse 1.8s infinite ease-in-out;
+}
+
+.mic.listening svg {
+  color: #ef4444;
+}
+
+.mic.listening span {
+  color: #fca5a5;
+}
+
+@keyframes micListenPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+    transform: scale(1.03);
+  }
+}
+
+/* --- Speech Transcript & Response Feedback --- */
+.heard {
+  display: block;
+  font-size: 12px;
+  color: var(--vb-text-muted);
+  font-style: italic;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.reply {
+  padding: var(--vb-space-12) var(--vb-space-16);
+  border-radius: var(--vb-radius-md);
+  background: var(--vb-bg-surface-subtle);
+  border: 1px solid var(--vb-border-subtle);
+  color: var(--vb-text-primary);
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: var(--vb-space-8);
+}
+
+/* --- Suggestions & Options Pills --- */
+.suggestionWrap {
+  display: flex;
+  gap: var(--vb-space-6);
+  flex-wrap: wrap;
+  margin-top: var(--vb-space-8);
+}
+
+.suggestionWrap button {
+  min-height: 28px;
+  padding: 3px var(--vb-space-10);
+  border-radius: var(--vb-radius-full);
+  border: 1px solid var(--vb-border-subtle);
+  background: var(--vb-bg-surface-subtle);
+  color: var(--vb-text-secondary);
+  font-size: 11px;
+  font-weight: var(--vb-font-weight-medium);
+  cursor: pointer;
+  transition: all var(--vb-transition-fast);
+}
+
+.suggestionWrap button:hover {
+  background: var(--vb-bg-surface-elevated);
+  border-color: var(--branch-primary, #10b981);
+  box-shadow: 0 0 10px var(--branch-glow, rgba(16, 185, 129, 0.2));
+  color: #fff;
+}
+
+.choiceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--vb-space-8);
+  margin-top: var(--vb-space-8);
+}
+
+.choiceGrid button {
+  min-height: 38px;
+  padding: 6px var(--vb-space-12);
+  border-radius: var(--vb-radius-md);
+  border: 1px solid var(--vb-border-subtle);
+  background: var(--vb-bg-surface-subtle);
+  color: var(--vb-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--vb-space-8);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: all var(--vb-transition-fast);
+}
+
+.choiceGrid button span {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--vb-radius-full);
+  background: var(--branch-tint);
+  border: 1px solid var(--branch-border);
+  color: var(--branch-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: var(--vb-font-weight-bold);
+  flex-shrink: 0;
+}
+
+.choiceGrid button:hover {
+  background: var(--vb-bg-surface-elevated);
+  border-color: var(--branch-accent);
+}
+
+.openResultsButton {
+  min-height: 40px;
+  width: 100%;
+  margin-top: var(--vb-space-8);
+  border-radius: var(--vb-radius-md);
+  border: 1px solid var(--branch-border);
+  background: var(--branch-tint);
+  color: var(--branch-accent);
+  font-weight: var(--vb-font-weight-semibold);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--vb-transition-fast);
+}
+
+.openResultsButton:hover {
+  background: var(--branch-accent);
+  color: var(--vb-text-inverse);
+}
+
+/* ==========================================================================
+   VOICE SETTINGS ACCORDION & AUDIO CONTROL STRIP (Milestone 1B Grouping)
+   ========================================================================== */
+.voiceAudioActionBar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--vb-space-6);
+  flex-wrap: wrap;
+  padding: var(--vb-space-6) 0;
+}
+
+.voiceAudioActionBar button {
+  min-height: 30px;
+  padding: 3px var(--vb-space-10);
+  border-radius: var(--vb-radius-sm);
+  border: 1px solid var(--vb-border-subtle);
+  background: var(--vb-bg-surface-subtle);
+  color: var(--vb-text-secondary);
+  font-size: 11.5px;
+  font-weight: var(--vb-font-weight-medium);
+  cursor: pointer;
+  transition: all var(--vb-transition-fast);
+}
+
+.voiceAudioActionBar button:hover:not(:disabled) {
+  background: var(--vb-bg-surface-elevated);
+  color: var(--vb-text-primary);
+  border-color: var(--branch-accent);
+}
+
+.voiceAudioActionBar button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.voiceSettingsDetails {
+  margin-top: var(--vb-space-6);
+  border: 1px solid var(--vb-border-subtle);
+  border-radius: var(--vb-radius-md);
+  background: var(--vb-bg-surface-subtle);
+  overflow: hidden;
+}
+
+.voiceSettingsSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--vb-space-8) var(--vb-space-12);
+  font-size: 11.5px;
+  font-weight: var(--vb-font-weight-semibold);
+  color: var(--vb-text-secondary);
+  cursor: pointer;
+  user-select: none;
+  list-style: none;
+  transition: all var(--vb-transition-fast);
+}
+
+.voiceSettingsSummary::-webkit-details-marker {
+  display: none;
+}
+
+.voiceSettingsSummary:hover {
+  color: var(--vb-text-primary);
+  background: var(--vb-bg-surface-elevated);
+}
+
+.voiceSettingsChevron {
+  transition: transform var(--vb-transition-fast);
+}
+
+.voiceSettingsDetails[open] .voiceSettingsChevron {
+  transform: rotate(90deg);
+}
+
+.voiceSettingsBody {
+  padding: var(--vb-space-10) var(--vb-space-12);
+  border-top: 1px solid var(--vb-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: var(--vb-space-10);
+}
+
+@media (max-width: 720px) {
+  .voiceBox {
+    padding: var(--vb-space-14);
+    gap: var(--vb-space-8);
+  }
+
+  .mic {
+    width: 68px;
+    height: 68px;
+    margin: var(--vb-space-8) auto;
+  }
+
+  .voiceSettings {
+    grid-template-columns: 1fr;
+  }
+}
