@@ -123,6 +123,7 @@ function safeAvatarUrl(value){
 function authHeaders(){const t=localStorage.getItem('valor_token');return t?{Authorization:`Bearer ${t}`}:{} }
 // Demo-only reminders are in memory; no auth request data is persisted.
 let demoReminders = [];
+let demoCareerDrafts = null;
 function getDemoFallback(path,opts={}){
   const currentBranch=normalizeBranch(localStorage.getItem('valor_branch_theme')||'Army');
   if(path==='/auth/me'){
@@ -298,13 +299,7 @@ function getDemoFallback(path,opts={}){
     return{overview:{total_users:142,approved_users:138,pending_partners:3},items:[]};
   }
   if(path==='/api/career/documents'){
-    try {
-      const stored = localStorage.getItem('valor_career_drafts');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
+    if (Array.isArray(demoCareerDrafts) && demoCareerDrafts.length > 0) return demoCareerDrafts;
     const defaultDrafts = [
       {
         id: 'cd-1',
@@ -396,7 +391,7 @@ Vanguard Defense Solutions LLC provides specialized supply chain advisory, inven
 • Texas Veteran Commission (TVC) Entrepreneurship Program: State tax exemptions and specialized small business mentorship.`
       }
     ];
-    try { localStorage.setItem('valor_career_drafts', JSON.stringify(defaultDrafts)); } catch {}
+    demoCareerDrafts = defaultDrafts;
     return defaultDrafts;
   }
   if(path==='/api/career/generate'){
@@ -510,12 +505,7 @@ ${notes ? `• Custom Requirements: ${notes}` : ''}
       content: draftContent
     };
 
-    try {
-      const stored = localStorage.getItem('valor_career_drafts');
-      const drafts = stored ? JSON.parse(stored) : [];
-      drafts.unshift(newDraft);
-      localStorage.setItem('valor_career_drafts', JSON.stringify(drafts));
-    } catch {}
+    demoCareerDrafts = [newDraft, ...(demoCareerDrafts || [])];
 
     return newDraft;
   }
@@ -616,7 +606,15 @@ function cleanVisibleText(value=''){
 function LinkifiedText({text=''}){
   const cleaned=cleanVisibleText(text);
   const parts=cleaned.split(/(https?:\/\/[^\s<>()]+)/g);
-  return <>{parts.map((part,i)=>/^https?:\/\//i.test(part)?<a className="officialResourceLink" href={part.replace(/[.,;:!?]+$/,'')} target="_blank" rel="noopener noreferrer" key={i}>Open official resource ↗</a>:<span key={i}>{part}</span>)}</>;
+  return <>{parts.map((part,i)=>{
+    if(!/^https?:\/\//i.test(part))return <span key={i}>{part}</span>;
+    let href='';
+    try{
+      const url=new URL(part.replace(/[.,;:!?]+$/,''));
+      if((url.protocol==='https:'||url.protocol==='http:')&&url.hostname)href=url.href;
+    }catch{}
+    return href?<a className="officialResourceLink" href={href} target="_blank" rel="noopener noreferrer" key={i}>Open official resource ↗</a>:<span key={i}>{part}</span>;
+  })}</>;
 }
 
 function HealthSafetyNotice(){
@@ -2815,10 +2813,50 @@ const mediaProviders={
   Audiomack:{kind:'external',home:'https://audiomack.com/',search:q=>`https://audiomack.com/search?q=${encodeURIComponent(q)}`,help:'Audiomack’s full website may refuse framing. ValorBuddy avoids blank screens and uses secure links.'},
   TuneIn:{kind:'external',home:'https://tunein.com/',search:q=>`https://tunein.com/search/?query=${encodeURIComponent(q)}`,help:'TuneIn stations open securely because the complete TuneIn site is not a reliable embedded player.'}
 };
-function getYouTubeEmbed(raw){try{const u=new URL(raw);let id='';if(u.hostname==='youtu.be')id=u.pathname.split('/').filter(Boolean)[0]||'';else if(u.hostname.includes('youtube.com')){id=u.searchParams.get('v')||'';if(!id&&u.pathname.includes('/shorts/'))id=u.pathname.split('/shorts/')[1]?.split('/')[0]||'';if(!id&&u.pathname.includes('/embed/'))id=u.pathname.split('/embed/')[1]?.split('/')[0]||'';const list=u.searchParams.get('list');if(list&&!id)return `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(list)}`;if(id&&list)return `https://www.youtube.com/embed/${encodeURIComponent(id)}?list=${encodeURIComponent(list)}`;}return id?`https://www.youtube.com/embed/${encodeURIComponent(id)}`:''}catch{return ''}}
-function getSpotifyEmbed(raw){try{const u=new URL(raw);if(!u.hostname.endsWith('spotify.com'))return '';const parts=u.pathname.split('/').filter(Boolean);const allowed=['track','album','artist','playlist','episode','show'];const index=parts.findIndex(x=>allowed.includes(x));if(index<0||!parts[index+1])return '';return `https://open.spotify.com/embed/${parts[index]}/${parts[index+1]}?utm_source=generator&theme=0`}catch{return ''}}
-function getAppleMusicEmbed(raw){try{const u=new URL(raw);if(u.hostname!=='music.apple.com')return '';return `https://embed.music.apple.com${u.pathname}${u.search}`}catch{return ''}}
-function getSoundCloudEmbed(raw){try{const u=new URL(raw);if(!u.hostname.endsWith('soundcloud.com'))return '';return `https://w.soundcloud.com/player/?url=${encodeURIComponent(raw)}&color=%2357e86e&auto_play=false&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=true`}catch{return ''}}
+function trustedMusicUrl(raw, domains){
+  try{
+    const u=new URL(raw);
+    if(u.protocol!=='https:')return null;
+    if(!domains.some(domain=>u.hostname===domain||u.hostname.endsWith('.'+domain)))return null;
+    return u;
+  }catch{return null;}
+}
+function getYouTubeEmbed(raw){
+  const u=trustedMusicUrl(raw,['youtube.com','youtu.be']);
+  if(!u)return '';
+  let id='';
+  if(u.hostname==='youtu.be')id=u.pathname.split('/').filter(Boolean)[0]||'';
+  else{
+    id=u.searchParams.get('v')||'';
+    if(!id&&u.pathname.startsWith('/shorts/'))id=u.pathname.split('/')[2]||'';
+    if(!id&&u.pathname.startsWith('/embed/'))id=u.pathname.split('/')[2]||'';
+  }
+  const list=u.searchParams.get('list');
+  if(!id&&!list)return '';
+  if(id&&!/^[a-zA-Z0-9_-]{11}$/.test(id))return '';
+  if(list&&!/^[a-zA-Z0-9_-]{10,150}$/.test(list))return '';
+  if(list&&!id)return `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(list)}`;
+  return `https://www.youtube.com/embed/${id}${list?'?list='+encodeURIComponent(list):''}`;
+}
+function getSpotifyEmbed(raw){
+  const u=trustedMusicUrl(raw,['spotify.com']);
+  if(!u)return '';
+  const parts=u.pathname.split('/').filter(Boolean);
+  const allowed=['track','album','artist','playlist','episode','show'];
+  const index=parts.findIndex(x=>allowed.includes(x));
+  if(index<0||!parts[index+1]||!/^[a-zA-Z0-9]+$/.test(parts[index+1]))return '';
+  return `https://open.spotify.com/embed/${parts[index]}/${parts[index+1]}?utm_source=generator&theme=0`;
+}
+function getAppleMusicEmbed(raw){
+  const u=trustedMusicUrl(raw,['music.apple.com']);
+  if(!u||u.hostname!=='music.apple.com')return '';
+  return `https://embed.music.apple.com${u.pathname}${u.search}`;
+}
+function getSoundCloudEmbed(raw){
+  const u=trustedMusicUrl(raw,['soundcloud.com']);
+  if(!u)return '';
+  return `https://w.soundcloud.com/player/?url=${encodeURIComponent(u.href)}&color=%2357e86e&auto_play=false&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=true`;
+}
 function ProviderLogo({name, size=18}){
   switch(name){
     case 'Spotify':
