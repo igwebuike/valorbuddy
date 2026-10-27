@@ -106,6 +106,17 @@ function friendlyVoiceLabel(v){
   const region=lang.includes('en-us')?'US':lang.includes('en-gb')?'UK':lang.includes('en-au')?'AU':lang.includes('en-ca')?'CA':'';
   return region && !name.toLowerCase().includes(region.toLowerCase()) ? `${name} • ${region}` : name;
 }
+function safeAvatarUrl(value){
+  if(typeof value !== 'string') return '';
+  const url = value.trim();
+  if(/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/i.test(url)) return url;
+  try{
+    const parsed = new URL(url);
+    if(parsed.protocol === 'https:') return parsed.href;
+  }catch{}
+  return '';
+}
+
 function authHeaders(){const t=localStorage.getItem('valor_token');return t?{Authorization:`Bearer ${t}`}:{} }
 function getDemoFallback(path,opts={}){
   const currentBranch=normalizeBranch(localStorage.getItem('valor_branch_theme')||'Army');
@@ -1069,10 +1080,10 @@ function Sidebar({user,screen,setScreen,mobileOpen,onLogout}){
           aria-label="Open profile"
         >
           <div className="tacticalAvatar">
-            {(user.avatar_url || user.profile_data?.avatar_url || localStorage.getItem('valor_user_avatar')) ? (
+            {safeAvatarUrl(user.avatar_url) || safeAvatarUrl(user.profile_data?.avatar_url) || safeAvatarUrl(localStorage.getItem('valor_user_avatar')) ? (
               <img
                 className="tacticalAvatarImg"
-                src={user.avatar_url || user.profile_data?.avatar_url || localStorage.getItem('valor_user_avatar')}
+                src={safeAvatarUrl(user.avatar_url) || safeAvatarUrl(user.profile_data?.avatar_url) || safeAvatarUrl(localStorage.getItem('valor_user_avatar'))}
                 alt={`${user.first_name || 'User'} avatar`}
               />
             ) : (
@@ -3042,14 +3053,20 @@ function Profile({user,setUser}){
   const[form,setForm]=useState(()=>makeForm(user));
   useEffect(()=>{if(!editing)setForm(makeForm(user))},[user,editing]);
 
-  const currentAvatar = user.avatar_url || user.profile_data?.avatar_url || localStorage.getItem('valor_user_avatar') || '';
+  const currentAvatar = safeAvatarUrl(user.avatar_url) || safeAvatarUrl(user.profile_data?.avatar_url) || safeAvatarUrl(localStorage.getItem('valor_user_avatar'));
   const initials = `${(user.first_name||'V')[0]||'V'}${(user.last_name||'B')[0]||'B'}`.toUpperCase();
 
   function handleAvatarUpload(e){
     const file = e.target.files?.[0];
     if(!file) return;
-    if(!file.type.startsWith('image/')){
-      alert('Please select a valid image file (JPEG, PNG, WebP).');
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)){
+      setMessage('Please select a JPEG, PNG, or WebP image.');
+      e.target.value = '';
+      return;
+    }
+    if(file.size > 5 * 1024 * 1024){
+      setMessage('Profile photos must be 5 MB or smaller.');
+      e.target.value = '';
       return;
     }
     const reader = new FileReader();
@@ -3094,8 +3111,10 @@ function Profile({user,setUser}){
         }).catch(() => {});
         setMessage('Profile photo updated successfully.');
       };
+      img.onerror = () => setMessage('Could not read this image. Please choose another photo.');
       img.src = ev.target.result;
     };
+    reader.onerror = () => setMessage('Could not open this file. Please try again.');
     reader.readAsDataURL(file);
     e.target.value = '';
   }
