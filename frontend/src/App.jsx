@@ -49,14 +49,20 @@ function applyBranchTheme(branch){
 }
 
 
+// Precise GPS coordinates are ephemeral and never written to persistent browser storage.
+let recentBrowserLocation = {lat:null,lng:null};
+try {
+  localStorage.removeItem('valor_lat');
+  localStorage.removeItem('valor_lng');
+  localStorage.removeItem('valor_location_updated');
+} catch {}
 function saveBrowserLocation(){
   try{
     if(!navigator.geolocation)return;
     navigator.geolocation.getCurrentPosition(pos=>{
       const lat=pos.coords.latitude;
       const lng=pos.coords.longitude;
-      localStorage.setItem('valor_lat',String(lat));
-      localStorage.setItem('valor_lng',String(lng));
+      recentBrowserLocation = {lat,lng};
     },()=>{}, {enableHighAccuracy:true,timeout:8000,maximumAge:300000});
   }catch{}
 }
@@ -68,8 +74,7 @@ async function freshLocation({required=false,maximumAge=15000}={}){
   }
   return await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(pos=>{
     const lat=pos.coords.latitude,lng=pos.coords.longitude;
-    localStorage.setItem('valor_lat',String(lat));localStorage.setItem('valor_lng',String(lng));
-    localStorage.setItem('valor_location_updated',String(Date.now()));
+    recentBrowserLocation = {lat,lng};
     resolve({lat,lng,accuracy:pos.coords.accuracy,source:'gps'});
   },err=>{
     const messages={1:'Location permission was denied. Enable location access for ValorBuddy in your browser settings and try again.',2:'Your current location could not be determined. Check Location Services and your connection, then try again.',3:'Location request timed out. Please try again.'};
@@ -79,9 +84,7 @@ async function freshLocation({required=false,maximumAge=15000}={}){
   },{enableHighAccuracy:true,timeout:12000,maximumAge}));
 }
 function locationPayload(){
-  const lat=localStorage.getItem('valor_lat');
-  const lng=localStorage.getItem('valor_lng');
-  return {lat:lat?Number(lat):null,lng:lng?Number(lng):null};
+  return {...recentBrowserLocation};
 }
 function voicePreferences(){
   const style=localStorage.getItem('valor_voice_style')||'command';
@@ -118,6 +121,8 @@ function safeAvatarUrl(value){
 }
 
 function authHeaders(){const t=localStorage.getItem('valor_token');return t?{Authorization:`Bearer ${t}`}:{} }
+// Demo-only reminders are in memory; no auth request data is persisted.
+let demoReminders = [];
 function getDemoFallback(path,opts={}){
   const currentBranch=normalizeBranch(localStorage.getItem('valor_branch_theme')||'Army');
   if(path==='/auth/me'){
@@ -139,11 +144,7 @@ function getDemoFallback(path,opts={}){
     };
   }
   if(path==='/api/reminders'||path.startsWith('/api/reminders/')){
-    let stored = [];
-    try {
-      const raw = localStorage.getItem('valor_reminders');
-      if (raw) stored = JSON.parse(raw);
-    } catch {}
+    let stored = demoReminders;
     if (!Array.isArray(stored) || stored.length === 0) {
       const now = new Date();
       const tomorrow = new Date(now.getTime() + 24 * 3600 * 1000);
@@ -191,7 +192,7 @@ function getDemoFallback(path,opts={}){
           delivery_state: 'scheduled'
         }
       ];
-      try { localStorage.setItem('valor_reminders', JSON.stringify(stored)); } catch {}
+      demoReminders = stored;
     }
 
     if (opts.method === 'POST') {
@@ -211,7 +212,7 @@ function getDemoFallback(path,opts={}){
         delivery_state: 'scheduled'
       };
       stored.unshift(newReminder);
-      try { localStorage.setItem('valor_reminders', JSON.stringify(stored)); } catch {}
+      demoReminders = stored;
       return newReminder;
     }
 
@@ -223,7 +224,7 @@ function getDemoFallback(path,opts={}){
       if (target) {
         target.status = body.status || target.status;
         target.stored_status = body.status || target.stored_status;
-        try { localStorage.setItem('valor_reminders', JSON.stringify(stored)); } catch {}
+        demoReminders = stored;
         return target;
       }
       return { status: 'ok' };
@@ -232,7 +233,7 @@ function getDemoFallback(path,opts={}){
     if (opts.method === 'DELETE') {
       const reminderId = path.replace('/api/reminders/', '');
       stored = stored.filter(x => String(x.id) !== String(reminderId));
-      try { localStorage.setItem('valor_reminders', JSON.stringify(stored)); } catch {}
+      demoReminders = stored;
       return { ok: true };
     }
 
