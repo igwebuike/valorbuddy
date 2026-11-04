@@ -38,7 +38,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, JSON, String, Text, create_engine, func, inspect, text
 from sqlalchemy.orm import Session, declarative_base, relationship, sessionmaker
-from app.agentic import AGENT_CATALOG as VOS_AGENT_CATALOG, TOOL_CATALOG as VOS_TOOL_CATALOG, CORE_PRINCIPLE as VOS_CORE_PRINCIPLE, route_goal, build_fallback_plan, build_agent_prompt, agent_opening
+from app.agentic import AGENT_CATALOG as VOS_AGENT_CATALOG, TOOL_CATALOG as VOS_TOOL_CATALOG, CORE_PRINCIPLE as VOS_CORE_PRINCIPLE, route_goal, build_fallback_plan, build_agent_prompt, agent_opening, generate_veteran_assistant_response
 from app.security import SecuritySettings, configuration_findings, emit_security_event, hash_password, password_needs_rehash, security_middleware, verify_password
 from app.data_protection import PREFIX as ENCRYPTED_PREFIX, protect_bytes, protect_text, unprotect_bytes, unprotect_text
 
@@ -56,7 +56,7 @@ CORS_ORIGINS = os.getenv(
 # GOOGLE_API_KEY remains a backward-compatible fallback only.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_PLANNER_MODEL = os.getenv("GEMINI_PLANNER_MODEL", GEMINI_MODEL)
 GOOGLE_CLOUD_PROJECT = os.getenv("GOOGLE_CLOUD_PROJECT", "")
 GOOGLE_CLOUD_LOCATION = os.getenv("GOOGLE_CLOUD_LOCATION", "global")
@@ -788,11 +788,15 @@ User message: {message}"""
     raw = await gemini_reply(prompt, json.dumps(schema), json_mode=True, model=GEMINI_PLANNER_MODEL)
     try:
         plan = json.loads(raw)
+        raw_intent = str(plan.get("intent", ""))
+        if not raw_intent or "|" in raw_intent:
+            raise ValueError("Intent placeholder detected")
         return {**schema, **plan}
     except Exception:
         fallback_intent = infer_intent(message)
         mapping = {"find_local_veteran_activities":"local_search","search_benefits":"benefits","get_today_briefing":"briefing","get_user_profile":"profile","suggest_music":"music"}
-        return {**schema, "intent": mapping.get(fallback_intent, fallback_intent), "needs_places": fallback_intent == "find_local_veteran_activities", "needs_location": fallback_intent == "find_local_veteran_activities", "search_query": message}
+        resolved = mapping.get(fallback_intent, fallback_intent)
+        return {**schema, "intent": resolved, "needs_places": fallback_intent == "find_local_veteran_activities", "needs_location": fallback_intent == "find_local_veteran_activities", "search_query": message}
 
 def clean_text(text: str) -> str:
     return " ".join((text or "").strip().split())
@@ -1193,15 +1197,17 @@ def is_event_choice_request(message: str) -> bool:
 
 def infer_intent(text: str) -> str:
     t = (text or "").lower()
+    if any(x in t for x in ["suicide", "kill myself", "hurt myself", "end my life", "crisis", "cant take it", "can't take it"]):
+        return "general"
     if any(x in t for x in ["remind", "reminder", "appointment", "call the va", "schedule", "tomorrow", "next week"]):
         return "create_reminder"
     if any(x in t for x in ["remember", "memory", "save this", "log this", "journal"]):
         return "save_memory"
-    if any(x in t for x in ["benefit", "claim", "gi bill", "disability", "home loan", "va loan", "spouse", "dependent", "survivor", "caregiver", "family access"]):
+    if any(x in t for x in ["benefit", "claim", "gi bill", "disability", "home loan", "va loan", "spouse", "dependent", "survivor", "caregiver", "family access", "pact act", "burn pit", "agent orange", "nexus", "c&p", "dbq", "service connection", "compensation"]):
         return "search_benefits"
     if any(x in t for x in ["event", "activity", "vfw", "american legion", "near me", "places", "coffee", "park", "restaurant", "bbq", "food", "clinic", "va facility", "gym", "fishing"]):
         return "find_local_veteran_activities"
-    if any(x in t for x in ["music", "song", "playlist", "play something"]):
+    if any(x in t for x in ["music", "song", "playlist", "play something", "cadence"]):
         return "suggest_music"
     if any(x in t for x in ["briefing", "today", "how is my day", "what should i do", "plan my day"]):
         return "get_today_briefing"
@@ -1381,7 +1387,15 @@ Use natural battle-buddy language without calling yourself an AI assistant. Fini
 
     if intent == "search_benefits":
         data = benefits_lookup(message, state, branch)
-        fallback = f"{first_name}, here is the strongest starting point: {data['items'][0]['title']}. {data['items'][0]['summary']} Next step: {data['items'][0]['next_step']}"
+        fallback = generate_veteran_assistant_response(
+            message=message,
+            first_name=first_name,
+            branch=branch,
+            city=city,
+            state=state,
+            context=context,
+            intent=intent,
+        )
         prompt = f"""You are ValorBuddy, a plain-English veteran benefits guide. You are informational only, not legal/medical advice.
 User: {first_name}, {branch}, {city}, {state}
 Question: {message}
@@ -1443,7 +1457,15 @@ Answer naturally and specifically. Include spouse, child, dependent, caregiver, 
         rems = db.query(Reminder).filter(Reminder.user_id == user.id).order_by(Reminder.id.desc()).limit(4).all()
     routed_agents = route_goal(message)
     active_agent = routed_agents[0] if routed_agents else "companion"
-    fallback = f"{agent_opening(active_agent, first_name)} I identified one useful next action and kept the response within this agent's mission."
+    fallback = generate_veteran_assistant_response(
+        message=message,
+        first_name=first_name,
+        branch=branch,
+        city=city,
+        state=state,
+        context=context,
+        intent=intent,
+    )
     profile = user.profile if user and user.profile else None
     profile_context = {
         "first_name": first_name, "last_name": getattr(profile, "last_name", ""), "rank": getattr(profile, "rank", ""),
@@ -1881,7 +1903,7 @@ def mfa_confirm(payload: MfaCodeRequest, authorization: str | None = Header(defa
 
 def send_password_reset_email(recipient: str, reset_url: str) -> bool:
     if not RESEND_API_KEY:
-        logger.warning("Password reset requested but RESEND_API_KEY is not configured")
+        logger.warning("Password reset requested for %s, but RESEND_API_KEY is not configured. Local reset link: %s", recipient, reset_url)
         return False
     try:
         response = httpx.post("https://api.resend.com/emails", headers={"Authorization": f"Bearer {RESEND_API_KEY}"}, json={"from": AUTH_FROM_EMAIL, "to": [recipient], "subject": "Reset your ValorBuddy password", "html": f'<p>A password reset was requested for your ValorBuddy account.</p><p><a href="{reset_url}">Reset password</a></p><p>This link expires in {PASSWORD_RESET_EXPIRE_MINUTES} minutes. If you did not request it, ignore this message.</p>'}, timeout=15)
@@ -2614,13 +2636,14 @@ async def companion_chat(
                 "next_action": mission.get("next_action"),
             },
         )
+        mission_fallback = (
+            f"{p.first_name if p else 'Battle Buddy'}, I have organized and planned the mission for '{mission.get('title', payload.message)}'. "
+            f"Specialist agents ({', '.join(mission.get('participating_agents', ['Supervisor']))}) have mapped the required steps. "
+            f"Next action: {mission.get('next_action', 'Open Mission Control to review each milestone and take action.')}"
+        )
         reply = await gemini_reply(
             synth_prompt,
-            mission.get("summary")
-            or (
-                "I created and worked the mission. Open Mission Control "
-                "to review the completed steps and next action."
-            ),
+            mission.get("summary") or mission_fallback,
         )
         result: dict[str, Any] = {
             "mode": "mission",
@@ -3164,24 +3187,46 @@ def admin_analytics(user: User = Depends(platform_admin_required), db: Session =
 @app.get("/api/career/documents")
 def list_career_documents(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     rows = db.query(CareerDocument).filter(CareerDocument.user_id == user.id).order_by(CareerDocument.updated_at.desc()).limit(100).all()
-    return [{"id":r.id,"document_type":r.document_type,"title":r.title,"target":r.target,"content":r.content,"status":r.status,"created_at":r.created_at,"updated_at":r.updated_at} for r in rows]
+    return [
+        {
+            "id": r.id,
+            "document_type": r.document_type,
+            "title": r.title,
+            "target": r.target,
+            "content": r.content,
+            "status": r.status,
+            "created_at": r.created_at.isoformat() if hasattr(r.created_at, "isoformat") else str(r.created_at),
+            "updated_at": r.updated_at.isoformat() if hasattr(r.updated_at, "isoformat") else str(r.updated_at)
+        }
+        for r in rows
+    ]
 
 
 @app.post("/api/career/generate")
 async def generate_career_document(payload: CareerGenerateIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     p = user.profile
     if not p:
-        raise HTTPException(status_code=400, detail="Complete your service profile first")
+        p = UserProfile(
+            user_id=user.id,
+            first_name="Veteran",
+            last_name="",
+            branch="Army",
+            service_status="Veteran"
+        )
+        db.add(p)
+        db.commit()
+        db.refresh(p)
     mos = p.military_mos or (p.profile_data or {}).get("mos","")
     military_title = p.military_job_title or (p.profile_data or {}).get("military_job_title","")
     experience = p.military_experience or (p.profile_data or {}).get("military_experience","")
     if not mos and not experience:
         mos = "Military Operations & Leadership"
         experience = f"Honorable service in United States {p.branch or 'Armed Forces'} ({p.rank or 'Service Member'}). Proficient in mission planning, team leadership, asset accountability, and operational safety."
-    doc_labels={"resume":"Civilian Resume","cover_letter":"Cover Letter","business_plan":"Veteran Business Plan","career_plan":"Career Transition Plan"}
+    doc_labels = {"resume":"Civilian Resume","cover_letter":"Cover Letter","business_plan":"Veteran Business Plan","career_plan":"Career Transition Plan"}
+    doc_label = doc_labels.get(payload.document_type, "Career Document")
     facts = {
-      "name": f"{p.first_name} {p.last_name or ''}".strip(), "branch": p.branch, "rank": p.rank or "",
-      "service_status": p.service_status, "service_years": f"{p.service_start_year or ''}-{p.service_end_year or ''}",
+      "name": f"{p.first_name} {p.last_name or ''}".strip() or "Veteran Member", "branch": p.branch or "Army", "rank": p.rank or "",
+      "service_status": p.service_status or "Veteran", "service_years": f"{p.service_start_year or ''}-{p.service_end_year or ''}",
       "mos": mos, "military_job_title": military_title, "military_experience": experience,
       "military_specialty_description": p.military_specialty_description or "", "years_of_service": p.years_of_service,
       "civilian_career_goal": p.civilian_career_goal or "", "business_interest": p.business_interest or "",
@@ -3190,7 +3235,7 @@ async def generate_career_document(payload: CareerGenerateIn, user: User = Depen
       "campaigns": (p.profile_data or {}).get("campaigns",""), "decorations": (p.profile_data or {}).get("decorations",""),
       "target": payload.target, "notes": payload.notes
     }
-    prompt = f"""Create a professional {doc_labels[payload.document_type]} for a U.S. military community member.
+    prompt = f"""Create a professional {doc_label} for a U.S. military community member.
 Use ONLY the verified facts below. Translate military terminology into civilian language, but do not invent employers, dates, degrees, certifications, metrics, clearances, awards, revenue, licenses, or achievements.
 For a resume: include summary, transferable skills, military experience, education/certifications placeholders only when not provided, and ATS keywords for the target.
 For a business plan: include executive summary, customer problem, solution, veteran/MOS advantage, target market, operations, marketing, revenue model, startup assumptions clearly labeled, risks, milestones, and next steps.
@@ -3198,7 +3243,7 @@ For a cover letter or career plan, use an appropriate professional structure.
 Verified profile:
 {json.dumps(facts, default=str)}
 Return polished plain text with clear headings."""
-    fallback = f"""{doc_labels[payload.document_type].upper()}
+    fallback = f"""{doc_label.upper()}
 
 Target: {payload.target}
 Candidate: {facts['name']}
@@ -3213,10 +3258,20 @@ NEXT STEP
 Review this draft, add verified accomplishments and measurable outcomes, and tailor it to the specific opportunity. No unverified credentials or metrics were added."""
     content = await gemini_reply(prompt, fallback)
     source_doc = db.query(Document).filter(Document.user_id == user.id, Document.doc_type == "resume").order_by(Document.id.desc()).first()
-    row = CareerDocument(user_id=user.id, document_type=payload.document_type, title=f"{doc_labels[payload.document_type]} — {payload.target}", target=payload.target, content=content, source_profile=facts, source_document_id=source_doc.id if source_doc else None)
-    db.add(row); db.add(AdminAuditLog(user_id=user.id, action="career.document.generated", details=f"{payload.document_type}:{payload.target}"))
-    db.commit(); db.refresh(row)
-    return {"id":row.id,"document_type":row.document_type,"title":row.title,"target":row.target,"content":row.content,"status":row.status,"created_at":row.created_at}
+    row = CareerDocument(user_id=user.id, document_type=payload.document_type, title=f"{doc_label} — {payload.target}", target=payload.target, content=content, source_profile=facts, source_document_id=source_doc.id if source_doc else None)
+    db.add(row)
+    db.add(AdminAuditLog(user_id=user.id, action="career.document.generated", details=f"{payload.document_type}:{payload.target}"))
+    db.commit()
+    db.refresh(row)
+    return {
+        "id": row.id,
+        "document_type": row.document_type,
+        "title": row.title,
+        "target": row.target,
+        "content": row.content,
+        "status": row.status,
+        "created_at": row.created_at.isoformat() if hasattr(row.created_at, "isoformat") else str(row.created_at)
+    }
 
 
 # ============================================================================
