@@ -49,14 +49,20 @@ function applyBranchTheme(branch){
 }
 
 
+// Precise GPS coordinates are ephemeral and never written to persistent browser storage.
+let recentBrowserLocation = {lat:null,lng:null};
+try {
+  localStorage.removeItem('valor_lat');
+  localStorage.removeItem('valor_lng');
+  localStorage.removeItem('valor_location_updated');
+} catch {}
 function saveBrowserLocation(){
   try{
     if(!navigator.geolocation)return;
     navigator.geolocation.getCurrentPosition(pos=>{
       const lat=pos.coords.latitude;
       const lng=pos.coords.longitude;
-      localStorage.setItem('valor_lat',String(lat));
-      localStorage.setItem('valor_lng',String(lng));
+      recentBrowserLocation = {lat,lng};
     },()=>{}, {enableHighAccuracy:true,timeout:8000,maximumAge:300000});
   }catch{}
 }
@@ -68,8 +74,7 @@ async function freshLocation({required=false,maximumAge=15000}={}){
   }
   return await new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(pos=>{
     const lat=pos.coords.latitude,lng=pos.coords.longitude;
-    localStorage.setItem('valor_lat',String(lat));localStorage.setItem('valor_lng',String(lng));
-    localStorage.setItem('valor_location_updated',String(Date.now()));
+    recentBrowserLocation = {lat,lng};
     resolve({lat,lng,accuracy:pos.coords.accuracy,source:'gps'});
   },err=>{
     const messages={1:'Location permission was denied. Enable location access for ValorBuddy in your browser settings and try again.',2:'Your current location could not be determined. Check Location Services and your connection, then try again.',3:'Location request timed out. Please try again.'};
@@ -79,9 +84,7 @@ async function freshLocation({required=false,maximumAge=15000}={}){
   },{enableHighAccuracy:true,timeout:12000,maximumAge}));
 }
 function locationPayload(){
-  const lat=localStorage.getItem('valor_lat');
-  const lng=localStorage.getItem('valor_lng');
-  return {lat:lat?Number(lat):null,lng:lng?Number(lng):null};
+  return {...recentBrowserLocation};
 }
 function voicePreferences(){
   const style=localStorage.getItem('valor_voice_style')||'command';
@@ -106,7 +109,21 @@ function friendlyVoiceLabel(v){
   const region=lang.includes('en-us')?'US':lang.includes('en-gb')?'UK':lang.includes('en-au')?'AU':lang.includes('en-ca')?'CA':'';
   return region && !name.toLowerCase().includes(region.toLowerCase()) ? `${name} • ${region}` : name;
 }
+function safeAvatarUrl(value){
+  if(typeof value !== 'string') return '';
+  const url = value.trim();
+  if(/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/i.test(url)) return url;
+  try{
+    const parsed = new URL(url);
+    if(parsed.protocol === 'https:') return parsed.href;
+  }catch{}
+  return '';
+}
+
 function authHeaders(){const t=localStorage.getItem('valor_token');return t?{Authorization:`Bearer ${t}`}:{} }
+// Demo-only reminders are in memory; no auth request data is persisted.
+let demoReminders = [];
+let demoCareerDrafts = null;
 function getDemoFallback(path,opts={}){
   const currentBranch=normalizeBranch(localStorage.getItem('valor_branch_theme')||'Army');
   if(path==='/auth/me'){
@@ -128,11 +145,7 @@ function getDemoFallback(path,opts={}){
     };
   }
   if(path==='/api/reminders'||path.startsWith('/api/reminders/')){
-    let stored = [];
-    try {
-      const raw = localStorage.getItem('valor_reminders');
-      if (raw) stored = JSON.parse(raw);
-    } catch {}
+    let stored = demoReminders;
     if (!Array.isArray(stored) || stored.length === 0) {
       const now = new Date();
       const tomorrow = new Date(now.getTime() + 24 * 3600 * 1000);
@@ -180,7 +193,7 @@ function getDemoFallback(path,opts={}){
           delivery_state: 'scheduled'
         }
       ];
-      try { localStorage.setItem('valor_reminders', JSON.stringify(stored)); } catch {}
+      demoReminders = stored;
     }
 
     if (opts.method === 'POST') {
@@ -200,7 +213,7 @@ function getDemoFallback(path,opts={}){
         delivery_state: 'scheduled'
       };
       stored.unshift(newReminder);
-      try { localStorage.setItem('valor_reminders', JSON.stringify(stored)); } catch {}
+      demoReminders = stored;
       return newReminder;
     }
 
@@ -212,7 +225,7 @@ function getDemoFallback(path,opts={}){
       if (target) {
         target.status = body.status || target.status;
         target.stored_status = body.status || target.stored_status;
-        try { localStorage.setItem('valor_reminders', JSON.stringify(stored)); } catch {}
+        demoReminders = stored;
         return target;
       }
       return { status: 'ok' };
@@ -221,7 +234,7 @@ function getDemoFallback(path,opts={}){
     if (opts.method === 'DELETE') {
       const reminderId = path.replace('/api/reminders/', '');
       stored = stored.filter(x => String(x.id) !== String(reminderId));
-      try { localStorage.setItem('valor_reminders', JSON.stringify(stored)); } catch {}
+      demoReminders = stored;
       return { ok: true };
     }
 
@@ -299,13 +312,7 @@ function getDemoFallback(path,opts={}){
     return{overview:{total_users:142,approved_users:138,pending_partners:3},items:[]};
   }
   if(path==='/api/career/documents'){
-    try {
-      const stored = localStorage.getItem('valor_career_drafts');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {}
+    if (Array.isArray(demoCareerDrafts) && demoCareerDrafts.length > 0) return demoCareerDrafts;
     const defaultDrafts = [
       {
         id: 'cd-1',
@@ -397,7 +404,7 @@ Vanguard Defense Solutions LLC provides specialized supply chain advisory, inven
 • Texas Veteran Commission (TVC) Entrepreneurship Program: State tax exemptions and specialized small business mentorship.`
       }
     ];
-    try { localStorage.setItem('valor_career_drafts', JSON.stringify(defaultDrafts)); } catch {}
+    demoCareerDrafts = defaultDrafts;
     return defaultDrafts;
   }
   if(path==='/api/career/generate'){
@@ -511,12 +518,7 @@ ${notes ? `• Custom Requirements: ${notes}` : ''}
       content: draftContent
     };
 
-    try {
-      const stored = localStorage.getItem('valor_career_drafts');
-      const drafts = stored ? JSON.parse(stored) : [];
-      drafts.unshift(newDraft);
-      localStorage.setItem('valor_career_drafts', JSON.stringify(drafts));
-    } catch {}
+    demoCareerDrafts = [newDraft, ...(demoCareerDrafts || [])];
 
     return newDraft;
   }
@@ -660,7 +662,15 @@ function cleanVisibleText(value=''){
 function LinkifiedText({text=''}){
   const cleaned=cleanVisibleText(text);
   const parts=cleaned.split(/(https?:\/\/[^\s<>()]+)/g);
-  return <>{parts.map((part,i)=>/^https?:\/\//i.test(part)?<a className="officialResourceLink" href={part.replace(/[.,;:!?]+$/,'')} target="_blank" rel="noopener noreferrer" key={i}>Open official resource ↗</a>:<span key={i}>{part}</span>)}</>;
+  return <>{parts.map((part,i)=>{
+    if(!/^https?:\/\//i.test(part))return <span key={i}>{part}</span>;
+    let href='';
+    try{
+      const url=new URL(part.replace(/[.,;:!?]+$/,''));
+      if((url.protocol==='https:'||url.protocol==='http:')&&url.hostname)href=url.href;
+    }catch{}
+    return href?<a className="officialResourceLink" href={href} target="_blank" rel="noopener noreferrer" key={i}>Open official resource ↗</a>:<span key={i}>{part}</span>;
+  })}</>;
 }
 
 function HealthSafetyNotice(){
@@ -1516,10 +1526,10 @@ function Sidebar({user,screen,setScreen,mobileOpen,onLogout}){
           aria-label="Open profile"
         >
           <div className="tacticalAvatar">
-            {(user.avatar_url || user.profile_data?.avatar_url || localStorage.getItem('valor_user_avatar')) ? (
+            {safeAvatarUrl(user.avatar_url) || safeAvatarUrl(user.profile_data?.avatar_url) || safeAvatarUrl(localStorage.getItem('valor_user_avatar')) ? (
               <img
                 className="tacticalAvatarImg"
-                src={user.avatar_url || user.profile_data?.avatar_url || localStorage.getItem('valor_user_avatar')}
+                src={safeAvatarUrl(user.avatar_url) || safeAvatarUrl(user.profile_data?.avatar_url) || safeAvatarUrl(localStorage.getItem('valor_user_avatar'))}
                 alt={`${user.first_name || 'User'} avatar`}
               />
             ) : (
@@ -3263,11 +3273,63 @@ const mediaProviders={
   Audiomack:{kind:'external',home:'https://audiomack.com/',search:q=>`https://audiomack.com/search?q=${encodeURIComponent(q)}`,help:'Audiomack’s full website may refuse framing. ValorBuddy avoids blank screens and uses secure links.'},
   TuneIn:{kind:'external',home:'https://tunein.com/',search:q=>`https://tunein.com/search/?query=${encodeURIComponent(q)}`,help:'TuneIn stations open securely because the complete TuneIn site is not a reliable embedded player.'}
 };
-function getYouTubeEmbed(raw){try{const u=new URL(raw);let id='';if(u.hostname==='youtu.be')id=u.pathname.split('/').filter(Boolean)[0]||'';else if(u.hostname.includes('youtube.com')){id=u.searchParams.get('v')||'';if(!id&&u.pathname.includes('/shorts/'))id=u.pathname.split('/shorts/')[1]?.split('/')[0]||'';if(!id&&u.pathname.includes('/embed/'))id=u.pathname.split('/embed/')[1]?.split('/')[0]||'';const list=u.searchParams.get('list');if(list&&!id)return `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(list)}`;if(id&&list)return `https://www.youtube.com/embed/${encodeURIComponent(id)}?list=${encodeURIComponent(list)}`;}return id?`https://www.youtube.com/embed/${encodeURIComponent(id)}`:''}catch{return ''}}
-function getYouTubeId(raw){try{const u=new URL(raw);if(u.hostname==='youtu.be')return u.pathname.split('/').filter(Boolean)[0]||'';if(u.hostname.includes('youtube.com')){const v=u.searchParams.get('v');if(v)return v;if(u.pathname.includes('/shorts/'))return u.pathname.split('/shorts/')[1]?.split('/')[0]||'';if(u.pathname.includes('/embed/'))return u.pathname.split('/embed/')[1]?.split('/')[0]||'';}return ''}catch{return ''}}
-function getSpotifyEmbed(raw){try{const u=new URL(raw);if(!u.hostname.endsWith('spotify.com'))return '';const parts=u.pathname.split('/').filter(Boolean);const allowed=['track','album','artist','playlist','episode','show'];const index=parts.findIndex(x=>allowed.includes(x));if(index<0||!parts[index+1])return '';return `https://open.spotify.com/embed/${parts[index]}/${parts[index+1]}?utm_source=generator&theme=0`}catch{return ''}}
-function getAppleMusicEmbed(raw){try{const u=new URL(raw);if(u.hostname!=='music.apple.com')return '';return `https://embed.music.apple.com${u.pathname}${u.search}`}catch{return ''}}
-function getSoundCloudEmbed(raw){try{const u=new URL(raw);if(!u.hostname.endsWith('soundcloud.com'))return '';return `https://w.soundcloud.com/player/?url=${encodeURIComponent(raw)}&color=%2357e86e&auto_play=false&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=true`}catch{return ''}}
+function trustedMusicUrl(raw, domains){
+  try{
+    const u=new URL(raw);
+    if(u.protocol!=='https:')return null;
+    if(!domains.some(domain=>u.hostname===domain||u.hostname.endsWith('.'+domain)))return null;
+    return u;
+  }catch{return null;}
+}
+function getYouTubeEmbed(raw){
+  const u=trustedMusicUrl(raw,['youtube.com','youtu.be']);
+  if(!u)return '';
+  let id='';
+  if(u.hostname==='youtu.be')id=u.pathname.split('/').filter(Boolean)[0]||'';
+  else{
+    id=u.searchParams.get('v')||'';
+    if(!id&&u.pathname.startsWith('/shorts/'))id=u.pathname.split('/')[2]||'';
+    if(!id&&u.pathname.startsWith('/embed/'))id=u.pathname.split('/')[2]||'';
+  }
+  const list=u.searchParams.get('list');
+  if(!id&&!list)return '';
+  if(id&&!/^[a-zA-Z0-9_-]{11}$/.test(id))return '';
+  if(list&&!/^[a-zA-Z0-9_-]{10,150}$/.test(list))return '';
+  if(list&&!id)return `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(list)}`;
+  return `https://www.youtube.com/embed/${id}${list?'?list='+encodeURIComponent(list):''}`;
+}
+function getYouTubeId(raw){
+  const u=trustedMusicUrl(raw,['youtube.com','youtu.be']);
+  if(!u)return '';
+  let id='';
+  if(u.hostname==='youtu.be')id=u.pathname.split('/').filter(Boolean)[0]||'';
+  else{
+    id=u.searchParams.get('v')||'';
+    if(!id&&u.pathname.startsWith('/shorts/'))id=u.pathname.split('/')[2]||'';
+    if(!id&&u.pathname.startsWith('/embed/'))id=u.pathname.split('/')[2]||'';
+  }
+  if(id&&/^[a-zA-Z0-9_-]{11}$/.test(id)) return id;
+  return '';
+}
+function getSpotifyEmbed(raw){
+  const u=trustedMusicUrl(raw,['spotify.com']);
+  if(!u)return '';
+  const parts=u.pathname.split('/').filter(Boolean);
+  const allowed=['track','album','artist','playlist','episode','show'];
+  const index=parts.findIndex(x=>allowed.includes(x));
+  if(index<0||!parts[index+1]||!/^[a-zA-Z0-9]+$/.test(parts[index+1]))return '';
+  return `https://open.spotify.com/embed/${parts[index]}/${parts[index+1]}?utm_source=generator&theme=0`;
+}
+function getAppleMusicEmbed(raw){
+  const u=trustedMusicUrl(raw,['music.apple.com']);
+  if(!u||u.hostname!=='music.apple.com')return '';
+  return `https://embed.music.apple.com${u.pathname}${u.search}`;
+}
+function getSoundCloudEmbed(raw){
+  const u=trustedMusicUrl(raw,['soundcloud.com']);
+  if(!u)return '';
+  return `https://w.soundcloud.com/player/?url=${encodeURIComponent(u.href)}&color=%2357e86e&auto_play=false&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=true`;
+}
 
 function mediaEmbed(provider,raw){
   const kind=mediaProviders[provider]?.kind;
@@ -3909,14 +3971,20 @@ function Profile({user,setUser}){
   const[form,setForm]=useState(()=>makeForm(user));
   useEffect(()=>{if(!editing)setForm(makeForm(user))},[user,editing]);
 
-  const currentAvatar = user.avatar_url || user.profile_data?.avatar_url || localStorage.getItem('valor_user_avatar') || '';
+  const currentAvatar = safeAvatarUrl(user.avatar_url) || safeAvatarUrl(user.profile_data?.avatar_url) || safeAvatarUrl(localStorage.getItem('valor_user_avatar'));
   const initials = `${(user.first_name||'V')[0]||'V'}${(user.last_name||'B')[0]||'B'}`.toUpperCase();
 
   function handleAvatarUpload(e){
     const file = e.target.files?.[0];
     if(!file) return;
-    if(!file.type.startsWith('image/')){
-      alert('Please select a valid image file (JPEG, PNG, WebP).');
+    if(!['image/jpeg','image/png','image/webp'].includes(file.type)){
+      setMessage('Please select a JPEG, PNG, or WebP image.');
+      e.target.value = '';
+      return;
+    }
+    if(file.size > 5 * 1024 * 1024){
+      setMessage('Profile photos must be 5 MB or smaller.');
+      e.target.value = '';
       return;
     }
     const reader = new FileReader();
@@ -3961,8 +4029,10 @@ function Profile({user,setUser}){
         }).catch(() => {});
         setMessage('Profile photo updated successfully.');
       };
+      img.onerror = () => setMessage('Could not read this image. Please choose another photo.');
       img.src = ev.target.result;
     };
+    reader.onerror = () => setMessage('Could not open this file. Please try again.');
     reader.readAsDataURL(file);
     e.target.value = '';
   }
