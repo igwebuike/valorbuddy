@@ -55,7 +55,7 @@ class SecurityTests(unittest.TestCase):
         self.assertNotIn(secret_token, logged_text)
         self.assertNotIn(reset_url, logged_text)
         self.assertNotIn("token=", logged_text)
-        self.assertIn("delivery skipped", logged_text)
+        self.assertIn("delivery provider unconfigured", logged_text)
 
 
 if __name__ == "__main__":
