@@ -79,24 +79,22 @@ class ReminderApiTests(unittest.TestCase):
 
         Base.metadata.create_all(bind=engine)
         self.client = TestClient(app)
-        self.db = SessionLocal()
-        # Find or create a test user
-        user = self.db.query(User).filter(User.email == "remindertest@valorbuddy.com").first()
-        if not user:
-            user = User(email="remindertest@valorbuddy.com", role="veteran", approval_status="approved", password_hash="dummy")
-            self.db.add(user)
-            self.db.commit()
-            self.db.refresh(user)
-        self.test_user = user
+        with SessionLocal() as db:
+            user = db.query(User).filter(User.email == "remindertest@valorbuddy.com").first()
+            if not user:
+                user = User(email="remindertest@valorbuddy.com", role="veteran", approval_status="approved", password_hash="dummy")
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+            self.test_user = user
         app.dependency_overrides[get_current_user] = lambda: self.test_user
 
     def tearDown(self):
-        from app.main import app, get_current_user, Reminder
+        from app.main import app, get_current_user, Reminder, SessionLocal
         app.dependency_overrides.pop(get_current_user, None)
-        # Clean up test reminders
-        self.db.query(Reminder).filter(Reminder.user_id == self.test_user.id).delete()
-        self.db.commit()
-        self.db.close()
+        with SessionLocal() as db:
+            db.query(Reminder).filter(Reminder.user_id == self.test_user.id).delete()
+            db.commit()
 
     def test_reminder_crud_lifecycle(self):
         # 1. Create reminder
