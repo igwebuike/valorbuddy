@@ -1903,7 +1903,7 @@ def mfa_confirm(payload: MfaCodeRequest, authorization: str | None = Header(defa
 
 def send_password_reset_email(recipient: str, reset_url: str) -> bool:
     if not RESEND_API_KEY:
-        logger.warning("Password reset requested for %s, but RESEND_API_KEY is not configured. Local reset link: %s", recipient, reset_url)
+        logger.warning("Password reset requested for %s, but email service (RESEND_API_KEY) is not configured; delivery skipped.", recipient)
         return False
     try:
         response = httpx.post("https://api.resend.com/emails", headers={"Authorization": f"Bearer {RESEND_API_KEY}"}, json={"from": AUTH_FROM_EMAIL, "to": [recipient], "subject": "Reset your ValorBuddy password", "html": f'<p>A password reset was requested for your ValorBuddy account.</p><p><a href="{reset_url}">Reset password</a></p><p>This link expires in {PASSWORD_RESET_EXPIRE_MINUTES} minutes. If you did not request it, ignore this message.</p>'}, timeout=15)
