@@ -11,9 +11,10 @@ permissions:
   contents: write
   pages: write
   id-token: write
+  deployments: write
 
 concurrency:
-  group: "pages-staging"
+  group: "pages-staging-${{ github.ref }}"
   cancel-in-progress: false
 
 jobs:
@@ -21,8 +22,8 @@ jobs:
     name: Build & Publish Staging
     runs-on: ubuntu-latest
     environment:
-      name: staging
-      url: https://igwebuike.github.io/valorbuddy/
+      name: ${{ github.ref_name == 'security/v6-standardization' && 'security/v6-standardization - valorbuddy-frontend-staging' || 'staging' }}
+      url: https://valorbuddy-frontend-staging.onrender.com
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -74,3 +75,11 @@ jobs:
         if: steps.pages.outcome == 'success'
         uses: actions/deploy-pages@v4
         continue-on-error: true
+
+      - name: Trigger Render Frontend Staging Deploy Hook (if configured)
+        if: env.RENDER_HOOK_URL != ''
+        continue-on-error: true
+        env:
+          RENDER_HOOK_URL: ${{ secrets.RENDER_FRONTEND_STAGING_DEPLOY_HOOK || secrets.RENDER_DEPLOY_HOOK || '' }}
+        run: |
+          curl -sS -X POST "$RENDER_HOOK_URL"

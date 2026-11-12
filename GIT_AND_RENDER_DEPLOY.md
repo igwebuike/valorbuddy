@@ -1,5 +1,8 @@
 # ValorBuddy 3.2 Git and Render Deployment
 
+> [!NOTE]
+> For the authoritative automated staging deployment workflow, see [docs/DEPLOYMENT_SOP.md](file:///c:/Users/Kelec/OneDrive/Desktop/valorbuddy_Site/docs/DEPLOYMENT_SOP.md) and [GEMINI.md](file:///c:/Users/Kelec/OneDrive/Desktop/valorbuddy_Site/GEMINI.md). All staging updates must target branch `security/v6-standardization` and deploy via GitHub Actions.
+
 ## Render backend environment
 
 Add these to the **valorbuddy Python backend**:

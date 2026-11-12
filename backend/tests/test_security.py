@@ -38,6 +38,25 @@ class SecurityTests(unittest.TestCase):
         self.assertTrue(limiter.allow("client", 2, 60)[0])
         self.assertFalse(limiter.allow("client", 2, 60)[0])
 
+    def test_password_reset_does_not_log_token_or_url(self):
+        import logging
+        from app.main import send_password_reset_email
+
+        secret_token = "secret-sensitive-reset-token-9876543210"
+        reset_url = f"https://valorbuddy.com/reset-password?token={secret_token}"
+        recipient = "veteran.test@example.com"
+
+        with self.assertLogs("valorbuddy.ai", level=logging.WARNING) as log_context:
+            with patch("app.main.RESEND_API_KEY", None):
+                result = send_password_reset_email(recipient, reset_url)
+
+        self.assertFalse(result)
+        logged_text = " ".join(log_context.output)
+        self.assertNotIn(secret_token, logged_text)
+        self.assertNotIn(reset_url, logged_text)
+        self.assertNotIn("token=", logged_text)
+        self.assertIn("delivery provider unconfigured", logged_text)
+
 
 if __name__ == "__main__":
     unittest.main()

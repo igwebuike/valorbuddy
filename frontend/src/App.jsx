@@ -1,5 +1,5 @@
 import React,{useEffect,useMemo,useRef,useState}from'react';
-import{Shield,Mic,MicOff,LogOut,User,Calendar,MapPin,Heart,Folder,Music,Bell,Brain,Search,ChevronRight,BarChart3,Lock,Eye,EyeOff,Plus,Upload,FileText,RefreshCw,Radio,Menu,X,Trash2,Car,Home,Briefcase,Navigation,DollarSign,BookOpen,TrendingUp,CheckCircle2,Clock,ArrowUpRight,Star}from'lucide-react';
+import{Shield,Mic,MicOff,LogOut,User,Calendar,MapPin,Heart,Folder,Music,Bell,Brain,Search,ChevronRight,BarChart3,Lock,Eye,EyeOff,Plus,Upload,FileText,RefreshCw,Radio,Menu,X,Trash2,Car,Home,Briefcase,Navigation,DollarSign,BookOpen,TrendingUp,CheckCircle2,Clock,ArrowUpRight,Star,Play,ExternalLink,Bookmark}from'lucide-react';
 import{Capacitor}from'@capacitor/core';
 import{TextToSpeech}from'@capacitor-community/text-to-speech';
 import{SpeechRecognition as NativeSpeechRecognition}from'@capgo/capacitor-speech-recognition';
@@ -91,7 +91,7 @@ function voicePreferences(){
   return {style,voiceName:localStorage.getItem('valor_voice_name')||''};
 }
 const voiceStyles={
-  command:{label:'Command — strong & steady',rate:.9,pitch:.78,volume:1},
+  command:{label:'Command — strong & steady',rate:.95,pitch:.92,volume:1},
   clear:{label:'Clear — professional',rate:.96,pitch:.94,volume:1},
   calm:{label:'Calm — reassuring',rate:.86,pitch:.9,volume:1},
   warm:{label:'Warm — conversational',rate:.92,pitch:1.02,volume:1}
@@ -264,8 +264,21 @@ function getDemoFallback(path,opts={}){
     ];
   }
   if(path==='/api/companion/chat'||path==='/api/vapi/action'){
+    let queryText = '';
+    try {
+      const parsedBody = JSON.parse(opts.body || '{}');
+      queryText = String(parsedBody.message || parsedBody.query || '').toLowerCase();
+    } catch {}
+    let responseText = `Good to have you with us! I am ValorBuddy, your AI Battle Buddy. I'm standing by to help with VA disability claims, MOS skills translation, local clinic navigation, and mission scheduling. What can I do for you today?`;
+    if(/hello|hi|hey|howdy|good morning|good afternoon|good evening/i.test(queryText)){
+      responseText = `Good day, Battle Buddy! I am ValorBuddy, your AI Battle Buddy. I'm standing by to help with VA disability claims, MOS skills translation, local clinic navigation, and mission scheduling. What can I do for you today?`;
+    } else if(/claim|disability|pact|rating/i.test(queryText)){
+      responseText = `For VA disability claims: 1. Submit an Intent to File on VA.gov first to lock in your effective date. 2. Gather in-service incident records, current medical diagnoses, and a medical nexus letter. 3. Connect with an accredited VSO for free representation.`;
+    } else if(/resume|mos|career|job|civilian/i.test(queryText)){
+      responseText = `To translate your military MOS into a civilian resume: focus on measurable outcomes, personnel leadership, equipment readiness rates, and security clearances. Open Career & Business in the left menu to generate a complete draft!`;
+    }
     return{
-      response:`Battle Buddy standing by in Staging Preview mode. I can help explore VA claims, translate military specialties, find nearby VAMC clinics, and assist your transition.`,
+      response: responseText,
       intent:'assistant_help',
       data:{
         items:[
@@ -517,7 +530,12 @@ async function api(path,opts={}){
   try{
     r=await fetch(API+path,{...opts,headers:{'Content-Type':'application/json',...authHeaders(),...(opts.headers||{})}});
   }catch(err){
-    if(isDemo)return getDemoFallback(path,opts);
+    if(isDemo || path==='/api/vapi/action' || path==='/api/companion/chat' || path==='/api/briefing') {
+      try {
+        const fallback = getDemoFallback(path, opts);
+        if (fallback) return fallback;
+      } catch {}
+    }
     throw new Error('ValorBuddy could not reach the server. Please check your connection and try again in a few seconds.');
   }
   if(!r.ok){
@@ -542,19 +560,57 @@ function stopSpeaking(){
     else window.speechSynthesis?.cancel();
   }catch{}
 }
+function cleanSpeechText(text){
+  if(!text)return '';
+  return String(text)
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/https?:\/\/\S+/gi, 'the official resource on your screen')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/[*_~#>-]/g, ' ')
+    .replace(/\bVA\b/g, 'V-A')
+    .replace(/\bMOS\b/g, 'M-O-S')
+    .replace(/\bAFSC\b/g, 'A-F-S-C')
+    .replace(/\bVFW\b/g, 'V-F-W')
+    .replace(/\bDD-?214\b/gi, 'D-D two fourteen')
+    .replace(/\bPACT\b/g, 'Pact')
+    .replace(/\b988\b/g, 'nine eight eight')
+    .replace(/\b838255\b/g, 'eight three eight, two five five')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
 function speechChunks(text,items=[]){
   if(items?.length){
     const out=[`I found ${Math.min(items.length,3)} options. I’ll explain them one at a time.`];
     items.slice(0,3).forEach((x,i)=>{
-      const title=x.title||x.name||`option ${i+1}`;
+      const title=cleanSpeechText(x.title||x.name||`option ${i+1}`);
       const rating=x.rating?` It has a rating of ${x.rating}.`:'';
-      const why=x.assistant_explanation||x.description||x.summary||'';
+      const why=cleanSpeechText(x.assistant_explanation||x.description||x.summary||'');
       out.push(`${i===0?'First':i===1?'The next one is':'The third option is'} ${title}.${rating} ${why}`.trim());
     });
     out.push('You can say stop at any time, ask why I chose one, or say one, two, or three.');
     return out;
   }
-  return String(text||'').split(/(?<=[.!?])\s+/).filter(Boolean).reduce((a,x)=>{if((a[a.length-1]||'').length<150)a[a.length-1]=(a[a.length-1]?a[a.length-1]+' ':'')+x;else a.push(x);return a},['']).filter(Boolean);
+  const clean = cleanSpeechText(text);
+  if(!clean) return [];
+
+  // For speech, extract a clear, conversational voice briefing (first 2-3 sentences + closing action)
+  const sentences = clean.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
+  let spokenText = clean;
+  if(sentences.length > 4){
+    const lead = sentences.slice(0, 3).join(' ');
+    const close = sentences[sentences.length - 1];
+    spokenText = `${lead} I've outlined the full operational steps and official links on your screen. ${close}`;
+  }
+
+  return spokenText.split(/(?<=[.!?])\s+/).filter(Boolean).reduce((a,x)=>{
+    if((a[a.length-1]||'').length < 160) {
+      a[a.length-1] = (a[a.length-1] ? a[a.length-1] + ' ' : '') + x;
+    } else {
+      a.push(x);
+    }
+    return a;
+  }, ['']).filter(Boolean);
 }
 function speak(text,{items=[],onDone}={}){
   stopSpeaking();
@@ -636,217 +692,871 @@ function HealthSafetyNotice(){
 
 
 
-function PrivacyPolicy(){
-  const updated='August 2, 2026';
-  return <div className="privacyPage">
-    <header className="privacyHeader">
-      <a className="privacyBrand" href="/" aria-label="Return to ValorBuddy home"><img src={valorLogo} alt="ValorBuddy"/><span><b>ValorBuddy</b><small>Your Digital Battle Buddy</small></span></a>
-      <a className="privacyHomeLink" href="/">Return to ValorBuddy</a>
-    </header>
-    <main className="privacyShell">
-      <section className="privacyHero">
-        <span className="privacyEyebrow">TAGUS TECHNOLOGIES LLC</span>
-        <h1>ValorBuddy Privacy Policy</h1>
-        <p>ValorBuddy supports veterans, service members, military families, caregivers, and authorized users with AI-assisted guidance, reminders, document tools, local recommendations, career resources, and other digital services.</p>
-        <div className="privacyMeta"><span><b>Effective date:</b> {updated}</span><span><b>Last updated:</b> {updated}</span></div>
-      </section>
 
-      <section className="privacyCard privacySummary">
-        <h2>Privacy at a glance</h2>
-        <div className="privacySummaryGrid">
-          <div><Shield/><h3>Your information has a purpose</h3><p>We collect information needed to provide, secure, personalize, and improve ValorBuddy.</p></div>
-          <div><Lock/><h3>You control your account</h3><p>You may request access, correction, export, or deletion of your information.</p></div>
-          <div><EyeOff/><h3>We do not sell personal data</h3><p>ValorBuddy does not sell your personal information or uploaded documents.</p></div>
+function TermsOfService(){
+  const updated = 'November 12, 2026';
+  return (
+    <div className="privacyPage">
+      <header className="privacyHeader">
+        <a className="privacyBrand" href="/" aria-label="Return to ValorBuddy home">
+          <img src={valorLogo} alt="ValorBuddy Logo" />
+          <span><b>ValorBuddy™</b><small>Your Digital Battle Buddy</small></span>
+        </a>
+        <nav className="privacyNav">
+          <a className="privacyHomeLink" href="/">Return to ValorBuddy</a>
+          <a href="/privacy-policy">Privacy Policy</a>
+          <a href="/data-retention-policy">Data Retention</a>
+          <a href="/delete-account">Delete Account</a>
+        </nav>
+      </header>
+
+      <main className="privacyShell">
+        <section className="privacyHero">
+          <span className="privacyEyebrow">TAGUS TECHNOLOGIES LLC · VETERAN-OWNED ENTERPRISE</span>
+          <h1>ValorBuddy™ Terms of Service</h1>
+          <p>
+            These Terms of Service ("Terms") govern your access to and use of ValorBuddy™ ("ValorBuddy", "the Service", "the Platform"), 
+            including our web application, mobile applications, APIs, and associated digital services operated by Tagus Technologies LLC 
+            ("Tagus", "we", "us", or "our"). By accessing, creating an account on, or using ValorBuddy, you acknowledge that you have read, 
+            understood, and agree to be legally bound by these Terms and our Privacy Policy.
+          </p>
+          <div className="privacyMeta">
+            <span><b>Publisher / Entity:</b> Tagus Technologies LLC</span>
+            <span><b>Effective Date:</b> {updated}</span>
+            <span><b>Last Revised:</b> {updated}</span>
+            <span><b>Jurisdiction:</b> State of Texas & United States Federal Law</span>
+          </div>
+        </section>
+
+        {/* Crisis & Emergency Notice */}
+        <div className="crisisNotice" role="alert">
+          <h3><Heart size={18} aria-hidden="true"/> Critical Emergency & Crisis Assistance Notice</h3>
+          <p>
+            <strong>ValorBuddy is NOT an emergency response service, suicide prevention hotline, medical provider, or 911 dispatcher.</strong>
+            {' '}If you or someone you know is in immediate crisis, having thoughts of self-harm, or experiencing a medical emergency, immediate help is available:
+          </p>
+          <p>
+            • <strong>Veterans Crisis Line:</strong> Dial <strong>988</strong>, then <strong>Press 1</strong> (Free, confidential, available 24/7/365)<br/>
+            • <strong>Crisis Text Line:</strong> Send a text message to <strong>838255</strong><br/>
+            • <strong>Emergency Services:</strong> Call <strong>911</strong> or go to the nearest emergency medical facility.
+          </p>
         </div>
-      </section>
 
-      <section className="privacyCard">
-        <h2>1. Who we are</h2>
-        <p>ValorBuddy is operated by <b>TAGUS Technologies LLC</b>. In this policy, “ValorBuddy,” “we,” “us,” and “our” refer to TAGUS Technologies LLC and the ValorBuddy service, including the ValorBuddy mobile application and website.</p>
-      </section>
+        {/* Section 1: Non-Clinical, Non-Legal, Non-Agency Disclaimers */}
+        <section className="privacyCard">
+          <h2>1. Fundamental Service Boundaries & Disclaimers</h2>
+          <div className="privacySection">
+            <h3>1.1 Informational & Educational Navigation Only</h3>
+            <p>
+              ValorBuddy is an AI-assisted informational and educational tool designed to help United States military veterans, 
+              transitioning service members, caregivers, and their families understand and navigate publicly available resources, 
+              statutory provisions (such as Title 38 of the Code of Federal Regulations), and Department of Veterans Affairs (VA) benefit programs.
+            </p>
+          </div>
+          <div className="privacySection">
+            <h3>1.2 No Medical Advice or Healthcare Treatment</h3>
+            <p>
+              ValorBuddy does not provide medical advice, psychiatric counseling, clinical evaluations, or formal diagnoses. 
+              The platform is not a medical device, electronic health record system, or telemedicine provider. Information provided 
+              by the Service must never be used as a substitute for professional clinical judgment, diagnosis, or treatment by a licensed physician, 
+              psychiatrist, or VA medical center healthcare professional.
+            </p>
+          </div>
+          <div className="privacySection">
+            <h3>1.3 No Formal Legal Representation or Claims Filing</h3>
+            <p>
+              ValorBuddy and Tagus Technologies LLC are <strong>not</strong> accredited Veteran Service Organizations (VSOs), 
+              claims agents, or attorneys recognized under 38 U.S.C. § 5902. Use of ValorBuddy does <strong>not</strong> constitute 
+              the legal filing, formal submission, or administrative adjudication of a claim with the U.S. Department of Veterans Affairs. 
+              Veterans are encouraged to consult accredited VSO representatives, state/county veteran service officers, or accredited attorneys 
+              for formal claims representation.
+            </p>
+          </div>
+          <div className="privacySection">
+            <h3>1.4 Independence & No Government Endorsement</h3>
+            <p>
+              Tagus Technologies LLC is an independent, Veteran-owned commercial software enterprise. ValorBuddy is not endorsed, sponsored, 
+              operated by, or affiliated with the U.S. Department of Veterans Affairs (VA), Department of Defense (DoD), or any other federal agency.
+            </p>
+          </div>
+        </section>
 
-      <section className="privacyCard">
-        <h2>2. Information we collect</h2>
-        <h3>Information you provide</h3>
-        <ul>
-          <li><b>Account and profile information:</b> name, email address, password-protected account credentials, military branch, service status, rank, location, career information, and other profile details you choose to provide.</li>
-          <li><b>Military and career information:</b> MOS, AFSC, rating, military role, service history, deployments, education, certifications, career goals, and business interests.</li>
-          <li><b>Content you create:</b> AI conversations, missions, memories, reminders, notes, saved media links, favorites, and feedback.</li>
-          <li><b>Documents you upload:</b> resumes, DD214 records, VA-related documents, certifications, PDFs, DOCX files, and other files you choose to submit for storage or analysis.</li>
-          <li><b>Communications:</b> information you provide when contacting support or requesting help.</li>
-        </ul>
-        <h3>Information collected through device features</h3>
-        <ul>
-          <li><b>Location:</b> with your permission, approximate or precise location may be used to identify nearby VA facilities, veteran organizations, activities, travel resources, and other relevant places.</li>
-          <li><b>Microphone and voice:</b> with your permission, microphone access may be used for voice conversations and commands. Audio may be processed to provide the requested voice feature.</li>
-          <li><b>Photos, camera, and files:</b> only when you choose to upload or attach content.</li>
-          <li><b>Notifications:</b> device notification identifiers and preferences may be used to deliver reminders and service updates when notifications are enabled.</li>
-        </ul>
-        <h3>Information collected automatically</h3>
-        <p>We may collect device type, operating system, app version, IP address, timestamps, diagnostic data, crash information, security events, and feature usage information needed to operate and protect the service.</p>
-      </section>
+        {/* Section 2: Eligibility & Accounts */}
+        <section className="privacyCard">
+          <h2>2. Eligibility, Account Registration & Security</h2>
+          <div className="privacySection">
+            <h3>2.1 Eligibility</h3>
+            <p>
+              You must be at least 18 years of age (or the age of legal majority in your jurisdiction) to create an account or use ValorBuddy. 
+              By using the Service, you represent and warrant that you possess the legal authority to enter into these Terms.
+            </p>
+          </div>
+          <div className="privacySection">
+            <h3>2.2 Account Credentials & Security</h3>
+            <p>
+              When creating an account, you must provide accurate, current, and complete information. You are solely responsible for maintaining 
+              the confidentiality of your login credentials, passwords, and multi-factor authentication (MFA) devices. You agree to notify Tagus Technologies 
+              immediately at <a href="mailto:security@valorbuddy.com">security@valorbuddy.com</a> if you suspect unauthorized access or any security breach.
+            </p>
+          </div>
+        </section>
 
-      <section className="privacyCard">
-        <h2>3. How we use information</h2>
-        <ul>
-          <li>Provide and personalize ValorBuddy features.</li>
-          <li>Answer questions and complete user-requested AI tasks.</li>
-          <li>Analyze user-submitted documents and generate requested summaries or drafts.</li>
-          <li>Provide local recommendations, directions, travel guidance, events, and nearby resources.</li>
-          <li>Create and deliver reminders, alerts, and notifications.</li>
-          <li>Maintain accounts, saved preferences, favorites, memories, and conversation history.</li>
-          <li>Detect fraud, abuse, security threats, errors, and service disruptions.</li>
-          <li>Improve accessibility, reliability, relevance, and performance.</li>
-          <li>Comply with law and enforce our terms and policies.</li>
-        </ul>
-      </section>
+        {/* Section 3: Permitted & Prohibited Conduct */}
+        <section className="privacyCard">
+          <h2>3. Acceptable Use & Prohibited Conduct</h2>
+          <p>
+            You agree to use ValorBuddy strictly for lawful personal or organizational purposes in accordance with these Terms. You agree that you will not:
+          </p>
+          <ul>
+            <li>Use the Service for any unlawful, fraudulent, defamatory, or deceptive purpose, including falsifying military discharge records or claims data;</li>
+            <li>Attempt to bypass, disable, probe, or test the vulnerability of any security control, rate limit, authentication mechanism, or network boundary;</li>
+            <li>Reverse engineer, decompile, disassemble, or extract source code from the Service;</li>
+            <li>Deploy automated crawlers, scrapers, bots, or data extraction scripts against the platform without express written authorization;</li>
+            <li>Upload or transmit malicious code, viruses, worms, or destructive payloads;</li>
+            <li>Transmit, upload, or store any classified, secret, or restricted military operational intelligence.</li>
+          </ul>
+        </section>
 
-      <section className="privacyCard">
-        <h2>4. AI-assisted features</h2>
-        <p>ValorBuddy uses artificial intelligence to respond to questions, explain options, help organize information, analyze documents, and generate drafts. AI output may be incomplete or inaccurate and should be reviewed before relying on it.</p>
-        <p>ValorBuddy is not a government agency, law firm, financial institution, healthcare provider, or emergency service. Information provided by the app is for general informational and organizational support and does not replace professional, legal, medical, financial, benefits, or emergency advice.</p>
-      </section>
+        {/* Section 4: AI Engine & Zero-Training Pledge */}
+        <section className="privacyCard">
+          <h2>4. AI-Assisted Retrieval & Zero-Training Pledge</h2>
+          <div className="privacySection">
+            <h3>4.1 Nature of AI-Assisted Output</h3>
+            <p>
+              ValorBuddy utilizes artificial intelligence models with search grounding to summarize complex regulations and point users to public official sources. 
+              While we engineer rigorous guardrails and statutory verification checks, AI-generated outputs may occasionally contain discrepancies. 
+              Users must independently verify critical eligibility criteria, statutory deadlines, and medical requirements with official government portals (VA.gov) 
+              or authorized representatives.
+            </p>
+          </div>
+          <div className="privacySection">
+            <h3>4.2 Zero-AI Foundation Model Training Pledge</h3>
+            <p>
+              We firmly believe that military service data deserves the highest standard of respect. <strong>Your private conversations, 
+              uploaded documents, and personal service information are NEVER sold to commercial brokers and are NEVER used to train public AI foundation models.</strong>
+            </p>
+          </div>
+        </section>
 
-      <section className="privacyCard">
-        <h2>5. When information is shared</h2>
-        <p>We may share information only as needed with service providers that help operate ValorBuddy, such as cloud hosting, databases, authentication, AI processing, mapping and places services, communications, analytics, document processing, and app distribution providers.</p>
-        <p>These providers may process information on our behalf under their own contractual and security obligations. Depending on the feature you use, providers may include Google services, Google Play, mapping or places services, voice-processing services, cloud infrastructure providers, and other vendors necessary to fulfill your request.</p>
-        <p>We may also disclose information when required by law, to protect rights or safety, to investigate abuse or security incidents, or as part of a merger, financing, acquisition, or sale of business assets subject to appropriate safeguards.</p>
-        <p><b>We do not sell your personal information.</b></p>
-      </section>
+        {/* Section 5: Military Document Vault (DD-214) */}
+        <section className="privacyCard">
+          <h2>5. Military Document Storage & Field-Level Encryption</h2>
+          <p>
+            ValorBuddy provides an optional, encrypted document vault for veterans to organize their military service records (such as DD-214 certificates of release). 
+            Sensitive fields stored within the vault are protected with AES-256 field-level encryption at rest. 
+            You retain sole and exclusive ownership of all documents and records you upload. You may delete your stored documents at any time.
+          </p>
+        </section>
 
-      <section className="privacyCard">
-        <h2>6. Documents and sensitive information</h2>
-        <p>Uploaded documents may contain sensitive personal information. Upload only information you are authorized and comfortable providing. Do not upload classified information, passwords, access codes, complete payment card details, or information belonging to another person without permission.</p>
-        <p>Documents are used to provide the feature you request, such as extraction, summarization, career assistance, benefits organization, or secure retrieval. You may request deletion as described below.</p>
-      </section>
+        {/* Section 6: Commercial Trader Status & App Store Distribution */}
+        <section className="privacyCard">
+          <h2>6. Commercial Trader Status & Digital Distribution</h2>
+          <p>
+            In compliance with Google Play Store trader status requirements and international consumer protection standards:
+          </p>
+          <ul>
+            <li><strong>Trader Identity:</strong> Tagus Technologies LLC is a registered commercial legal entity (Wylie, Texas, USA) providing software services.</li>
+            <li><strong>Application Scope:</strong> These Terms apply to ValorBuddy across web, Android, and mobile distribution environments globally.</li>
+            <li><strong>Pricing & Subscriptions:</strong> ValorBuddy provides core educational features free of charge. Any optional premium tiers, professional memberships, or enterprise partner subscriptions will be clearly disclosed prior to purchase. In-app subscriptions on Android are governed by Google Play Billing policies.</li>
+          </ul>
+        </section>
 
-      <section className="privacyCard">
-        <h2>7. Data retention</h2>
-        <p>We retain account data while an account is active, password-reset tokens for up to 30 minutes, security and access logs for 365 days, and encrypted backups under a limited rotation. See our <a href="/data-retention-policy">Data Retention and Deletion Policy</a> for the complete schedule.</p>
-      </section>
+        {/* Section 7: Intellectual Property */}
+        <section className="privacyCard">
+          <h2>7. Intellectual Property Rights</h2>
+          <p>
+            The ValorBuddy name, brand emblem, custom military branch tactical themes, software code, user interface designs, and proprietary workflows 
+            are the exclusive intellectual property of Tagus Technologies LLC, protected under United States and international copyright, trademark, 
+            and intellectual property laws. Tagus grants you a limited, non-exclusive, non-transferable, revocable license to access and use the Service 
+            for personal, non-commercial purposes.
+          </p>
+        </section>
 
-      <section className="privacyCard">
-        <h2>8. Your choices and rights</h2>
-        <ul>
-          <li>Update profile information within ValorBuddy where available.</li>
-          <li>Control location, microphone, camera, file, and notification permissions through your device settings.</li>
-          <li>Delete individual memories, reminders, documents, favorites, or other saved items where the app provides that option.</li>
-          <li>Request access, correction, export, restriction, objection, or deletion where applicable.</li>
-          <li>Withdraw consent for optional processing by disabling the relevant permission or contacting us.</li>
-        </ul>
-        <div className="privacyCallout"><h3>Account and data deletion</h3><p>To request deletion of your ValorBuddy account and associated personal data, visit our <a href="/delete-account">Account Deletion page</a>. You may also email <a href="mailto:privacy@valorbuddy.com?subject=ValorBuddy%20Account%20Deletion%20Request">privacy@valorbuddy.com</a>. We may need to verify your identity before completing the request.</p></div>
-      </section>
+        {/* Section 8: Termination & Account Deletion */}
+        <section className="privacyCard">
+          <h2>8. Termination & Account Deletion</h2>
+          <p>
+            You have the right to terminate your account and discontinue use of the Service at any time. You can request permanent account and data deletion 
+            through your in-app profile settings or directly at <a href="/delete-account">/delete-account</a>. 
+            Tagus Technologies LLC reserves the right to suspend or terminate accounts that breach these Terms, engage in fraudulent claims activity, 
+            or threaten platform integrity.
+          </p>
+        </section>
 
-      <section className="privacyCard">
-        <h2>9. Security</h2>
-        <p>We use reasonable administrative, technical, and organizational safeguards designed to protect information. However, no internet transmission, mobile application, or storage system can be guaranteed to be completely secure. Keep your credentials confidential and notify us promptly of suspected unauthorized access.</p>
-      </section>
+        {/* Section 9: Disclaimer of Warranties */}
+        <section className="privacyCard">
+          <h2>9. Disclaimer of Warranties</h2>
+          <p style={{textTransform:'uppercase',fontSize:'13px',lineHeight:'1.6',color:'#94a3b8'}}>
+            TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS, 
+            WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES 
+            OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. TAGUS TECHNOLOGIES LLC DOES NOT WARRANT THAT 
+            THE SERVICE WILL OPERATE UNINTERRUPTED, SECURE, OR ERROR-FREE, OR THAT ANY DEFECTS WILL BE TIMELY CORRECTED.
+          </p>
+        </section>
 
-      <section className="privacyCard">
-        <h2>10. Children’s privacy</h2>
-        <p>ValorBuddy is not directed to children under 13, and we do not knowingly collect personal information from children under 13. If you believe a child has provided personal information without appropriate authorization, contact us so we can review and delete it where required.</p>
-      </section>
+        {/* Section 10: Limitation of Liability */}
+        <section className="privacyCard">
+          <h2>10. Limitation of Liability</h2>
+          <p style={{textTransform:'uppercase',fontSize:'13px',lineHeight:'1.6',color:'#94a3b8'}}>
+            TO THE FULLEST EXTENT PERMITTED BY LAW, IN NO EVENT SHALL TAGUS TECHNOLOGIES LLC, ITS AFFILIATES, OFFICERS, DIRECTORS, EMPLOYEES, 
+            AGENTS, OR ADVISORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION 
+            LOSS OF DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, ARISING OUT OF OR IN CONNECTION WITH YOUR USE OF OR INABILITY TO USE THE SERVICE.
+          </p>
+        </section>
 
-      <section className="privacyCard">
-        <h2>11. Third-party links and services</h2>
-        <p>ValorBuddy may provide links to third-party websites, music providers, government resources, maps, veteran organizations, employers, and other services. Their privacy practices are governed by their own policies, and we are not responsible for their content or practices.</p>
-      </section>
+        {/* Section 11: Governing Law & Jurisdiction */}
+        <section className="privacyCard">
+          <h2>11. Governing Law & Dispute Resolution</h2>
+          <p>
+            These Terms and any dispute arising out of or related to ValorBuddy shall be governed by and construed in accordance with the laws 
+            of the State of Texas, without regard to its conflict of law principles, and applicable federal laws of the United States. 
+            You agree to submit to the exclusive jurisdiction and venue of state and federal courts located in Collin County, Texas.
+          </p>
+        </section>
 
-      <section className="privacyCard">
-        <h2>12. Changes to this policy</h2>
-        <p>We may update this policy as ValorBuddy changes. We will post the revised policy on this page and update the “Last updated” date. Material changes may also be communicated through the app or by other appropriate means.</p>
-      </section>
+        {/* Section 12: Contact & Entity Information */}
+        <section className="privacyCard">
+          <h2>12. Contact Information & Legal Notices</h2>
+          <div className="privacyContactGrid">
+            <div className="privacyContactBox">
+              <h4>Legal & Regulatory Inquiries</h4>
+              <p>
+                <b>Tagus Technologies LLC</b><br/>
+                Attn: Legal & Compliance Department<br/>
+                219 Columbine Drive, Wylie, TX 75098<br/>
+                <b>Email:</b> <a href="mailto:terms@valorbuddy.com">terms@valorbuddy.com</a><br/>
+                <b>Corporate:</b> <a href="mailto:legal@tagustechnologies.com">legal@tagustechnologies.com</a><br/>
+                <b>Privacy Office:</b> <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a><br/>
+                <b>Official Web:</b> <a href="https://valorbuddy.com" target="_blank" rel="noopener noreferrer">https://valorbuddy.com</a>
+              </p>
+            </div>
+            <div className="privacyContactBox">
+              <h4>Corporate Officers</h4>
+              <p>
+                <b>SSG Godson Onyeije, U.S. Army (Ret.)</b><br/>
+                President, Federal Programs<br/>
+                <a href="mailto:godson.onyeije@tagustechnologies.com">godson.onyeije@tagustechnologies.com</a><br/><br/>
+                <b>Eugene Ezenwa Ebem</b><br/>
+                Co-Founder & CTO<br/>
+                <a href="mailto:eugene.ebem@tagustechnologies.com">eugene.ebem@tagustechnologies.com</a>
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
 
-      <section className="privacyCard privacyContact">
-        <h2>13. Contact us</h2>
-        <p>Questions, privacy requests, and complaints may be directed to:</p>
-        <address><b>TAGUS Technologies LLC</b><br/>ValorBuddy Privacy Team<br/><a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a><br/><a href="https://valorbuddy.com">https://valorbuddy.com</a></address>
-      </section>
-    </main>
-    <footer className="privacyFooter"><span>© 2026 TAGUS Technologies LLC. All rights reserved.</span><a href="/">ValorBuddy Home</a></footer>
-  </div>
+      <footer className="privacyFooter">
+        <span>© 2026 TAGUS Technologies LLC. All rights reserved. ValorBuddy™ is a registered trademark of TAGUS Technologies LLC.</span>
+        <span>
+          <a href="/privacy-policy">Privacy Policy</a> · <a href="/data-retention-policy">Data Retention</a> · <a href="/delete-account">Delete Account</a> · <a href="/">Return Home</a>
+        </span>
+      </footer>
+    </div>
+  );
+}
+
+
+function PrivacyPolicy(){
+  const updated = 'November 3, 2026';
+  return (
+    <div className="privacyPage">
+      <header className="privacyHeader">
+        <a className="privacyBrand" href="/" aria-label="Return to ValorBuddy home">
+          <img src={valorLogo} alt="ValorBuddy Logo" />
+          <span><b>ValorBuddy™</b><small>Your Digital Battle Buddy</small></span>
+        </a>
+        <nav className="privacyNav">
+          <a href="/terms">Terms of Service</a>
+          <a href="/data-retention-policy">Data Retention</a>
+          <a href="/delete-account">Delete Account</a>
+          <a className="privacyHomeLink" href="/">Return to ValorBuddy</a>
+        </nav>
+      </header>
+
+      <main className="privacyShell">
+        <section className="privacyHero">
+          <span className="privacyEyebrow">TAGUS TECHNOLOGIES LLC · VETERAN-OWNED ENTERPRISE</span>
+          <h1>ValorBuddy™ Privacy Policy</h1>
+          <p>
+            ValorBuddy is dedicated to honoring the service of United States veterans, military personnel, caregivers, and families. 
+            We protect your privacy with the same discipline and integrity demanded of military service. We do not sell your personal data, 
+            and your military records, VA claim documents, and conversations are never used to train public AI foundation models.
+          </p>
+          <div className="privacyMeta">
+            <span><b>Entity:</b> Tagus Technologies LLC</span>
+            <span><b>Effective Date:</b> {updated}</span>
+            <span><b>Last Revised:</b> {updated}</span>
+            <span><b>Jurisdiction:</b> State of Texas & United States Federal Law</span>
+          </div>
+        </section>
+
+        {/* Crisis Notice */}
+        <div className="crisisNotice" role="alert">
+          <h3><Heart size={18} aria-hidden="true"/> Critical Emergency & Crisis Assistance Notice</h3>
+          <p>
+            <strong>ValorBuddy is NOT an emergency response service, suicide prevention hotline, or 911 dispatcher.</strong>
+            {' '}If you or a veteran you know is in crisis, having thoughts of suicide, or experiencing a medical emergency, immediate help is available:
+          </p>
+          <p>
+            • <strong>Veterans Crisis Line:</strong> Dial <strong>988</strong>, then <strong>Press 1</strong> (Free, confidential, available 24/7/365)<br/>
+            • <strong>Crisis Text Line:</strong> Send a text message to <strong>838255</strong><br/>
+            • <strong>Deaf or Hard of Hearing:</strong> Dial <strong>711</strong>, then <strong>988</strong><br/>
+            • <strong>Medical / Police Emergency:</strong> Call <strong>911</strong> immediately or proceed to the nearest emergency room.
+          </p>
+        </div>
+
+        {/* Privacy at a glance */}
+        <section className="privacyCard privacySummary">
+          <h2>Privacy & Security Commitments at a Glance</h2>
+          <div className="privacySummaryGrid">
+            <div>
+              <Shield size={20} style={{color:'var(--branch-accent, #10b981)'}}/>
+              <h3>Zero AI Model Training</h3>
+              <p>Your conversations, DD-214 records, disability ratings, and personal memories are <b>never</b> used to train public or proprietary foundation models.</p>
+            </div>
+            <div>
+              <Lock size={20} style={{color:'var(--branch-accent, #10b981)'}}/>
+              <h3>Military-Grade Encryption</h3>
+              <p>AES-256 encryption at rest and TLS 1.3 in transit, with dedicated field-level encryption for sensitive military service and disability records.</p>
+            </div>
+            <div>
+              <EyeOff size={20} style={{color:'var(--branch-accent, #10b981)'}}/>
+              <h3>We Never Sell Personal Data</h3>
+              <p>Tagus Technologies LLC never sells, rents, or monetizes member profiles, contact info, or uploaded files to data brokers or advertisers.</p>
+            </div>
+            <div>
+              <Brain size={20} style={{color:'var(--branch-accent, #10b981)'}}/>
+              <h3>Veteran Context Control</h3>
+              <p>You have full visibility and granular control over your AI Battle Buddy context memories, with 1-click inspection, export, or complete wiping.</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 1: Who We Are & Company Information */}
+        <section className="privacyCard">
+          <h2>1. Who We Are & Corporate Registrations</h2>
+          <p>
+            ValorBuddy™ is developed and operated by <b>Tagus Technologies LLC</b>, a Texas limited liability company. 
+            In this policy, “ValorBuddy,” “Tagus Technologies,” “we,” “us,” and “our” refer to Tagus Technologies LLC and its digital services, 
+            including web applications at <a href="https://valorbuddy.com" target="_blank" rel="noopener noreferrer">valorbuddy.com</a>, the ValorBuddy mobile application, AI orchestration layers, 
+            and document vault storage.
+          </p>
+          <div className="privacyGovGrid">
+            <div className="privacyGovItem">
+              <small>Legal Business Entity</small>
+              <b>Tagus Technologies LLC</b>
+            </div>
+            <div className="privacyGovItem">
+              <small>Corporate Headquarters</small>
+              <b>219 Columbine Drive, Wylie, TX 75098</b>
+            </div>
+            <div className="privacyGovItem">
+              <small>Unique Entity Identifier (UEI)</small>
+              <b>CLBEA2FNJ456</b>
+            </div>
+            <div className="privacyGovItem">
+              <small>CAGE Code</small>
+              <b>95U91</b>
+            </div>
+            <div className="privacyGovItem">
+              <small>SAM.gov Status</small>
+              <b>Active Registration (All Awards)</b>
+            </div>
+            <div className="privacyGovItem">
+              <small>Primary NAICS Code</small>
+              <b>518210 (Data Processing & Hosting)</b>
+            </div>
+            <div className="privacyGovItem">
+              <small>Trademark Registration</small>
+              <b>ValorBuddy™ (USPTO SN 50105197)</b>
+            </div>
+            <div className="privacyGovItem">
+              <small>Company Leadership</small>
+              <b>SSG Godson Onyeije, Ret. & Eugene E. Ebem</b>
+            </div>
+          </div>
+        </section>
+
+        {/* Section 2: Independent Contractor Disclaimer */}
+        <section className="privacyCard">
+          <h2>2. Relationship with Government Agencies</h2>
+          <p>
+            <b>Non-Affiliation Notice:</b> ValorBuddy™ is an independent commercial software platform created by Tagus Technologies LLC. 
+            Tagus Technologies LLC is not the U.S. Department of Veterans Affairs (VA), Department of Defense (DoD), or any other federal or state agency. 
+            ValorBuddy provides AI-assisted navigation of publicly available federal benefits, military-to-civilian career alignment tools, and community resources.
+          </p>
+          <p>
+            Information generated or summarized by ValorBuddy does not constitute official VA adjudication, formal legal counsel, accredited claims representation 
+            (under 38 U.S.C. § 5901), or licensed medical/clinical diagnosis. For official decisions or formal claim filing, members should work directly with accredited 
+            Veterans Service Organizations (VSOs such as DAV, VFW, American Legion), state VA counselors, or licensed attorneys.
+          </p>
+        </section>
+
+        {/* Section 3: Information We Collect */}
+        <section className="privacyCard">
+          <h2>3. Information We Collect</h2>
+          <p>We collect information solely to provide, personalize, protect, and fulfill the capabilities of ValorBuddy requested by you.</p>
+          
+          <h3>A. Information You Voluntarily Provide</h3>
+          <ul>
+            <li><b>Account & Profile Identity:</b> Full name, email address, password credentials (hashed with Argon2id), military branch (Army, Navy, Air Force, Marines, Coast Guard, Space Force), rank, service status (Veteran, Retired, Active Duty, Reserve, National Guard, Spouse, Caregiver), and residential city and state.</li>
+            <li><b>Military Service History & Goals:</b> Military Occupational Specialty (MOS/AFSC/Rating), military role title, years of service, verified clearance level, civilian education, professional certifications, target career goals, and business/entrepreneurial interests.</li>
+            <li><b>Uploaded Documents & Military Records:</b> DD-214 Certificates of Release or Discharge, VA disability rating decision letters, resumes, certification PDFs, and DOCX files uploaded to the Document Vault for analysis, translation, or personal reference.</li>
+            <li><b>Conversational AI Context & Memories:</b> Text messages, mission descriptions, goals, reminders, notes, and specific memory items you request your AI Battle Buddy to retain.</li>
+            <li><b>Support Communications:</b> Inquiries, feedback, and customer support correspondence.</li>
+          </ul>
+
+          <h3>B. Information Collected Through Device Permissions (Explicit Consent)</h3>
+          <ul>
+            <li><b>Location (Geographic):</b> When enabled, approximate or precise device coordinates are used exclusively to calculate distances to nearby VA medical centers, VA clinics, VFW posts, American Legion halls, and veteran community events. Location is never tracked continuously in the background or sold.</li>
+            <li><b>Microphone & Audio:</b> When voice input is active, audio streams are processed in real-time to convert your speech into text commands. Raw audio files are ephemeral and discarded immediately following speech-to-text processing.</li>
+            <li><b>Camera, Photos & Files:</b> Accessed solely when you initiate an upload for your profile portrait or vault documents.</li>
+            <li><b>Device Notifications:</b> Device notification push tokens utilized to deliver scheduled medication reminders, appointment alerts, and mission updates when enabled.</li>
+          </ul>
+
+          <h3>C. Technical & Diagnostic Information</h3>
+          <p>
+            When accessing ValorBuddy, our secure infrastructure automatically logs standard network information including device type, operating system version, browser family, IP address, request timestamps, and system performance metrics necessary for cybersecurity, rate limiting, and incident response.
+          </p>
+        </section>
+
+        {/* Section 4: AI & Zero-Training Guarantees */}
+        <section className="privacyCard">
+          <h2>4. Artificial Intelligence & Zero-Training Guarantees</h2>
+          <p>
+            ValorBuddy integrates state-of-the-art artificial intelligence orchestration to assist veterans with plain-English benefits explanation, 
+            military skills translation, resume building, and mission planning. Because we handle sensitive veteran data, we enforce rigorous AI boundaries:
+          </p>
+          <div className="privacyCallout">
+            <h3>Strict Zero-Training Covenant</h3>
+            <p>
+              Tagus Technologies LLC maintains strict enterprise data protection agreements. <b>Under no circumstances are your uploaded documents, 
+              DD-214 records, disability percentages, private conversations, or veteran profile attributes used to train, retrain, improve, or fine-tune 
+              any public or commercial third-party foundation models</b> (including models operated by Google, OpenAI, Anthropic, or others).
+            </p>
+          </div>
+          <ul>
+            <li><b>Ephemeral Inference:</b> Data passed into language model APIs is processed in isolated execution contexts and is not retained or indexed by underlying AI infrastructure providers for secondary purposes.</li>
+            <li><b>Veteran Memory Visibility:</b> You retain total control over the long-term context memory utilized by your AI Battle Buddy. You can inspect your active memories, edit them, or trigger an instant full memory wipe at any time.</li>
+            <li><b>Advisory Nature:</b> AI outputs should always be reviewed by the member before formal submission to employers, government agencies, or healthcare providers.</li>
+          </ul>
+        </section>
+
+        {/* Section 5: Data Security Architecture */}
+        <section className="privacyCard">
+          <h2>5. Security Architecture & Technical Safeguards</h2>
+          <p>
+            Tagus Technologies LLC aligns its information security controls with federal standards, including principles from 
+            <b> NIST SP 800-53</b> (Security and Privacy Controls for Information Systems) and <b>NIST SP 800-171</b> (Protecting Controlled Unclassified Information):
+          </p>
+          <div className="privacyTableWrapper">
+            <table className="privacyTable">
+              <thead>
+                <tr>
+                  <th>Protection Layer</th>
+                  <th>Implementation Standard</th>
+                  <th>Scope</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><b>Encryption in Transit</b></td>
+                  <td>TLS 1.3 / HTTPS Enforced</td>
+                  <td>All client-to-server, WebSocket, and API communications</td>
+                </tr>
+                <tr>
+                  <td><b>Encryption at Rest</b></td>
+                  <td>AES-256 Bit Encryption</td>
+                  <td>All databases, disk volumes, object stores, and backups</td>
+                </tr>
+                <tr>
+                  <td><b>Field-Level Encryption</b></td>
+                  <td>Dedicated AES-256 Field Cipher</td>
+                  <td>DD-214 document extracts, VA disability ratings, deployment details</td>
+                </tr>
+                <tr>
+                  <td><b>Credential Hashing</b></td>
+                  <td>Argon2id Cryptographic Hash</td>
+                  <td>All user and administrator passwords with random salt</td>
+                </tr>
+                <tr>
+                  <td><b>Multi-Factor Authentication</b></td>
+                  <td>TOTP RFC 6238 (Authenticator App)</td>
+                  <td>Mandatory for all administrators; available to all members</td>
+                </tr>
+                <tr>
+                  <td><b>Audit & Traceability</b></td>
+                  <td>Tamper-Evident Access Logs</td>
+                  <td>Retained for 365 days for forensic tracking & security events</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        {/* Section 6: How Information Is Used & Third-Party Disclosure */}
+        <section className="privacyCard">
+          <h2>6. How Information Is Shared & Disclosed</h2>
+          <p>
+            <b>We Do Not Sell Your Information:</b> Tagus Technologies LLC does not sell, rent, broker, or trade member personal data, 
+            documents, or contact details to third parties, marketing firms, or commercial aggregators.
+          </p>
+          <p>We share information solely under the following limited circumstances:</p>
+          <ul>
+            <li><b>Sub-Processors & Cloud Providers:</b> We utilize vetted, enterprise-grade cloud providers for cloud hosting, managed database storage, secure authentication, transactional email, and mapping services. These providers operate under binding Data Processing Agreements and security terms.</li>
+            <li><b>Marketplace & Veteran Resource Partners:</b> When community partners, employers, or veteran vendors publish programs or services on ValorBuddy, they receive only <b>aggregated, anonymous metrics</b> (such as total impressions or clicks). Partners <b>never</b> receive searchable rosters of individual veterans, private profiles, disability data, or document vault contents. Direct referral occurs only when you affirmatively choose to contact a partner.</li>
+            <li><b>Legal & Protective Requirements:</b> We may disclose information only if required by a valid court subpoena, warrant, or statutory legal requirement, or when necessary to protect the immediate physical safety of any person, investigate criminal fraud, or defend against cyberattacks.</li>
+          </ul>
+        </section>
+
+        {/* Section 7: Data Retention & Purging Schedule */}
+        <section className="privacyCard">
+          <h2>7. Data Retention Schedule</h2>
+          <p>We adhere to strict data minimization principles. Personal information is retained only as long as necessary to fulfill active service:</p>
+          <ul>
+            <li><b>Account Profile & Vault Documents:</b> Retained while your account remains open and active. When you delete a document from the vault, it is permanently expunged from primary storage immediately.</li>
+            <li><b>AI Battle Buddy Context Memory:</b> Stored until you edit or delete individual memories or trigger a full context reset.</li>
+            <li><b>Password Reset Tokens:</b> Expire automatically within 30 minutes and are purged from system tables.</li>
+            <li><b>Security & Audit Logs:</b> Maintained for 365 days to meet federal security log retention standards, after which they are systematically deleted.</li>
+            <li><b>System Backups:</b> Encrypted rolling system snapshots cycle and overwrite automatically every 35 days.</li>
+          </ul>
+          <p>For more details, review our complete <a href="/data-retention-policy">Data Retention and Deletion Policy</a>.</p>
+        </section>
+
+        {/* Section 8: Your Rights & Account Deletion */}
+        <section className="privacyCard">
+          <h2>8. Your Rights & Account Deletion Controls</h2>
+          <p>You have full autonomy over your data on ValorBuddy. Under federal guidelines and applicable state privacy statutes, you have the right to:</p>
+          <ul>
+            <li><b>Access & Data Portability:</b> Review all personal profile attributes, service history, and uploaded files stored in your account.</li>
+            <li><b>Correction:</b> Update or rectify incorrect service, contact, or profile information directly within the Profile screen.</li>
+            <li><b>Granular Deletion:</b> Delete specific uploaded documents, memories, reminders, or favorite links at any time without deleting your full account.</li>
+            <li><b>Account Erasure (Right to be Forgotten):</b> You may permanently delete your entire ValorBuddy account and all associated records.</li>
+          </ul>
+          <div className="privacyCallout">
+            <h3>Permanent Account Deletion</h3>
+            <p>
+              To permanently delete your ValorBuddy account, visit our self-service <a href="/delete-account">Account Deletion Page</a> 
+              or email <a href="mailto:privacy@valorbuddy.com?subject=ValorBuddy%20Account%20Deletion%20Request">privacy@valorbuddy.com</a>. 
+              Upon verified identity confirmation, your user credentials, profile records, AI memories, and stored documents will be permanently purged within 30 days.
+            </p>
+          </div>
+        </section>
+
+        {/* Section 9: State Privacy Compliance */}
+        <section className="privacyCard">
+          <h2>9. State Privacy Law Compliance (Texas TDPSA, CCPA/CPRA)</h2>
+          <p>
+            As a Texas-headquartered enterprise, Tagus Technologies LLC complies with the <b>Texas Data Privacy and Security Act (TDPSA)</b>, 
+            the <b>California Consumer Privacy Act as amended by the California Privacy Rights Act (CCPA/CPRA)</b>, 
+            and other state data protection frameworks:
+          </p>
+          <ul>
+            <li><b>Right to Opt-Out of Targeted Advertising & Sale:</b> We do not sell personal data or engage in targeted behavioral cross-context advertising.</li>
+            <li><b>Right to Non-Discrimination:</b> You will never receive degraded service or penalty for exercising any of your statutory privacy rights.</li>
+            <li><b>Sensitive Personal Data Consent:</b> We process sensitive military service indicators and disability ratings solely based on your affirmative submission to fulfill requested veteran support tools.</li>
+          </ul>
+        </section>
+
+        {/* Section 10: Children's Privacy */}
+        <section className="privacyCard">
+          <h2>10. Children's Privacy</h2>
+          <p>
+            ValorBuddy is strictly intended for military veterans, active service members, and adult family members or designated caregivers. 
+            We do not knowingly collect, solicit, or maintain personal information from individuals under 13 years of age (or under 16 where required by state law). 
+            If we discover that a minor has submitted personal information, we will immediately take steps to permanently delete the data.
+          </p>
+        </section>
+
+        {/* Section 11: Third-Party Links */}
+        <section className="privacyCard">
+          <h2>11. Third-Party Websites & Integrations</h2>
+          <p>
+            ValorBuddy provides curated links to official government portals (such as VA.gov, eBenefits, Military OneSource), YouTube educational and relaxation videos, 
+            mapping services (Google Maps, Apple Maps), and partner veteran organizations. When clicking external links, you exit ValorBuddy and become subject to 
+            the respective third party's privacy terms. We encourage you to review their independent privacy disclosures.
+          </p>
+        </section>
+
+        {/* Section 12: Changes to this Policy */}
+        <section className="privacyCard">
+          <h2>12. Changes & Policy Updates</h2>
+          <p>
+            We may periodically revise this Privacy Policy to reflect evolving platform capabilities, new federal requirements, or updated security protocols. 
+            Any modifications will be posted to this page with an updated "Last Revised" date. For material changes affecting the collection or handling of sensitive data, 
+            we will provide prominent in-app notification or direct email alert to registered account holders prior to implementation.
+          </p>
+        </section>
+
+        {/* Section 13: Corporate Contact Information */}
+        <section className="privacyCard privacyContact">
+          <h2>13. Corporate Contact & Privacy Officer</h2>
+          <p>For questions, privacy requests, data access inquiries, or compliance notices, please contact our dedicated Privacy & Federal Compliance Office:</p>
+          <div className="privacyContactGrid">
+            <div className="privacyContactBox">
+              <h4>Corporate Headquarters</h4>
+              <p>
+                <b>TAGUS Technologies LLC</b><br/>
+                Attn: Privacy & Data Protection Office<br/>
+                219 Columbine Drive<br/>
+                Wylie, Texas 75098, USA
+              </p>
+            </div>
+            <div className="privacyContactBox">
+              <h4>Electronic Contact</h4>
+              <p>
+                <b>Privacy Inquiries:</b> <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a><br/>
+                <b>Corporate Office:</b> <a href="mailto:privacy@tagustechnologies.com">privacy@tagustechnologies.com</a><br/>
+                <b>General Support:</b> <a href="mailto:support@tagustechnologies.com">support@tagustechnologies.com</a><br/>
+                <b>Official Site:</b> <a href="https://valorbuddy.com" target="_blank" rel="noopener noreferrer">https://valorbuddy.com</a>
+              </p>
+            </div>
+            <div className="privacyContactBox">
+              <h4>Corporate Officers</h4>
+              <p>
+                <b>SSG Godson Onyeije, U.S. Army (Ret.)</b><br/>
+                President, Federal Programs<br/>
+                <a href="mailto:godson.onyeije@tagustechnologies.com">godson.onyeije@tagustechnologies.com</a><br/><br/>
+                <b>Eugene Ezenwa Ebem</b><br/>
+                Co-Founder & CTO<br/>
+                <a href="mailto:eugene.ebem@tagustechnologies.com">eugene.ebem@tagustechnologies.com</a>
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="privacyFooter">
+        <span>© 2026 TAGUS Technologies LLC. All rights reserved. ValorBuddy™ is a registered trademark of TAGUS Technologies LLC.</span>
+        <span>
+          <a href="/terms">Terms of Service</a> · <a href="/data-retention-policy">Data Retention</a> · <a href="/delete-account">Delete Account</a> · <a href="/">Return Home</a>
+        </span>
+      </footer>
+    </div>
+  );
 }
 
 function AccountDeletion(){
-  const updated='August 2, 2026';
-  const subject='ValorBuddy Account Deletion Request';
-  const mailto=`mailto:privacy@valorbuddy.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent('Please delete my ValorBuddy account and associated data.\n\nAccount email: \nFull name: \nReason (optional): \n')}`;
-  return <div className="privacyPage deletionPage">
-    <header className="privacyHeader">
-      <a className="privacyBrand" href="/" aria-label="Return to ValorBuddy home"><img src={valorLogo} alt="ValorBuddy"/><span><b>ValorBuddy</b><small>Your Digital Battle Buddy</small></span></a>
-      <nav className="privacyNav"><a href="/privacy-policy">Privacy Policy</a><a className="privacyHomeLink" href="/">Return to ValorBuddy</a></nav>
-    </header>
-    <main className="privacyShell">
-      <section className="privacyHero deletionHero">
-        <span className="privacyEyebrow">TAGUS TECHNOLOGIES LLC</span>
-        <h1>Delete Your ValorBuddy Account</h1>
-        <p>Use this page to request deletion of your ValorBuddy account and the personal data associated with it.</p>
-        <div className="privacyMeta"><span><b>Last updated:</b> {updated}</span><span><b>App:</b> ValorBuddy</span></div>
-      </section>
+  const updated = 'November 3, 2026';
+  const subject = 'ValorBuddy Account Deletion Request';
+  const mailto = "mailto:privacy@valorbuddy.com?cc=privacy@tagustechnologies.com&subject=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent("Please delete my ValorBuddy account and associated data.\n\nAccount email: \nFull name: \nReason (optional): \n");
+  return (
+    <div className="privacyPage deletionPage">
+      <header className="privacyHeader">
+        <a className="privacyBrand" href="/" aria-label="Return to ValorBuddy home">
+          <img src={valorLogo} alt="ValorBuddy Logo"/>
+          <span><b>ValorBuddy™</b><small>Your Digital Battle Buddy</small></span>
+        </a>
+        <nav className="privacyNav">
+          <a href="/terms">Terms of Service</a>
+          <a href="/privacy-policy">Privacy Policy</a>
+          <a href="/data-retention-policy">Data Retention</a>
+          <a className="privacyHomeLink" href="/">Return to ValorBuddy</a>
+        </nav>
+      </header>
+      <main className="privacyShell">
+        <section className="privacyHero deletionHero">
+          <span className="privacyEyebrow">TAGUS TECHNOLOGIES LLC</span>
+          <h1>Delete Your ValorBuddy™ Account</h1>
+          <p>Use this page to request permanent deletion of your ValorBuddy account and all personal data associated with it.</p>
+          <div className="privacyMeta">
+            <span><b>Last updated:</b> {updated}</span>
+            <span><b>Entity:</b> Tagus Technologies LLC (Wylie, TX)</span>
+            <span><b>UEI:</b> CLBEA2FNJ456</span>
+            <span><b>CAGE:</b> 95U91</span>
+          </div>
+        </section>
 
-      <section className="privacyCard deletionAction">
-        <h2>Submit a deletion request</h2>
-        <p>Send the request from the email address connected to your ValorBuddy account. This helps us verify that you are authorized to delete the account.</p>
-        <a className="deletionButton" href={mailto}>Email account deletion request</a>
-        <p className="deletionEmail">Email: <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a><br/>Subject: <b>{subject}</b></p>
-      </section>
+        <section className="privacyCard deletionAction">
+          <h2>Submit an Account Deletion Request</h2>
+          <p>Send your deletion request from the email address registered with your ValorBuddy account. This allows our compliance team to securely verify your identity before initiating cryptographic erasure.</p>
+          <a className="deletionButton" href={mailto}>Email Account Deletion Request</a>
+          <p className="deletionEmail">Direct Email: <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a> (cc: <a href="mailto:privacy@tagustechnologies.com">privacy@tagustechnologies.com</a>)<br/>Subject: <b>{subject}</b></p>
+        </section>
 
-      <section className="privacyCard">
-        <h2>What to include</h2>
-        <ol className="deletionSteps">
-          <li>The email address used for your ValorBuddy account.</li>
-          <li>Your full name as shown in the account.</li>
-          <li>A clear statement that you want the ValorBuddy account deleted.</li>
-          <li>If you cannot email from the registered address, explain why so we can complete an alternate identity check.</li>
-        </ol>
-      </section>
+        <section className="privacyCard">
+          <h2>What to Include in Your Request</h2>
+          <ol className="deletionSteps">
+            <li>The email address registered with your ValorBuddy account.</li>
+            <li>Your full name as displayed on your profile.</li>
+            <li>A clear statement requesting complete permanent account and data deletion.</li>
+            <li>If you are unable to email from your registered address, explain why so we can initiate an alternate secure identity verification check.</li>
+          </ol>
+        </section>
 
-      <section className="privacyCard">
-        <h2>What will be deleted</h2>
-        <ul>
-          <li>Your ValorBuddy user account and profile information.</li>
-          <li>Saved AI conversation history, missions, reminders, memories, favorites, and preferences associated with the account.</li>
-          <li>User-uploaded documents and files associated with the account, subject to the retention limits below.</li>
-          <li>Stored location preferences and other account-linked personalization data.</li>
-        </ul>
-      </section>
+        <section className="privacyCard">
+          <h2>What Will Be Deleted</h2>
+          <ul>
+            <li>Your ValorBuddy member account, credentials, and profile records.</li>
+            <li>All saved AI Battle Buddy conversation history, missions, context memories, reminders, and preferences.</li>
+            <li>All uploaded documents, DD-214 records, VA decision letters, resumes, and personal vault files.</li>
+            <li>Saved location coordinates and custom UI branch preferences.</li>
+          </ul>
+        </section>
 
-      <section className="privacyCard">
-        <h2>Data that may be retained</h2>
-        <p>We may retain limited information when required for legal, fraud-prevention, security, accounting, dispute-resolution, or regulatory purposes. Data may also remain temporarily in encrypted backups until those backups are overwritten through the normal retention cycle. Retained information will not be used to continue providing the deleted account.</p>
-      </section>
+        <section className="privacyCard">
+          <h2>Processing Timeline</h2>
+          <p>Our Data Protection team will acknowledge receipt within 48 business hours. Verified deletion requests are completed within 30 days in full compliance with state and federal privacy regulations. You will receive an official confirmation email once cryptographic wiping has been completed.</p>
+        </section>
 
-      <section className="privacyCard">
-        <h2>Processing time</h2>
-        <p>We will acknowledge the request and may ask for identity verification. Verified requests are generally completed within 30 days, unless additional time is permitted or required by law. We will confirm when the account deletion process has been completed.</p>
-      </section>
-
-      <section className="privacyCard">
-        <h2>Delete some data without deleting your account</h2>
-        <p>Where available, you may delete individual reminders, memories, documents, favorites, or other saved items inside ValorBuddy. You may also email us to request deletion or correction of specific information without closing your entire account.</p>
-      </section>
-
-      <section className="privacyCard privacyContact">
-        <h2>Contact</h2>
-        <address><b>TAGUS Technologies LLC</b><br/>ValorBuddy Privacy Team<br/><a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a><br/><a href="https://valorbuddy.com/privacy-policy">Privacy Policy</a></address>
-      </section>
-    </main>
-    <footer className="privacyFooter"><span>© 2026 TAGUS Technologies LLC. All rights reserved.</span><span><a href="/privacy-policy">Privacy Policy</a> · <a href="/">ValorBuddy Home</a></span></footer>
-  </div>
+        <section className="privacyCard privacyContact">
+          <h2>Compliance Office Contact</h2>
+          <address>
+            <b>TAGUS Technologies LLC</b><br/>
+            Attn: Data Protection Officer<br/>
+            219 Columbine Drive, Wylie, Texas 75098, USA<br/>
+            <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a> · <a href="mailto:privacy@tagustechnologies.com">privacy@tagustechnologies.com</a><br/>
+            <a href="/privacy-policy">Privacy Policy</a> · <a href="/data-retention-policy">Data Retention Policy</a>
+          </address>
+        </section>
+      </main>
+      <footer className="privacyFooter">
+        <span>© 2026 TAGUS Technologies LLC. All rights reserved.</span>
+        <span><a href="/terms">Terms of Service</a> · <a href="/privacy-policy">Privacy Policy</a> · <a href="/data-retention-policy">Data Retention</a> · <a href="/">ValorBuddy Home</a></span>
+      </footer>
+    </div>
+  );
 }
 
 function DataRetentionPolicy(){
-  return <div className="privacyPage"><header className="privacyHeader"><a className="privacyBrand" href="/"><img src={valorLogo} alt="ValorBuddy"/><span><b>ValorBuddy</b><small>Your Digital Battle Buddy</small></span></a><nav className="privacyNav"><a href="/privacy-policy">Privacy Policy</a><a href="/delete-account">Delete Account</a></nav></header><main className="privacyShell"><section className="privacyHero"><span className="privacyEyebrow">TAGUS TECHNOLOGIES LLC</span><h1>Data Retention and Deletion Policy</h1><p>How ValorBuddy protects, retains, and removes member information.</p><div className="privacyMeta"><span><b>Effective:</b> September 6, 2026</span></div></section><section className="privacyCard"><h2>Retention schedule</h2><ul><li><b>Account and profile:</b> retained while the account is active and removed after a verified deletion request, subject to limited legal or security holds.</li><li><b>Sensitive service information:</b> deployment history and VA disability-rating fields are encrypted and retained only while supplied by the member.</li><li><b>Uploaded documents:</b> DD214s, VA records, resumes, and certifications are encrypted at rest and retained until the member deletes them or closes the account.</li><li><b>Password-reset tokens:</b> expire after 30 minutes and are automatically purged.</li><li><b>Security and access logs:</b> retained for 365 days unless a documented incident or legal hold requires longer retention.</li><li><b>Encrypted backups:</b> expire through the normal backup rotation, normally within 35 days.</li></ul></section><section className="privacyCard"><h2>Access safeguards</h2><p>Sensitive profile and document access is logged. Administrator access uses role-based controls and mandatory multi-factor authentication. Marketplace vendors cannot access private conversations, documents, medical information, reminders, or sensitive profile fields.</p></section><section className="privacyCard"><h2>Your choices</h2><p>Delete individual documents, reminders, memories, and preferences inside ValorBuddy where controls are available. For complete account deletion, use the <a href="/delete-account">account-deletion page</a> or email <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a> from your registered address.</p></section></main><footer className="privacyFooter"><span>© 2026 TAGUS Technologies LLC.</span><a href="/">ValorBuddy Home</a></footer></div>
+  const updated = 'November 3, 2026';
+  return (
+    <div className="privacyPage">
+      <header className="privacyHeader">
+        <a className="privacyBrand" href="/" aria-label="Return to ValorBuddy home">
+          <img src={valorLogo} alt="ValorBuddy Logo"/>
+          <span><b>ValorBuddy™</b><small>Your Digital Battle Buddy</small></span>
+        </a>
+        <nav className="privacyNav">
+          <a href="/terms">Terms of Service</a>
+          <a href="/privacy-policy">Privacy Policy</a>
+          <a href="/delete-account">Delete Account</a>
+          <a className="privacyHomeLink" href="/">Return to ValorBuddy</a>
+        </nav>
+      </header>
+      <main className="privacyShell">
+        <section className="privacyHero">
+          <span className="privacyEyebrow">TAGUS TECHNOLOGIES LLC · DATA RETENTION SPECIFICATION</span>
+          <h1>Data Retention and Deletion Schedule</h1>
+          <p>How Tagus Technologies LLC protects, retains, rotates, and cryptographically removes member information across the ValorBuddy platform.</p>
+          <div className="privacyMeta">
+            <span><b>Effective Date:</b> {updated}</span>
+            <span><b>Corporate Entity:</b> Tagus Technologies LLC (Wylie, TX)</span>
+            <span><b>UEI:</b> CLBEA2FNJ456</span>
+            <span><b>CAGE:</b> 95U91</span>
+          </div>
+        </section>
+
+        <section className="privacyCard">
+          <h2>Retention Schedule by Data Category</h2>
+          <div className="privacyTableWrapper">
+            <table className="privacyTable">
+              <thead>
+                <tr>
+                  <th>Data Category</th>
+                  <th>Retention Period</th>
+                  <th>Purge & Cryptographic Treatment</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><b>Account Profile & Settings</b></td>
+                  <td>Duration of active account membership</td>
+                  <td>Permanently removed within 30 days of verified deletion request</td>
+                </tr>
+                <tr>
+                  <td><b>Sensitive Military Service Data</b></td>
+                  <td>Duration of active account membership</td>
+                  <td>Field-level encrypted (AES-256); erased immediately upon member deletion or account closure</td>
+                </tr>
+                <tr>
+                  <td><b>Document Vault (DD-214, VA Ratings, Resumes)</b></td>
+                  <td>Until deleted by member or account closure</td>
+                  <td>Encrypted at rest (AES-256); deleted files expunged from primary storage immediately</td>
+                </tr>
+                <tr>
+                  <td><b>AI Battle Buddy Context Memories</b></td>
+                  <td>User-controlled (until wiped by member)</td>
+                  <td>Veterans can inspect, edit, or one-click wipe memory history at any time</td>
+                </tr>
+                <tr>
+                  <td><b>Password Reset Tokens</b></td>
+                  <td>30 minutes max</td>
+                  <td>Automatically purged from database tables upon expiration</td>
+                </tr>
+                <tr>
+                  <td><b>Security, Access & Telemetry Logs</b></td>
+                  <td>365 days</td>
+                  <td>Tamper-resistant audit logs retained for cybersecurity compliance, then systematically rotated out</td>
+                </tr>
+                <tr>
+                  <td><b>Encrypted System Backups</b></td>
+                  <td>35 days rolling cycle</td>
+                  <td>Automated rotation; overwritten and expunged after 35 days</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="privacyCard">
+          <h2>Access Controls & Safeguards</h2>
+          <p>
+            Access to sensitive profile records and document vault files is strictly restricted. Administrator access utilizes role-based access control (RBAC) 
+            and mandatory Time-based One-Time Password (TOTP) Multi-Factor Authentication. Marketplace vendors and community partners never receive access 
+            to private member conversations, documents, medical info, or sensitive profile fields.
+          </p>
+        </section>
+
+        <section className="privacyCard">
+          <h2>Your Rights & Self-Service Controls</h2>
+          <p>
+            You may delete individual uploaded documents, reminders, memories, and profile attributes at any time from within the application. 
+            For complete account deletion, visit our <a href="/delete-account">Account Deletion Page</a> or email our compliance office at{' '}
+            <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a> or <a href="mailto:privacy@tagustechnologies.com">privacy@tagustechnologies.com</a>.
+          </p>
+        </section>
+
+        <section className="privacyCard privacyContact">
+          <h2>Compliance Office Contact</h2>
+          <address>
+            <b>TAGUS Technologies LLC</b><br/>
+            Attn: Data Retention & Compliance Team<br/>
+            219 Columbine Drive, Wylie, Texas 75098, USA<br/>
+            <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a> · <a href="mailto:privacy@tagustechnologies.com">privacy@tagustechnologies.com</a><br/>
+            <a href="/privacy-policy">ValorBuddy Privacy Policy</a>
+          </address>
+        </section>
+      </main>
+      <footer className="privacyFooter">
+        <span>© 2026 TAGUS Technologies LLC. All rights reserved.</span>
+        <span><a href="/terms">Terms of Service</a> · <a href="/privacy-policy">Privacy Policy</a> · <a href="/delete-account">Delete Account</a> · <a href="/">Return Home</a></span>
+      </footer>
+    </div>
+  );
 }
 
 function App(){
-  const path=window.location.pathname.replace(/\/+$/,'')||'/';
-  if(path==='/privacy'||path==='/privacy-policy') return <PrivacyPolicy/>;
-  if(path==='/delete-account'||path==='/account-deletion'||path==='/delete-my-account') return <AccountDeletion/>;
-  if(path==='/data-retention-policy') return <DataRetentionPolicy/>;
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  const query = new URLSearchParams(window.location.search);
+  const hash = window.location.hash.toLowerCase();
+  const screenParam = (query.get('screen') || query.get('page') || '').toLowerCase();
+
+  if(path === '/terms' || path === '/terms-of-service' || path === '/tos' || screenParam === 'terms' || screenParam === 'terms-of-service' || screenParam === 'tos' || hash === '#terms' || hash === '#terms-of-service' || hash === '#tos') {
+    return <TermsOfService/>;
+  }
+  if(path === '/privacy' || path === '/privacy-policy' || screenParam === 'privacy' || screenParam === 'privacy-policy' || hash === '#privacy' || hash === '#privacy-policy') {
+    return <PrivacyPolicy/>;
+  }
+  if(path === '/delete-account' || path === '/account-deletion' || path === '/delete-my-account' || screenParam === 'delete-account' || hash === '#delete-account') {
+    return <AccountDeletion/>;
+  }
+  if(path === '/data-retention-policy' || path === '/data-retention' || screenParam === 'data-retention' || hash === '#data-retention') {
+    return <DataRetentionPolicy/>;
+  }
   return <ValorBuddyApplication/>;
 }
+
 
 function ValorBuddyApplication(){
   const[token,setToken]=useState(localStorage.getItem('valor_token'));
@@ -923,7 +1633,7 @@ function ValorBuddyApplication(){
         {screen==='music'&&<MusicPage user={{...user,branch:safeBranch}} setUser={setUser}/>}
         {screen==='tutorial'&&<Tutorial setScreen={setScreen}/>}
         {screen==='missions'&&<MissionControl user={{...user,branch:safeBranch}}/>}
-        {screen==='career'&&<CareerBusiness user={{...user,branch:safeBranch}}/>}
+        {screen==='career'&&<CareerErrorBoundary><CareerBusiness user={{...user,branch:safeBranch}}/></CareerErrorBoundary>}
         {screen==='admin'&&<Admin onPreview={setAdminPartnerPreview}/>}
         {screen==='vendorAdmin'&&<Admin onPreview={setAdminPartnerPreview} vendorOnly/>}
         {screen==='profile'&&<Profile user={{...user,branch:safeBranch}} setUser={setUser}/>}
@@ -1008,6 +1718,15 @@ function Auth({onLogin}){
         {tab==='partner'&&<small className="partnerLegal">Applications require verification. Submitting does not activate billing or grant access to private Veteran information.</small>}
       </form>
       <div className="tagusProductLine">ValorBuddy is a product of <b>Tagus Technologies LLC</b></div>
+      <div className="authLegalLinks">
+        <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+        <span>·</span>
+        <a href="/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+        <span>·</span>
+        <a href="/data-retention-policy" target="_blank" rel="noopener noreferrer">Data Retention</a>
+        <span>·</span>
+        <a href="/delete-account" target="_blank" rel="noopener noreferrer">Account Deletion</a>
+      </div>
     </div>
   </div>
 }
@@ -1132,6 +1851,13 @@ function Sidebar({user,screen,setScreen,mobileOpen,onLogout}){
           <LogOut size={14} aria-hidden="true"/>
           <span>Secure Sign Out</span>
         </button>
+        <div className="sidebarLegalLinks">
+          <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>
+          <span>·</span>
+          <a href="/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy</a>
+          <span>·</span>
+          <a href="/data-retention-policy" target="_blank" rel="noopener noreferrer">Data Retention</a>
+        </div>
       </div>
     </aside>
   );
@@ -1348,7 +2074,8 @@ function SmartResultPopup({open,onClose,title,subtitle,items,onChoose,kind='even
   return <div className="smartModalBackdrop" onClick={onClose}><section className="smartModal" role="dialog" aria-modal="true" onClick={e=>e.stopPropagation()}><button className="modalClose" onClick={onClose} aria-label="Close dialog">×</button><div className="modalHeader"><span className="modalEyebrow">VALORBUDDY RECOMMENDATIONS</span><h2>{cleanVisibleText(title)}</h2>{subtitle&&<p>{cleanVisibleText(subtitle)}</p>}</div><div className="smartResultWrap">{items.map((x,i)=><article className="smartResultCard" key={`${x.title}-${i}`}><div className="resultRank">{i+1}</div><div className="resultMain"><div className="resultTitleRow"><h3>{cleanVisibleText(x.title)}</h3>{x.rating&&<span className="ratingPill">★ {x.rating}{x.review_count?` · ${x.review_count}`:''}</span>}</div>{x.location&&<p className="resultLocation">📍 {cleanVisibleText(x.location)}</p>}<p className="assistantExplains"><b>Why ValorBuddy suggests it:</b> {cleanVisibleText(x.assistant_explanation||x.description||x.summary)}</p>{x.open_now!==undefined&&x.open_now!==null&&<span className={`openPill ${x.open_now?'open':'closed'}`}>{x.open_now?'Open now':'Currently closed'}</span>}{x.next_step&&<div className="nextStep"><b>Best next step</b><span>{cleanVisibleText(x.next_step)}</span></div>}{x.community_note&&<div className="communityVoice"><b>What veterans commonly say</b><p>{cleanVisibleText(x.community_note)}</p></div>}{x.reviews?.length>0&&<div className="reviewPanel"><b>What Google reviewers are saying</b>{x.reviews.map((r,j)=><blockquote key={j}><span>“{cleanVisibleText(r.text)}”</span><small>{r.author}{r.rating?` · ${r.rating}/5`:''}{r.time_description?` · ${r.time_description}`:''}</small></blockquote>)}</div>}<div className="resultActions">{onChoose&&<button className="primaryAction" onClick={()=>onChoose(x,i)}>Choose this</button>}{x.maps_url&&<a href={x.maps_url} target="_blank" rel="noreferrer">Directions</a>}{x.website&&<a href={x.website} target="_blank" rel="noreferrer">Website</a>}{x.phone&&<a href={`tel:${x.phone}`}>Call</a>}</div></div></article>)}</div><div className="modalFooter"><span>Not seeing the right fit?</span><button onClick={onClose}>Refine the search</button></div></section></div>}
 function VoicePanel({user,onResult}){
   const[listening,setListening]=useState(false);const[transcript,setTranscript]=useState('');const[reply,setReply]=useState('');const[results,setResults]=useState([]);const[choices,setChoices]=useState([]);const[popupOpen,setPopupOpen]=useState(false);const[popupTitle,setPopupTitle]=useState('Recommended options');
-  const[voiceStyle,setVoiceStyle]=useState(()=>voicePreferences().style);const[voiceName,setVoiceName]=useState(()=>voicePreferences().voiceName);const[availableVoices,setAvailableVoices]=useState([]);const[locationState,setLocationState]=useState('');const[autoRead,setAutoRead]=useState(()=>localStorage.getItem('valor_voice_auto_read')==='true');const[muted,setMuted]=useState(()=>localStorage.getItem('valor_voice_muted')==='true');const[playback,setPlayback]=useState('stopped');
+  const[voiceStyle,setVoiceStyle]=useState(()=>voicePreferences().style);const[voiceName,setVoiceName]=useState(()=>voicePreferences().voiceName);const[availableVoices,setAvailableVoices]=useState([]);const[locationState,setLocationState]=useState('');const[autoRead,setAutoRead]=useState(()=>localStorage.getItem('valor_voice_auto_read')!=='false');const[muted,setMuted]=useState(()=>localStorage.getItem('valor_voice_muted')==='true');const[playback,setPlayback]=useState('stopped');
+  const conversationLoop=useRef(false);const[conversationLoopActive,setConversationLoopActive]=useState(false);
   const rec=useRef(null);const followUpTimer=useRef(null);const welcomed=useRef(false);const resultContext=useRef([]);const conversationHistory=useRef([]);const restartTimer=useRef(null);const nativeLastText=useRef('');const nativeSubmitted=useRef(false);
   const greeting=useMemo(()=>{const h=new Date().getHours();const time=h<12?'Good morning':h<18?'Good afternoon':'Good evening';return `${time}, ${user.first_name}. How can I help?`},[user.first_name]);
   function playWelcome(force=false,withAudio=false){if(welcomed.current&&!force)return;welcomed.current=true;setReply(greeting);if(withAudio&&!muted){setPlayback('playing');speak(greeting,{onDone:()=>setPlayback('stopped')})}try{sessionStorage.setItem(`valor_welcome_${user.email||user.first_name}`,'1')}catch{}}
@@ -1362,14 +2089,14 @@ function VoicePanel({user,onResult}){
   useEffect(()=>{localStorage.setItem('valor_voice_style',voiceStyle);localStorage.setItem('valor_voice_name',voiceName)},[voiceStyle,voiceName]);
   useEffect(()=>{localStorage.setItem('valor_voice_auto_read',String(autoRead));localStorage.setItem('valor_voice_muted',String(muted))},[autoRead,muted]);
   useEffect(()=>{setReply(greeting);return()=>{clearTimeout(restartTimer.current);stopSpeaking();if(isNativeApp()){NativeSpeechRecognition.forceStop({timeout:500}).catch(()=>{});NativeSpeechRecognition.removeAllListeners().catch(()=>{})}clearTimeout(followUpTimer.current)}},[greeting]);
-  async function send(text,{auto=false,liveLocOverride=null}={}){const value=String(text||'').trim();if(!value)return;clearTimeout(followUpTimer.current);stopSpeaking();setPlayback('stopped');if(!auto)setTranscript(value);setReply('Let me check that for you…');setChoices([]);setPopupOpen(false);try{const needsLiveLocation=/near me|nearby|around me|close to me|closest/i.test(value);const liveLoc=liveLocOverride||(needsLiveLocation?await freshLocation({required:true,maximumAge:0}):{source:'profile'});const history=conversationHistory.current.slice(-12);const d=await api('/api/vapi/action',{method:'POST',body:JSON.stringify({message:value,query:value,first_name:user.first_name,email:user.email,branch:user.branch,city:user.city,state:user.state,user_type:user.user_type||'Veteran',context_items:resultContext.current,conversation_history:history,lat:liveLoc?.source==='gps'?liveLoc.lat:null,lng:liveLoc?.source==='gps'?liveLoc.lng:null,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone})});conversationHistory.current=[...history,{role:'user',content:value},{role:'assistant',content:d.response}].slice(-12);const found=d.data?.items||[];if(found.length){resultContext.current=found;setResults(found)}else if(!d.data?.preserve_results){setResults([]);resultContext.current=[]}setReply(d.response);setChoices(d.data?.choices||[]);if(found.length){setPopupTitle(d.intent==='search_benefits'?'Benefits explained clearly':'Best nearby options');setPopupOpen(true)}if(autoRead&&!muted){setPlayback('playing');speak(d.response,{items:found.length?found:[],onDone:()=>setPlayback('stopped')})}onResult?.(d);if(d.data?.awaiting_clarification&&d.data?.default_query){followUpTimer.current=setTimeout(()=>send(d.data.default_query,{auto:true}),12000)}}catch(e){setReply(e.message)}}
+  async function send(text,{auto=false,liveLocOverride=null,fromVoice=false}={}){const value=String(text||'').trim();if(!value)return;clearTimeout(followUpTimer.current);clearTimeout(restartTimer.current);stopSpeaking();setPlayback('stopped');if(!auto)setTranscript(value);setReply('Let me check that for you…');setChoices([]);setPopupOpen(false);try{const needsLiveLocation=/near me|nearby|around me|close to me|closest/i.test(value);const liveLoc=liveLocOverride||(needsLiveLocation?await freshLocation({required:true,maximumAge:0}):{source:'profile'});const history=conversationHistory.current.slice(-12);const d=await api('/api/vapi/action',{method:'POST',body:JSON.stringify({message:value,query:value,first_name:user.first_name,email:user.email,branch:user.branch,city:user.city,state:user.state,user_type:user.user_type||'Veteran',context_items:resultContext.current,conversation_history:history,lat:liveLoc?.source==='gps'?liveLoc.lat:null,lng:liveLoc?.source==='gps'?liveLoc.lng:null,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone})});conversationHistory.current=[...history,{role:'user',content:value},{role:'assistant',content:d.response}].slice(-12);const found=d.data?.items||[];if(found.length){resultContext.current=found;setResults(found)}else if(!d.data?.preserve_results){setResults([]);resultContext.current=[]}setReply(d.response);setChoices(d.data?.choices||[]);if(found.length){setPopupTitle(d.intent==='search_benefits'?'Benefits explained clearly':'Best nearby options');setPopupOpen(true)}const shouldSpeak=(autoRead||fromVoice||conversationLoop.current)&&!muted;if(shouldSpeak){setPlayback('playing');speak(d.response,{items:found.length?found:[],onDone:()=>{setPlayback('stopped');if(conversationLoop.current&&!muted){restartTimer.current=setTimeout(()=>{if(conversationLoop.current)start(true)},400)}}})}onResult?.(d);if(d.data?.awaiting_clarification&&d.data?.default_query){followUpTimer.current=setTimeout(()=>send(d.data.default_query,{auto:true}),12000)}}catch(e){setReply(e.message);conversationLoop.current=false;setConversationLoopActive(false)}}
   async function useMyLocation(){setLocationState('Locating…');setReply('Getting your live location…');try{const loc=await freshLocation({required:true,maximumAge:0});setLocationState(`Live location active • ±${Math.round(loc.accuracy||0)}m`);await send('Use my current GPS location and show confirmed veteran events near me',{liveLocOverride:loc})}catch(e){setLocationState('Location unavailable');setReply(e.message)}}
   function playText(text=reply){if(!text||muted)return;setPlayback('playing');speak(text,{items:results,onDone:()=>setPlayback('stopped')})}
   function pauseVoice(){if(isNativeApp()){stopSpeaking();setPlayback('stopped');return}window.speechSynthesis?.pause();setPlayback('paused')}
   function resumeVoice(){if(isNativeApp()){playText();return}window.speechSynthesis?.resume();setPlayback('playing')}
-  function stopVoice(){stopSpeaking();setPlayback('stopped')}
+  function stopVoice(){conversationLoop.current=false;setConversationLoopActive(false);clearTimeout(restartTimer.current);stopSpeaking();setPlayback('stopped')}
   function testVoice(){stopSpeaking();if(!muted){setPlayback('playing');speak(`ValorBuddy command voice ready. ${user.first_name}, I’m here and ready to support your mission.`,{onDone:()=>setPlayback('stopped')})}}
-  function handleSpeech(text){const value=String(text||'').trim();const lower=value.toLowerCase();if(/^(wait|stop|hold on|pause|one moment|be quiet|listen)(\b|$)/.test(lower)){stopSpeaking();setReply(`Okay, ${user.first_name}. I stopped. I’m listening.`);setTranscript(value);restartTimer.current=setTimeout(()=>start(true),450);return}if(speechState.active)stopSpeaking();send(value)}
+  function handleSpeech(text){const value=String(text||'').trim();const lower=value.toLowerCase();if(/^(wait|stop|hold on|pause|one moment|be quiet|listen|cancel|exit|quit|bye|goodbye)(\b|$)/.test(lower)){conversationLoop.current=false;setConversationLoopActive(false);clearTimeout(restartTimer.current);stopSpeaking();setReply(`Understood, ${user.first_name}. Conversation paused. Tap the microphone whenever you're ready.`);setTranscript(value);return}if(speechState.active)stopSpeaking();send(value,{fromVoice:true})}
   async function startNative(restart=false){
     try{
       const available=await NativeSpeechRecognition.available();
@@ -1393,9 +2120,16 @@ function VoicePanel({user,onResult}){
       if(finalText&&!nativeSubmitted.current){nativeSubmitted.current=true;nativeLastText.current=finalText;setTranscript(finalText);setListening(false);handleSpeech(finalText)}
     }catch(e){setListening(false);setReply('ValorBuddy could not start voice recognition. Check microphone permission and try again.')}
   }
-  function start(restart=false){clearTimeout(followUpTimer.current);if(!restart)playWelcome();if(isNativeApp()){startNative(restart);return}const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){setReply('Voice recognition is not available in this browser. Please type your request below.');return}try{rec.current?.abort?.()}catch{}const r=new SR();r.lang='en-US';r.interimResults=true;r.continuous=false;r.onstart=()=>{setListening(true);if(!restart)setReply(`I’m listening, ${user.first_name}. Speak naturally, and interrupt me whenever you need to.`)};r.onend=()=>setListening(false);r.onerror=e=>{setListening(false);if(e.error!=='aborted')setReply('I didn’t catch that clearly. Tap the microphone and try again, or choose one of the options below.')};r.onresult=e=>{let finalText='';let interim='';for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)finalText+=t;else interim+=t}const heard=(finalText||interim).trim();if(heard)setTranscript(heard);if(finalText.trim())handleSpeech(finalText)};rec.current=r;r.start()}
-  function stopListening(){if(isNativeApp()){NativeSpeechRecognition.forceStop({timeout:600}).catch(()=>{});setListening(false)}else rec.current?.stop?.()}
-  const suggestions=['Veteran events near me','Benefits for my family','Closest VA clinic','Free activities this weekend','Why did you choose these?','Are these veteran-owned?'];
+  function start(restart=false){clearTimeout(followUpTimer.current);clearTimeout(restartTimer.current);if(!restart){conversationLoop.current=true;setConversationLoopActive(true);playWelcome()}if(isNativeApp()){startNative(restart);return}const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR){setReply('Voice recognition is not available in this browser. Please type your request below.');conversationLoop.current=false;setConversationLoopActive(false);return}try{rec.current?.abort?.()}catch{}const r=new SR();r.lang='en-US';r.interimResults=true;r.continuous=false;r.onstart=()=>{setListening(true);if(!restart)setReply(`I’m listening, ${user.first_name}. Speak naturally, and interrupt me whenever you need to.`)};r.onend=()=>setListening(false);r.onerror=e=>{setListening(false);if(e.error==='no-speech'){conversationLoop.current=false;setConversationLoopActive(false);return}if(e.error!=='aborted'){conversationLoop.current=false;setConversationLoopActive(false);setReply('I didn’t catch that clearly. Tap the microphone and try again, or choose one of the options below.')}};r.onresult=e=>{let finalText='';let interim='';for(let i=e.resultIndex;i<e.results.length;i++){const t=e.results[i][0].transcript;if(e.results[i].isFinal)finalText+=t;else interim+=t}const heard=(finalText||interim).trim();if(heard)setTranscript(heard);if(finalText.trim())handleSpeech(finalText)};rec.current=r;r.start()}
+  function stopListening(){conversationLoop.current=false;setConversationLoopActive(false);clearTimeout(restartTimer.current);if(isNativeApp()){NativeSpeechRecognition.forceStop({timeout:600}).catch(()=>{});setListening(false)}else rec.current?.stop?.()}
+  const suggestions=[
+    'Explain VA disability claim steps under the PACT Act',
+    'Translate my military MOS into civilian resume bullet points',
+    'Find the nearest VA clinic and emergency resources',
+    'What benefits am I eligible for under the Post-9/11 GI Bill?',
+    'How do I get a VA Home Loan Certificate of Eligibility?',
+    'Show veteran events and VFW posts near me'
+  ];
 
   const isProcessing = reply === 'Let me check that for you…';
   const isSpeaking = playback === 'playing';
@@ -1425,7 +2159,7 @@ function VoicePanel({user,onResult}){
 
       <div className="voiceStateBanner">
         <span className="voiceStatePrompt">{voiceState.prompt}</span>
-        <p className="voiceIntro">Audio is off by default. You control when ValorBuddy reads a response aloud.</p>
+        <p className="voiceIntro">{conversationLoopActive?'🎙️ Hands-free conversation mode active — speak naturally after each answer.':'Interactive voice mode. Tap the microphone to start a conversation, and ValorBuddy will speak back.'}</p>
       </div>
 
       {/* Tactical Audio Waveform Visualizer */}
@@ -1438,11 +2172,11 @@ function VoicePanel({user,onResult}){
       {/* Main Microphone Action */}
       <button
         className={`mic ${listening?'listening':''} ${isProcessing?'processing':''} ${isSpeaking?'speaking':''}`}
-        onClick={()=>listening?stopListening():start()}
+        onClick={()=>{if(listening){stopListening()}else{stopSpeaking();start()}}}
         aria-label={listening?'Stop listening':'Start voice assistant'}
       >
         {listening?<MicOff aria-hidden="true"/>:<Mic aria-hidden="true"/>}
-        <span>{listening?'Listening…':'Tap to Speak'}</span>
+        <span>{listening?'Listening…':isSpeaking?'Interrupt / Speak':'Tap to Speak'}</span>
       </button>
 
       {/* Grouped Audio Playback Controls */}
@@ -2838,6 +3572,19 @@ function getYouTubeEmbed(raw){
   if(list&&!id)return `https://www.youtube.com/embed/videoseries?list=${encodeURIComponent(list)}`;
   return `https://www.youtube.com/embed/${id}${list?'?list='+encodeURIComponent(list):''}`;
 }
+function getYouTubeId(raw){
+  const u=trustedMusicUrl(raw,['youtube.com','youtu.be']);
+  if(!u)return '';
+  let id='';
+  if(u.hostname==='youtu.be')id=u.pathname.split('/').filter(Boolean)[0]||'';
+  else{
+    id=u.searchParams.get('v')||'';
+    if(!id&&u.pathname.startsWith('/shorts/'))id=u.pathname.split('/')[2]||'';
+    if(!id&&u.pathname.startsWith('/embed/'))id=u.pathname.split('/')[2]||'';
+  }
+  if(id&&/^[a-zA-Z0-9_-]{11}$/.test(id)) return id;
+  return '';
+}
 function getSpotifyEmbed(raw){
   const u=trustedMusicUrl(raw,['spotify.com']);
   if(!u)return '';
@@ -2857,6 +3604,128 @@ function getSoundCloudEmbed(raw){
   if(!u)return '';
   return `https://w.soundcloud.com/player/?url=${encodeURIComponent(u.href)}&color=%2357e86e&auto_play=false&hide_related=false&show_comments=false&show_user=true&show_reposts=false&show_teaser=true&visual=true`;
 }
+
+function mediaEmbed(provider,raw){
+  const kind=mediaProviders[provider]?.kind;
+  if(!raw)return '';
+  if(kind==='youtube')return getYouTubeEmbed(raw);
+  if(kind==='spotify')return getSpotifyEmbed(raw);
+  if(kind==='apple')return getAppleMusicEmbed(raw);
+  if(kind==='soundcloud')return getSoundCloudEmbed(raw);
+  return '';
+}
+
+const FEATURED_YOUTUBE_VIDEOS = [
+  {
+    id: 'mU3H2rY4WvY',
+    title: 'The Army Song (The Army Goes Rolling Along) - Official Anthem',
+    category: 'Anthems & Cadences',
+    author: 'U.S. Army Band "Pershing\'s Own"',
+    duration: '2:15',
+    url: 'https://www.youtube.com/watch?v=mU3H2rY4WvY',
+    description: 'The official ceremonial march and anthem of the United States Army.'
+  },
+  {
+    id: 'KkW5C5n2h0o',
+    title: 'Anchors Aweigh - Official U.S. Navy March',
+    category: 'Anthems & Cadences',
+    author: 'United States Navy Band',
+    duration: '2:40',
+    url: 'https://www.youtube.com/watch?v=KkW5C5n2h0o',
+    description: 'The official fight song and ceremonial march of the United States Navy.'
+  },
+  {
+    id: 'uQ7L_5wXn5k',
+    title: 'The Marines\' Hymn - From the Halls of Montezuma',
+    category: 'Anthems & Cadences',
+    author: '"The President\'s Own" U.S. Marine Band',
+    duration: '2:30',
+    url: 'https://www.youtube.com/watch?v=uQ7L_5wXn5k',
+    description: 'The historic official hymn of the United States Marine Corps.'
+  },
+  {
+    id: '5Y6V3d2f9sQ',
+    title: 'The U.S. Air Force Song (Wild Blue Yonder)',
+    category: 'Anthems & Cadences',
+    author: 'The U.S. Air Force Band',
+    duration: '2:25',
+    url: 'https://www.youtube.com/watch?v=5Y6V3d2f9sQ',
+    description: 'Official ceremonial anthem of the United States Air Force.'
+  },
+  {
+    id: 'Wz3k_Q1r8xE',
+    title: 'Semper Paratus (Always Ready) - Coast Guard March',
+    category: 'Anthems & Cadences',
+    author: 'U.S. Coast Guard Band',
+    duration: '2:10',
+    url: 'https://www.youtube.com/watch?v=Wz3k_Q1r8xE',
+    description: 'Official military march of the United States Coast Guard.'
+  },
+  {
+    id: 'Hq0w7tX7G_A',
+    title: 'Semper Supra - Official U.S. Space Force Anthem',
+    category: 'Anthems & Cadences',
+    author: 'USSF Ceremonial Ensemble',
+    duration: '1:45',
+    url: 'https://www.youtube.com/watch?v=Hq0w7tX7G_A',
+    description: 'Official anthem of the United States Space Force, capturing vigilance from the high frontier.'
+  },
+  {
+    id: 'jfKfPfyJRdk',
+    title: 'Lo-Fi Chill Beats for Focus & Relaxation - Calm Stream',
+    category: 'Focus & Relaxation',
+    author: 'Lofi Girl',
+    duration: 'Live',
+    url: 'https://www.youtube.com/watch?v=jfKfPfyJRdk',
+    description: 'Calm, steady beats designed to reduce stress, aid concentration, and provide a peaceful work backdrop.'
+  },
+  {
+    id: 'DWcJFNfaw9c',
+    title: 'Calming Ambient Soundscape for PTSD Relief & Deep Sleep',
+    category: 'Focus & Relaxation',
+    author: 'Veteran Wellness Soundscapes',
+    duration: '3:00:00',
+    url: 'https://www.youtube.com/watch?v=DWcJFNfaw9c',
+    description: 'Soothing frequency audio designed for veterans winding down and decompressing after high tempo.'
+  },
+  {
+    id: '26U_seo0a1g',
+    title: 'U.S. Military Cadences Running Motivation & Morning PT',
+    category: 'Fitness & Motivation',
+    author: 'Tactical Cadence Collective',
+    duration: '15:20',
+    url: 'https://www.youtube.com/watch?v=26U_seo0a1g',
+    description: 'High-energy authentic airborne and infantry running cadences for morning workouts and ruck marches.'
+  },
+  {
+    id: 'bFzK3zD7F2A',
+    title: 'Understanding VA Disability Claims: How the VA Rates Conditions',
+    category: 'VA Guides & Knowledge',
+    author: 'Veterans Guide',
+    duration: '12:45',
+    url: 'https://www.youtube.com/watch?v=bFzK3zD7F2A',
+    description: 'Step-by-step breakdown of 38 CFR ratings, service connection, and avoiding common claim errors.'
+  },
+  {
+    id: 'gMhQZ8wY6m8',
+    title: 'Transitioning from Military to Corporate: What Veterans Need to Know',
+    category: 'Transition & Stories',
+    author: 'Veteran Career Network',
+    duration: '18:10',
+    url: 'https://www.youtube.com/watch?v=gMhQZ8wY6m8',
+    description: 'Practical advice from former service members on navigating corporate culture and networking.'
+  },
+  {
+    id: 'tAGnKpE4NCI',
+    title: 'Metallica - Enter Sandman (Official Music Video)',
+    category: 'Rock & Motivation',
+    author: 'Metallica',
+    duration: '5:30',
+    url: 'https://www.youtube.com/watch?v=tAGnKpE4NCI',
+    description: 'High-octane rock anthem beloved across deployment vehicle speaker setups.'
+  }
+];
+
 function ProviderLogo({name, size=18}){
   switch(name){
     case 'Spotify':
@@ -2893,16 +3762,155 @@ function ProviderLogo({name, size=18}){
 }
 
 function MusicPage({user,setUser}){
-  const[title,setTitle]=useState('');const[url,setUrl]=useState('');const[mood,setMood]=useState('');const[items,setItems]=useState([]);const[provider,setProvider]=useState('Spotify');const[query,setQuery]=useState('');const[preview,setPreview]=useState(null);const[error,setError]=useState('');const[genres,setGenres]=useState([]);const[newGenre,setNewGenre]=useState('');
-  async function load(){setItems(await api('/api/music/favorites'));try{const d=await api('/api/music/genres');setGenres(d.items||[])}catch{setGenres(user?.preferred_music_genres||[])}}
+  const[title,setTitle]=useState('');
+  const[url,setUrl]=useState('');
+  const[mood,setMood]=useState('');
+  const[items,setItems]=useState([]);
+  const[provider,setProvider]=useState('YouTube');
+  const[query,setQuery]=useState('');
+  const[preview,setPreview]=useState(null);
+  const[error,setError]=useState('');
+  const[genres,setGenres]=useState([]);
+  const[newGenre,setNewGenre]=useState('');
+
+  // YouTube Dedicated Video Theater State
+  const[activeVideo,setActiveVideo]=useState(FEATURED_YOUTUBE_VIDEOS[0]);
+  const[activeCategory,setActiveCategory]=useState('All');
+  const[ytSearch,setYtSearch]=useState('');
+  const[customVideos,setCustomVideos]=useState([]);
+  const[copiedUrl,setCopiedUrl]=useState(false);
+  const[savedFeedback,setSavedFeedback]=useState('');
+  const theaterRef=useRef(null);
+
+  async function load(){
+    setItems(await api('/api/music/favorites'));
+    try{
+      const d=await api('/api/music/genres');
+      setGenres(d.items||[]);
+    }catch{
+      setGenres(user?.preferred_music_genres||[]);
+    }
+  }
+
   useEffect(()=>{load()},[]);
-  async function add(){if(!title.trim())return;await api('/api/music/favorites',{method:'POST',body:JSON.stringify({title,url,mood})});setTitle('');setUrl('');setMood('');load()}
-  async function remove(id){await api(`/api/music/favorites/${id}`,{method:'DELETE'});load()}
-  async function addGenre(){const value=newGenre.trim();if(!value)return;const d=await api('/api/music/genres',{method:'POST',body:JSON.stringify({genre:value})});setGenres(d.items||[]);setNewGenre('');if(setUser)setUser(v=>({...v,preferred_music_genres:d.items||[]}))}
-  async function removeGenre(name){const d=await api(`/api/music/genres/${encodeURIComponent(name)}`,{method:'DELETE'});setGenres(d.items||[]);if(setUser)setUser(v=>({...v,preferred_music_genres:d.items||[]}))}
-  function openSearch(){const p=mediaProviders[provider];window.open(p.search(query||title||genres[0]||'veteran music'),'_blank','noopener,noreferrer')}
-  function previewLink(raw=url,name=provider){const embed=mediaEmbed(name,raw);setError('');if(embed){setPreview({provider:name,source:raw,embed});return}const kind=mediaProviders[name]?.kind;if(kind&&kind!=='external')setError(`That does not look like a supported ${name} content link. Open ${name}, choose a song, playlist, album, show, or video, copy its link, and paste it here.`);else setPreview({provider:name,source:raw||mediaProviders[name]?.home,embed:''})}
+
+  async function add(){
+    if(!title.trim())return;
+    await api('/api/music/favorites',{method:'POST',body:JSON.stringify({title,url,mood})});
+    setTitle('');setUrl('');setMood('');
+    load();
+  }
+
+  async function quickSaveVideo(vid){
+    await api('/api/music/favorites',{
+      method:'POST',
+      body:JSON.stringify({
+        title:vid.title,
+        url:vid.url,
+        mood:vid.category||'YouTube Video'
+      })
+    });
+    setSavedFeedback(`Saved "${vid.title.slice(0, 24)}..." to saved media!`);
+    setTimeout(()=>setSavedFeedback(''),3000);
+    load();
+  }
+
+  async function remove(id){
+    await api(`/api/music/favorites/${id}`,{method:'DELETE'});
+    load();
+  }
+
+  async function addGenre(){
+    const value=newGenre.trim();
+    if(!value)return;
+    const d=await api('/api/music/genres',{method:'POST',body:JSON.stringify({genre:value})});
+    setGenres(d.items||[]);
+    setNewGenre('');
+    if(setUser)setUser(v=>({...v,preferred_music_genres:d.items||[]}));
+  }
+
+  async function removeGenre(name){
+    const d=await api(`/api/music/genres/${encodeURIComponent(name)}`,{method:'DELETE'});
+    setGenres(d.items||[]);
+    if(setUser)setUser(v=>({...v,preferred_music_genres:d.items||[]}));
+  }
+
+  function openSearch(){
+    const p=mediaProviders[provider];
+    window.open(p.search(query||title||genres[0]||'veteran music'),'_blank','noopener,noreferrer');
+  }
+
+  function previewLink(raw=url,name=provider){
+    const embed=mediaEmbed(name,raw);
+    setError('');
+    if(embed){
+      setPreview({provider:name,source:raw,embed});
+      if(name==='YouTube'||name==='YouTube Music'){
+        const id=getYouTubeId(raw);
+        if(id){
+          setActiveVideo({
+            id,
+            title:title||'Custom YouTube Video',
+            category:'Custom Link',
+            author:'YouTube',
+            url:raw,
+            description:'Direct link loaded inside ValorBuddy.'
+          });
+        }
+      }
+      return;
+    }
+    const kind=mediaProviders[name]?.kind;
+    if(kind&&kind!=='external'){
+      setError(`That does not look like a supported ${name} content link. Open ${name}, choose a song, playlist, album, show, or video, copy its link, and paste it here.`);
+    }else{
+      setPreview({provider:name,source:raw||mediaProviders[name]?.home,embed:''});
+    }
+  }
+
+  function playSelectedVideo(vid){
+    setActiveVideo(vid);
+    if(theaterRef.current){
+      theaterRef.current.scrollIntoView({behavior:'smooth',block:'start'});
+    }
+  }
+
+  function handlePlayFromSearch(e){
+    e?.preventDefault?.();
+    const q=ytSearch.trim();
+    if(!q)return;
+    const id=getYouTubeId(q);
+    if(id){
+      const newVid={
+        id,
+        title:`YouTube Video (${id})`,
+        category:'Custom Link',
+        author:'YouTube',
+        url:q.startsWith('http')?q:`https://www.youtube.com/watch?v=${id}`,
+        description:'Direct YouTube link loaded into playback.'
+      };
+      setActiveVideo(newVid);
+      setCustomVideos(prev=>[newVid,...prev.filter(v=>v.id!==id)]);
+      setYtSearch('');
+    }else{
+      window.open(`https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`,'_blank','noopener,noreferrer');
+    }
+  }
+
+  function copyVideoLink(link){
+    if(navigator?.clipboard?.writeText){
+      navigator.clipboard.writeText(link);
+      setCopiedUrl(true);
+      setTimeout(()=>setCopiedUrl(false),2000);
+    }
+  }
+
+  const allVideos=[...customVideos,...FEATURED_YOUTUBE_VIDEOS];
+  const categories=['All','Anthems & Cadences','Focus & Relaxation','Fitness & Motivation','VA Guides & Knowledge','Transition & Stories'];
+  const filteredVideos=activeCategory==='All'?allVideos:allVideos.filter(v=>v.category===activeCategory);
   const selected=mediaProviders[provider];
+  const isYouTube=provider==='YouTube'||provider==='YouTube Music';
+
   return <section className="page readablePage mediaCenterPage" aria-label="Music and Media Center">
     <div className="operationsHeader">
       <div className="operationsEyebrow">
@@ -2910,8 +3918,9 @@ function MusicPage({user,setUser}){
         <span>Morale & Media</span>
       </div>
       <h1 className="operationsTitle">Music & Media Center</h1>
-      <p className="operationsLead">Choose your own genres, play supported media with approved provider players, and keep favorite playlists and podcasts organized.</p>
+      <p className="operationsLead">Watch YouTube videos directly, listen to military anthems and relaxing focus streams, and keep favorite media organized.</p>
     </div>
+
     <section className="genreManager">
       <div>
         <small>YOUR MUSIC PROFILE</small>
@@ -2929,6 +3938,7 @@ function MusicPage({user,setUser}){
         {genres.length===0?<span className="emptyGenre">No genres added yet.</span>:genres.map(g=><span key={g}>{g}<button type="button" aria-label={`Remove ${g}`} onClick={()=>removeGenre(g)}><X size={12} aria-hidden="true"/></button></span>)}
       </div>
     </section>
+
     <div className="providerTabs" role="tablist" aria-label="Media providers">
       {Object.keys(mediaProviders).map(name=>(
         <button
@@ -2944,103 +3954,245 @@ function MusicPage({user,setUser}){
         </button>
       ))}
     </div>
-    <div className="mediaWorkspace">
-      <section className="providerPanel">
-        <div className="providerHeading">
-          <div className="providerHeadingLeft">
-            <span className="providerPanelLogo" aria-hidden="true">
-              <ProviderLogo name={provider} size={34}/>
-            </span>
+
+    {/* YOUTUBE DEDICATED THEATER & VIDEO DISPLAY FEATURE */}
+    {isYouTube ? (
+      <section className="ytTheaterContainer" ref={theaterRef} aria-label="YouTube Video Theater">
+        <div className="ytTheaterHeader">
+          <div className="ytTheaterHeaderLeft">
+            <ProviderLogo name="YouTube" size={32}/>
             <div>
-              <small>SELECTED SERVICE</small>
-              <h2>{provider}</h2>
+              <small>ACTIVE THEATER SCREEN</small>
+              <h2>Watch YouTube Videos in ValorBuddy</h2>
             </div>
           </div>
-          <span className={`supportBadge ${selected.kind==='external'?'handoff':'embedded'}`}>
-            {selected.kind==='external'?'Secure handoff':'In-app player'}
+          <span className="ytBadge">
+            <Play size={11} fill="#ff4d4d" aria-hidden="true"/>
+            <span>HD Web Video Player</span>
           </span>
         </div>
-        <p>{selected.help}</p>
-        <div className="mediaSearchRow">
-          <input
-            value={query}
-            onChange={e=>setQuery(e.target.value)}
-            onKeyDown={e=>e.key==='Enter'&&openSearch()}
-            placeholder={`Search ${provider} for an artist, song, playlist, or podcast`}
-            aria-label={`Search ${provider}`}
+
+        {/* 16:9 Screen Display */}
+        <div className="ytScreenWrapper">
+          <iframe
+            src={`https://www.youtube.com/embed/${activeVideo.id}?autoplay=1&rel=0`}
+            title={activeVideo.title}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
           />
-          <button type="button" onClick={openSearch}>
-            <Search size={15} aria-hidden="true"/>
-            <span>Search {provider}</span>
-          </button>
         </div>
-        <label className="mediaUrlField">
-          <span>Paste a specific {provider} content link</span>
-          <input
-            value={url}
-            onChange={e=>setUrl(e.target.value)}
-            placeholder={`Paste the copied ${provider} link here`}
-            aria-label={`Specific ${provider} content link`}
-          />
-        </label>
-        {error&&<div className="mediaError">{error}</div>}
-        <div className="mediaActionRow">
-          <button
-            className="primary actionButton"
-            type="button"
-            onClick={()=>previewLink()}
-            disabled={!url.trim()&&selected.kind!=='external'}
-          >
-            {selected.kind==='external'?'Open safely':'Preview inside ValorBuddy'}
-          </button>
-          <button
-            type="button"
-            onClick={()=>window.open(selected.home,'_blank','noopener,noreferrer')}
-          >
-            Visit {provider}
-          </button>
-        </div>
-      </section>
-      <section className="mediaPreviewPanel">
-        {preview?.embed?(
-          <>
-            <div className="playerTitle">
-              <div>
-                <small>NOW READY</small>
-                <h3>{preview.provider} player</h3>
-              </div>
-              <button type="button" onClick={()=>setPreview(null)}>Close</button>
-            </div>
-            <iframe
-              src={preview.embed}
-              title={`${preview.provider} approved player`}
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              allowFullScreen
-              referrerPolicy="strict-origin-when-cross-origin"
-            />
-          </>
-        ):preview&&!preview.embed?(
-          <div className="handoffCard">
-            <Radio size={16} aria-hidden="true"/>
-            <h3>{preview.provider} protects playback outside embedded websites</h3>
-            <p>ValorBuddy will keep your saved title and link. Open the service securely without displaying a broken player.</p>
+
+        {/* Meta Bar */}
+        <div className="ytMetaBar">
+          <div className="ytMetaInfo">
+            <span className="ytMetaCategory">{activeVideo.category}</span>
+            <h3 className="ytMetaTitle">{activeVideo.title}</h3>
+            <div className="ytMetaAuthor">Channel: <strong>{activeVideo.author}</strong> • Duration: {activeVideo.duration}</div>
+            <p className="ytMetaDesc">{activeVideo.description}</p>
+            {savedFeedback && <div style={{color:'var(--branch-accent)',fontSize:'0.82rem',fontWeight:'700',marginTop:'6px'}}>{savedFeedback}</div>}
+          </div>
+          <div className="ytMetaActions">
             <button
-              className="primary actionButton"
               type="button"
-              onClick={()=>window.open(preview.source||selected.home,'_blank','noopener,noreferrer')}
+              className="ytActionButton primary"
+              onClick={()=>quickSaveVideo(activeVideo)}
             >
-              Continue to {preview.provider}
+              <Bookmark size={14} aria-hidden="true"/>
+              <span>Save to Favorites</span>
+            </button>
+            <button
+              type="button"
+              className="ytActionButton"
+              onClick={()=>window.open(activeVideo.url,'_blank','noopener,noreferrer')}
+            >
+              <ExternalLink size={14} aria-hidden="true"/>
+              <span>Watch on YouTube</span>
+            </button>
+            <button
+              type="button"
+              className="ytActionButton"
+              onClick={()=>copyVideoLink(activeVideo.url)}
+            >
+              <span>{copiedUrl ? 'Copied Link!' : 'Copy Link'}</span>
             </button>
           </div>
-        ):(
-          <div className="playerEmpty">
-            <Music size={24} aria-hidden="true"/>
-            <h3>No blank player</h3>
-            <p>Choose a provider and paste a supported content link. ValorBuddy will only display an approved player when one is available.</p>
+        </div>
+
+        {/* Video Discovery & Category Shelf */}
+        <div className="ytShelfSection">
+          <div className="ytShelfHeader">
+            <h3>Featured Veteran Channels & Playlists</h3>
+            <div className="ytFilterStrip">
+              {categories.map(cat=>(
+                <button
+                  key={cat}
+                  type="button"
+                  className={`ytFilterPill ${activeCategory===cat?'active':''}`}
+                  onClick={()=>setActiveCategory(cat)}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
-        )}
+
+          {/* Quick Search & Direct Link input */}
+          <form className="ytSearchRow" onSubmit={handlePlayFromSearch}>
+            <input
+              value={ytSearch}
+              onChange={e=>setYtSearch(e.target.value)}
+              placeholder="Paste any YouTube URL (e.g. youtu.be/...) or search videos to watch immediately..."
+              aria-label="Search or paste YouTube video link"
+            />
+            <button type="submit">
+              <Play size={13} fill="#fff" aria-hidden="true"/>
+              <span>Play Video</span>
+            </button>
+          </form>
+
+          {/* Interactive Video Cards Grid */}
+          <div className="ytVideoGrid">
+            {filteredVideos.map(vid=>(
+              <article
+                key={vid.id}
+                className={`ytVideoCard ${activeVideo.id===vid.id?'active':''}`}
+                onClick={()=>playSelectedVideo(vid)}
+              >
+                <div className="ytThumbWrapper">
+                  <img
+                    src={`https://img.youtube.com/vi/${vid.id}/mqdefault.jpg`}
+                    alt={vid.title}
+                    loading="lazy"
+                  />
+                  <div className="ytPlayOverlay" aria-hidden="true">
+                    <Play size={16} fill="#ffffff" color="#ffffff"/>
+                  </div>
+                  <span className="ytDurationBadge">{vid.duration}</span>
+                </div>
+                <div className="ytCardBody">
+                  <span className="ytCardCategory">{vid.category}</span>
+                  <h4 className="ytCardTitle">{vid.title}</h4>
+                  <div className="ytCardAuthor">{vid.author}</div>
+                </div>
+              </article>
+            ))}
+          </div>
+        </div>
       </section>
-    </div>
+    ) : (
+      <>
+        {/* Switch to YouTube Banner */}
+        <div className="ytSwitchBanner">
+          <div className="ytSwitchBannerLeft">
+            <ProviderLogo name="YouTube" size={26}/>
+            <span>Looking for military cadences, anthems, or veteran YouTube videos?</span>
+          </div>
+          <button type="button" className="ytSwitchBtn" onClick={()=>setProvider('YouTube')}>
+            <Play size={12} fill="#fff" aria-hidden="true"/>
+            <span>Open YouTube Theater</span>
+          </button>
+        </div>
+
+        <div className="mediaWorkspace">
+          <section className="providerPanel">
+            <div className="providerHeading">
+              <div className="providerHeadingLeft">
+                <span className="providerPanelLogo" aria-hidden="true">
+                  <ProviderLogo name={provider} size={34}/>
+                </span>
+                <div>
+                  <small>SELECTED SERVICE</small>
+                  <h2>{provider}</h2>
+                </div>
+              </div>
+              <span className={`supportBadge ${selected.kind==='external'?'handoff':'embedded'}`}>
+                {selected.kind==='external'?'Secure handoff':'In-app player'}
+              </span>
+            </div>
+            <p>{selected.help}</p>
+            <div className="mediaSearchRow">
+              <input
+                value={query}
+                onChange={e=>setQuery(e.target.value)}
+                onKeyDown={e=>e.key==='Enter'&&openSearch()}
+                placeholder={`Search ${provider} for an artist, song, playlist, or podcast`}
+                aria-label={`Search ${provider}`}
+              />
+              <button type="button" onClick={openSearch}>
+                <Search size={15} aria-hidden="true"/>
+                <span>Search {provider}</span>
+              </button>
+            </div>
+            <label className="mediaUrlField">
+              <span>Paste a specific {provider} content link</span>
+              <input
+                value={url}
+                onChange={e=>setUrl(e.target.value)}
+                placeholder={`Paste the copied ${provider} link here`}
+                aria-label={`Specific ${provider} content link`}
+              />
+            </label>
+            {error&&<div className="mediaError">{error}</div>}
+            <div className="mediaActionRow">
+              <button
+                className="primary actionButton"
+                type="button"
+                onClick={()=>previewLink()}
+                disabled={!url.trim()&&selected.kind!=='external'}
+              >
+                {selected.kind==='external'?'Open safely':'Preview inside ValorBuddy'}
+              </button>
+              <button
+                type="button"
+                onClick={()=>window.open(selected.home,'_blank','noopener,noreferrer')}
+              >
+                Visit {provider}
+              </button>
+            </div>
+          </section>
+          <section className="mediaPreviewPanel">
+            {preview?.embed?(
+              <>
+                <div className="playerTitle">
+                  <div>
+                    <small>NOW READY</small>
+                    <h3>{preview.provider} player</h3>
+                  </div>
+                  <button type="button" onClick={()=>setPreview(null)}>Close</button>
+                </div>
+                <iframe
+                  src={preview.embed}
+                  title={`${preview.provider} approved player`}
+                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                  allowFullScreen
+                  referrerPolicy="strict-origin-when-cross-origin"
+                />
+              </>
+            ):preview&&!preview.embed?(
+              <div className="handoffCard">
+                <Radio size={16} aria-hidden="true"/>
+                <h3>{preview.provider} protects playback outside embedded websites</h3>
+                <p>ValorBuddy will keep your saved title and link. Open the service securely without displaying a broken player.</p>
+                <button
+                  className="primary actionButton"
+                  type="button"
+                  onClick={()=>window.open(preview.source||selected.home,'_blank','noopener,noreferrer')}
+                >
+                  Continue to {preview.provider}
+                </button>
+              </div>
+            ):(
+              <div className="playerEmpty">
+                <Music size={24} aria-hidden="true"/>
+                <h3>No blank player</h3>
+                <p>Choose a provider and paste a supported content link. ValorBuddy will only display an approved player when one is available.</p>
+              </div>
+            )}
+          </section>
+        </div>
+      </>
+    )}
+
     <div className="featureForm darkForm saveMediaForm">
       <label>
         <span>Favorite title</span>
@@ -3059,6 +4211,7 @@ function MusicPage({user,setUser}){
         <span>Save favorite</span>
       </button>
     </div>
+
     <h2>Saved media</h2>
     <div className="contentGrid">
       {items.length===0&&<div className="emptyState"><Music size={24} style={{color:'var(--branch-accent)', marginBottom:'8px'}} aria-hidden="true"/><h3>No saved media yet</h3><p>Save a song, playlist, station, podcast, audiobook, or Veteran TV link.</p></div>}
@@ -3428,14 +4581,64 @@ function MissionControl(){
   </section>;
 }
 
+class CareerErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, errorInfo) {
+    console.error('Career component error caught by boundary:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <section className="page readablePage" aria-label="Career and Business Studio">
+          <div className="operationsHeader">
+            <div className="operationsEyebrow">
+              <Briefcase size={14} aria-hidden="true"/>
+              <span>Veteran Operations</span>
+            </div>
+            <h1 className="operationsTitle">Career & Business Studio</h1>
+          </div>
+          <div className="err" role="alert" style={{margin:'20px 0', padding:'16px', borderRadius:'8px'}}>
+            <p style={{margin:'0 0 8px', fontWeight:700, fontSize:'15px'}}>The Career Studio encountered an unexpected display issue.</p>
+            <p style={{fontSize:'13px', margin:'0 0 14px', color:'var(--vb-text-secondary)'}}>
+              {this.state.error?.message || 'A temporary rendering issue occurred. The rest of ValorBuddy remains fully operational.'}
+            </p>
+            <button
+              type="button"
+              className="primary actionButton"
+              onClick={() => this.setState({ hasError: false, error: null })}
+              style={{minHeight:'42px', padding:'8px 18px', fontSize:'14px'}}
+            >
+              Reload Career Studio
+            </button>
+          </div>
+        </section>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function safeFormatLabel(val, fallback = 'draft') {
+  return String(val || fallback).replace(/_/g, ' ');
+}
+
 function CareerBusiness({user}){
+  const safeUser = user || {};
   const[type,setType]=useState('resume');
-  const[target,setTarget]=useState(user.civilian_career_goal||user.business_interest||'');
+  const[target,setTarget]=useState(safeUser.civilian_career_goal||safeUser.business_interest||'');
   const[notes,setNotes]=useState('');
   const[docs,setDocs]=useState([]);
   const[current,setCurrent]=useState(null);
   const[busy,setBusy]=useState(false);
   const[copySuccess,setCopySuccess]=useState(false);
+  const[error,setError]=useState('');
+  const[statusMsg,setStatusMsg]=useState('');
 
   async function load(){
     try {
@@ -3451,20 +4654,70 @@ function CareerBusiness({user}){
   useEffect(()=>{load()},[]);
 
   async function generate(){
-    if(target.trim().length<2){
-      alert('Enter the target role or business idea before sending this request to the Career Agent.');
+    const cleanTarget = String(target || '').trim();
+    const cleanNotes = String(notes || '').trim();
+
+    if(cleanTarget.length < 2){
+      setError('Please enter a target role or business idea (at least 2 characters) before generating.');
+      setStatusMsg('');
       return;
     }
+
     setBusy(true);
+    setError('');
+    setStatusMsg('');
+
     try{
-      const d=await api('/api/career/generate',{method:'POST',body:JSON.stringify({document_type:type,target,notes})});
-      if (d && (d.content || d.title)) {
+      const d = await api('/api/career/generate', {
+        method: 'POST',
+        body: JSON.stringify({ document_type: type, target: cleanTarget, notes: cleanNotes })
+      });
+
+      if (!d || typeof d !== 'object') {
+        throw new Error('Received an invalid response from the Career Agent.');
+      }
+
+      if (d.content || d.title) {
         setCurrent(d);
+        setStatusMsg('Verified career draft generated successfully.');
+      } else {
+        throw new Error('The Career Agent did not return draft content. Please try again.');
       }
       await load();
-    }catch(e){
-      alert(e.message);
-    }finally{setBusy(false)}
+    } catch(e) {
+      console.error('Career generate error:', e);
+      const msg = typeof e?.message === 'string' ? e.message : 'Unable to generate career draft. Please check your connection and try again.';
+      setError(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyToClipboard(text){
+    const str = String(text || '');
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(str);
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2500);
+        return;
+      }
+    } catch {}
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = str;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2500);
+    } catch {
+      setError('Could not copy to clipboard automatically. You can manually copy the text below.');
+    }
   }
 
   return <section className="page readablePage" aria-label="Career and Business Studio">
@@ -3477,10 +4730,24 @@ function CareerBusiness({user}){
       <p className="operationsLead">Translate your military experience into civilian opportunities. Use your service record, MOS, and leadership background to build verified career drafts.</p>
     </div>
 
+    {error && (
+      <div className="err" role="alert" style={{marginBottom:'16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', padding:'10px 14px', borderRadius:'8px'}}>
+        <span>{error}</span>
+        <button type="button" onClick={()=>setError('')} style={{background:'transparent', border:'none', color:'inherit', cursor:'pointer', fontWeight:700, fontSize:'14px', padding:'0 4px'}} aria-label="Dismiss error">✕</button>
+      </div>
+    )}
+
+    {statusMsg && (
+      <div className="authSuccess" role="status" style={{marginBottom:'16px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'8px', padding:'10px 14px', borderRadius:'8px'}}>
+        <span>{statusMsg}</span>
+        <button type="button" onClick={()=>setStatusMsg('')} style={{background:'transparent', border:'none', color:'inherit', cursor:'pointer', fontWeight:700, fontSize:'14px', padding:'0 4px'}} aria-label="Dismiss notice">✕</button>
+      </div>
+    )}
+
     <div className="mosFlowBanner" aria-label="Military to Civilian Translation Workflow">
       <div className="mosFlowStep">
         <span>Step 1: Military Experience</span>
-        <b>{user.military_mos ? `${user.military_mos} · ${user.military_job_title || 'Specialist'}` : 'Your MOS & Service Record'}</b>
+        <b>{safeUser.military_mos ? `${safeUser.military_mos} · ${safeUser.military_job_title || 'Specialist'}` : 'Your MOS & Service Record'}</b>
       </div>
       <span className="mosFlowArrow" aria-hidden="true">→</span>
       <div className="mosFlowStep">
@@ -3490,7 +4757,7 @@ function CareerBusiness({user}){
       <span className="mosFlowArrow" aria-hidden="true">→</span>
       <div className="mosFlowStep">
         <span>Step 3: Civilian Opportunities</span>
-        <b>{user.civilian_career_goal || 'Tailored Resume & Planning'}</b>
+        <b>{safeUser.civilian_career_goal || 'Tailored Resume & Planning'}</b>
       </div>
     </div>
 
@@ -3508,7 +4775,7 @@ function CareerBusiness({user}){
           </label>
           <label>
             <span className="fieldLabel">Target role or business idea</span>
-            <input value={target} onChange={e=>setTarget(e.target.value)} placeholder="Example: Senior Operations & Logistics Manager" disabled={busy} aria-label="Target role or business idea"/>
+            <input value={target} onChange={e=>{setTarget(e.target.value); if(error) setError('');}} placeholder="Example: Senior Operations & Logistics Manager" disabled={busy} aria-label="Target role or business idea"/>
           </label>
 
           <div style={{display:'flex', flexWrap:'wrap', gap:'6px', margin:'-4px 0 10px', alignItems:'center'}}>
@@ -3526,6 +4793,7 @@ function CareerBusiness({user}){
                 onClick={() => {
                   setTarget(presetTarget);
                   setType(presetType);
+                  if (error) setError('');
                 }}
               >
                 + {presetTarget}
@@ -3549,19 +4817,19 @@ function CareerBusiness({user}){
         <p className="muted" style={{fontSize:'12px', margin:'0 0 8px'}}>Verified profile context supplied to the Career Agent:</p>
         <div className="mosReadinessItem">
           <span>MOS / AFSC / Rating</span>
-          <b>{user.military_mos || '25B Information Technology / 11B Infantry'}</b>
+          <b>{safeUser.military_mos || '25B Information Technology / 11B Infantry'}</b>
         </div>
         <div className="mosReadinessItem">
           <span>Military Job Title</span>
-          <b>{user.military_job_title || `${user.rank || 'SFC'} • Operations Specialist`}</b>
+          <b>{safeUser.military_job_title || `${safeUser.rank || 'SFC'} • Operations Specialist`}</b>
         </div>
         <div className="mosReadinessItem">
           <span>Civilian Career Goal</span>
-          <b>{user.civilian_career_goal || 'Operations & Technology Leadership'}</b>
+          <b>{safeUser.civilian_career_goal || 'Operations & Technology Leadership'}</b>
         </div>
         <div className="mosReadinessItem">
           <span>Business Interest</span>
-          <b>{user.business_interest || 'Defense Contracting & Advisory'}</b>
+          <b>{safeUser.business_interest || 'Defense Contracting & Advisory'}</b>
         </div>
       </aside>
     </div>
@@ -3578,19 +4846,15 @@ function CareerBusiness({user}){
         <div className="generatedDocHeader" style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', flexWrap:'wrap', gap:'12px'}}>
           <div>
             <span className="statusPill approved" style={{marginBottom:'6px', display:'inline-block'}}>
-              {(current.status || current.document_type || 'draft').replaceAll('_', ' ')}
+              {safeFormatLabel(current.status || current.document_type || 'draft')}
             </span>
-            <h2 style={{margin:0}}>{current.title}</h2>
+            <h2 style={{margin:0}}>{typeof current.title === 'string' ? current.title : 'Generated Career Draft'}</h2>
           </div>
           <div style={{display:'flex', gap:'8px', alignItems:'center'}}>
             <button
               type="button"
               className="actionButton"
-              onClick={()=>{
-                navigator.clipboard?.writeText(current.content);
-                setCopySuccess(true);
-                setTimeout(()=>setCopySuccess(false), 2500);
-              }}
+              onClick={()=>copyToClipboard(current.content)}
             >
               <FileText size={14} aria-hidden="true"/>
               <span>{copySuccess ? 'Copied!' : 'Copy to clipboard'}</span>
@@ -3606,7 +4870,9 @@ function CareerBusiness({user}){
             </button>
           </div>
         </div>
-        <pre style={{whiteSpace:'pre-wrap', wordBreak:'break-word', marginTop:'16px'}}>{current.content}</pre>
+        <pre style={{whiteSpace:'pre-wrap', wordBreak:'break-word', marginTop:'16px'}}>
+          {typeof current.content === 'string' ? current.content : (current.content ? JSON.stringify(current.content, null, 2) : '')}
+        </pre>
       </article>
     )}
 
@@ -3622,27 +4888,35 @@ function CareerBusiness({user}){
       </div>
     ) : (
       <div className="contentGrid">
-        {docs.map(d => (
-          <article className="contentCard" key={d.id}>
-            <div className="cardTop">
-              <h3>{d.title}</h3>
-              <span className="statusPill approved">{(d.status || d.document_type || 'draft').replaceAll('_', ' ')}</span>
-            </div>
-            <p><b>Target:</b> {d.target}</p>
-            <small className="muted">{d.document_type?.replaceAll('_', ' ')}</small>
-            <div className="cardActions" style={{marginTop:'auto', paddingTop:'10px'}}>
-              <button
-                type="button"
-                onClick={() => {
-                  setCurrent(d);
-                  window.scrollTo({top: 350, behavior: 'smooth'});
-                }}
-              >
-                <span>Open draft</span>
-              </button>
-            </div>
-          </article>
-        ))}
+        {docs.map((d, index) => {
+          if (!d || typeof d !== 'object') return null;
+          const docId = d.id || `doc-${index}`;
+          const title = typeof d.title === 'string' ? d.title : 'Career Draft';
+          const targetStr = typeof d.target === 'string' ? d.target : 'Target Role';
+          const statusStr = safeFormatLabel(d.status || d.document_type || 'draft');
+          const typeStr = safeFormatLabel(d.document_type || 'career draft');
+          return (
+            <article className="contentCard" key={docId}>
+              <div className="cardTop">
+                <h3>{title}</h3>
+                <span className="statusPill approved">{statusStr}</span>
+              </div>
+              <p><b>Target:</b> {targetStr}</p>
+              <small className="muted">{typeStr}</small>
+              <div className="cardActions" style={{marginTop:'auto', paddingTop:'10px'}}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCurrent(d);
+                    window.scrollTo({top: 350, behavior: 'smooth'});
+                  }}
+                >
+                  <span>Open draft</span>
+                </button>
+              </div>
+            </article>
+          );
+        })}
       </div>
     )}
   </section>;
