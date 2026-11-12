@@ -904,9 +904,31 @@ function TermsOfService(){
           </p>
         </section>
 
-        {/* Section 11: Governing Law & Jurisdiction */}
+        {/* Section 11: Third-Party Websites & Integrations */}
         <section className="privacyCard">
-          <h2>11. Governing Law & Dispute Resolution</h2>
+          <h2>11. Third-Party Websites & Integrations</h2>
+          <div className="privacySection">
+            <p>
+              ValorBuddy provides curated access to approved public-facing resources, including official government websites (such as VA.gov, eBenefits, and Military OneSource), educational and wellness content, mapping services, and recognized Veteran support organizations.
+            </p>
+            <p>
+              <strong>Integration Limitations:</strong> ValorBuddy is an independent, third-party platform and is not affiliated with, endorsed by, or officially integrated into the U.S. Department of Veterans Affairs (VA) or other government agencies unless expressly authorized.
+            </p>
+            <p>
+              Links to VA resources direct users to publicly accessible, official government websites. ValorBuddy does not access restricted VA systems, retrieve confidential government records, process VA benefits claims, or exchange information directly with VA databases without appropriate authorization and approved technical integrations.
+            </p>
+            <p>
+              External websites and services operate independently and are governed by their respective privacy policies and terms of service. Users are encouraged to review these policies before providing personal information.
+            </p>
+            <p>
+              Any future integration with VA systems or other government platforms will be subject to applicable security, privacy, technical, and regulatory requirements, including formal authorization where required.
+            </p>
+          </div>
+        </section>
+
+        {/* Section 12: Governing Law & Jurisdiction */}
+        <section className="privacyCard">
+          <h2>12. Governing Law & Dispute Resolution</h2>
           <p>
             These Terms and any dispute arising out of or related to ValorBuddy shall be governed by and construed in accordance with the laws 
             of the State of Texas, without regard to its conflict of law principles, and applicable federal laws of the United States. 
@@ -914,9 +936,9 @@ function TermsOfService(){
           </p>
         </section>
 
-        {/* Section 12: Contact & Entity Information */}
+        {/* Section 13: Contact & Entity Information */}
         <section className="privacyCard">
-          <h2>12. Contact Information & Legal Notices</h2>
+          <h2>13. Contact Information & Legal Notices</h2>
           <div className="privacyContactGrid">
             <div className="privacyContactBox">
               <h4>Legal & Regulatory Inquiries</h4>
@@ -957,7 +979,7 @@ function TermsOfService(){
 
 
 function PrivacyPolicy(){
-  const updated = 'November 3, 2026';
+  const updated = 'November 11, 2026';
   return (
     <div className="privacyPage">
       <header className="privacyHeader">
@@ -966,10 +988,10 @@ function PrivacyPolicy(){
           <span><b>ValorBuddy™</b><small>Your Digital Battle Buddy</small></span>
         </a>
         <nav className="privacyNav">
+          <a className="privacyHomeLink" href="/">Return to ValorBuddy</a>
           <a href="/terms">Terms of Service</a>
           <a href="/data-retention-policy">Data Retention</a>
           <a href="/delete-account">Delete Account</a>
-          <a className="privacyHomeLink" href="/">Return to ValorBuddy</a>
         </nav>
       </header>
 
@@ -978,347 +1000,472 @@ function PrivacyPolicy(){
           <span className="privacyEyebrow">TAGUS TECHNOLOGIES LLC · VETERAN-OWNED ENTERPRISE</span>
           <h1>ValorBuddy™ Privacy Policy</h1>
           <p>
-            ValorBuddy is dedicated to honoring the service of United States veterans, military personnel, caregivers, and families. 
-            We protect your privacy with the same discipline and integrity demanded of military service. We do not sell your personal data, 
-            and your military records, VA claim documents, and conversations are never used to train public AI foundation models.
+            Your Digital Battle Buddy · Operated by TAGUS Technologies LLC
           </p>
           <div className="privacyMeta">
-            <span><b>Entity:</b> Tagus Technologies LLC</span>
-            <span><b>Effective Date:</b> {updated}</span>
-            <span><b>Last Revised:</b> {updated}</span>
-            <span><b>Jurisdiction:</b> State of Texas & United States Federal Law</span>
+            <span><b>Company:</b> TAGUS Technologies LLC</span>
+            <span><b>Effective Date:</b> November 11, 2026</span>
+            <span><b>Last Revised:</b> November 11, 2026</span>
+            <span><b>Jurisdiction:</b> United States</span>
           </div>
         </section>
 
-        {/* Crisis Notice */}
+        {/* Important Government Affiliation Disclaimer */}
+        <section className="privacyCard" style={{borderLeft: '4px solid #C29B38', background: 'rgba(194, 155, 56, 0.05)'}}>
+          <h2 style={{color: '#E5C365'}}>Important Government Affiliation Disclaimer</h2>
+          <div className="privacySection">
+            <p>
+              <strong>ValorBuddy™ is an independent, privately developed AI-powered Veteran support platform operated by TAGUS Technologies LLC.</strong>
+            </p>
+            <p>
+              ValorBuddy is not a U.S. government application and is not affiliated with, sponsored by, endorsed by, or operated by the U.S. Department of Veterans Affairs (VA), Department of Defense (DoD), or any other government agency.
+            </p>
+            <p>
+              ValorBuddy helps Veterans, service members, caregivers, and families discover information, understand publicly available resources, organize personal activities, and navigate relevant support services.
+            </p>
+            <p>
+              Links to government resources direct users to official, publicly accessible websites. Providing these links does not constitute government approval, endorsement, or authorization to access restricted government systems.
+            </p>
+            <p>
+              ValorBuddy does not independently determine VA benefits eligibility, approve claims, issue official government decisions, or provide accredited VA claims representation.
+            </p>
+            <p>
+              For official VA benefits information and services, visit <a href="https://www.va.gov" target="_blank" rel="noopener noreferrer">https://www.va.gov</a>.
+            </p>
+          </div>
+        </section>
+
+        {/* Emergency and Crisis Assistance Notice */}
         <div className="crisisNotice" role="alert">
-          <h3><Heart size={18} aria-hidden="true"/> Critical Emergency & Crisis Assistance Notice</h3>
+          <h3><Heart size={18} aria-hidden="true"/> Emergency and Crisis Assistance Notice</h3>
           <p>
-            <strong>ValorBuddy is NOT an emergency response service, suicide prevention hotline, or 911 dispatcher.</strong>
-            {' '}If you or a veteran you know is in crisis, having thoughts of suicide, or experiencing a medical emergency, immediate help is available:
+            <strong>ValorBuddy is not an emergency response service, medical provider, crisis intervention service, or substitute for professional assistance.</strong>
+            {' '}If you or someone else is experiencing an emergency or immediate danger, call <strong>911</strong>.
           </p>
           <p>
-            • <strong>Veterans Crisis Line:</strong> Dial <strong>988</strong>, then <strong>Press 1</strong> (Free, confidential, available 24/7/365)<br/>
-            • <strong>Crisis Text Line:</strong> Send a text message to <strong>838255</strong><br/>
-            • <strong>Deaf or Hard of Hearing:</strong> Dial <strong>711</strong>, then <strong>988</strong><br/>
-            • <strong>Medical / Police Emergency:</strong> Call <strong>911</strong> immediately or proceed to the nearest emergency room.
+            Veterans and their families experiencing emotional distress or a mental health crisis may contact the Veterans Crisis Line:
+          </p>
+          <p>
+            • <strong>Call 988 and press 1.</strong><br/>
+            • <strong>Text 838255.</strong><br/>
+            • <strong>Visit</strong> <a href="https://www.veteranscrisisline.net" target="_blank" rel="noopener noreferrer" style={{color:'#fca5a5',textDecoration:'underline'}}>https://www.veteranscrisisline.net</a>.
+          </p>
+          <p style={{marginTop:'8px',fontSize:'13px',color:'#fecaca'}}>
+            ValorBuddy's AI-generated responses should not be relied upon for emergency, medical, legal, or other high-risk decisions.
           </p>
         </div>
 
-        {/* Privacy at a glance */}
-        <section className="privacyCard privacySummary">
-          <h2>Privacy & Security Commitments at a Glance</h2>
-          <div className="privacySummaryGrid">
-            <div>
-              <Shield size={20} style={{color:'var(--branch-accent, #10b981)'}}/>
-              <h3>Zero AI Model Training</h3>
-              <p>Your conversations, DD-214 records, disability ratings, and personal memories are <b>never</b> used to train public or proprietary foundation models.</p>
-            </div>
-            <div>
-              <Lock size={20} style={{color:'var(--branch-accent, #10b981)'}}/>
-              <h3>Military-Grade Encryption</h3>
-              <p>AES-256 encryption at rest and TLS 1.3 in transit, with dedicated field-level encryption for sensitive military service and disability records.</p>
-            </div>
-            <div>
-              <EyeOff size={20} style={{color:'var(--branch-accent, #10b981)'}}/>
-              <h3>We Never Sell Personal Data</h3>
-              <p>Tagus Technologies LLC never sells, rents, or monetizes member profiles, contact info, or uploaded files to data brokers or advertisers.</p>
-            </div>
-            <div>
-              <Brain size={20} style={{color:'var(--branch-accent, #10b981)'}}/>
-              <h3>Veteran Context Control</h3>
-              <p>You have full visibility and granular control over your AI Battle Buddy context memories, with 1-click inspection, export, or complete wiping.</p>
-            </div>
-          </div>
-        </section>
-
-        {/* Section 1: Who We Are & Company Information */}
+        {/* 1. Who We Are */}
         <section className="privacyCard">
-          <h2>1. Who We Are & Corporate Registrations</h2>
-          <p>
-            ValorBuddy™ is developed and operated by <b>Tagus Technologies LLC</b>, a Texas limited liability company. 
-            In this policy, “ValorBuddy,” “Tagus Technologies,” “we,” “us,” and “our” refer to Tagus Technologies LLC and its digital services, 
-            including web applications at <a href="https://valorbuddy.com" target="_blank" rel="noopener noreferrer">valorbuddy.com</a>, the ValorBuddy mobile application, AI orchestration layers, 
-            and document vault storage.
-          </p>
-          <div className="privacyGovGrid">
-            <div className="privacyGovItem">
-              <small>Legal Business Entity</small>
-              <b>Tagus Technologies LLC</b>
-            </div>
-            <div className="privacyGovItem">
-              <small>Corporate Headquarters</small>
-              <b>219 Columbine Drive, Wylie, TX 75098</b>
-            </div>
-            <div className="privacyGovItem">
-              <small>Unique Entity Identifier (UEI)</small>
-              <b>CLBEA2FNJ456</b>
-            </div>
-            <div className="privacyGovItem">
-              <small>CAGE Code</small>
-              <b>95U91</b>
-            </div>
-            <div className="privacyGovItem">
-              <small>SAM.gov Status</small>
-              <b>Active Registration (All Awards)</b>
-            </div>
-            <div className="privacyGovItem">
-              <small>Primary NAICS Code</small>
-              <b>518210 (Data Processing & Hosting)</b>
-            </div>
-            <div className="privacyGovItem">
-              <small>Trademark Registration</small>
-              <b>ValorBuddy™ (USPTO SN 50105197)</b>
-            </div>
-            <div className="privacyGovItem">
-              <small>Company Leadership</small>
-              <b>SSG Godson Onyeije, Ret. & Eugene E. Ebem</b>
+          <h2>1. Who We Are</h2>
+          <div className="privacySection">
+            <p>
+              ValorBuddy™ is developed and operated by TAGUS Technologies LLC, a privately owned United States technology company.
+            </p>
+            <p>
+              ValorBuddy provides AI-assisted tools intended to help Veterans, service members, caregivers, and families access information, discover relevant services, manage reminders, explore career opportunities, and connect with community resources.
+            </p>
+            <p>
+              This Privacy Policy describes how information may be collected, used, processed, stored, shared, and deleted when users interact with ValorBuddy through its website, mobile applications, and associated services.
+            </p>
+            <div style={{marginTop: '12px', padding: '12px 16px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.08)'}}>
+              <p style={{margin: '0 0 4px 0'}}><b>Company:</b> TAGUS Technologies LLC</p>
+              <p style={{margin: '0 0 4px 0'}}><b>Platform:</b> ValorBuddy™</p>
+              <p style={{margin: '0 0 4px 0'}}><b>Website:</b> <a href="https://valorbuddy.com" target="_blank" rel="noopener noreferrer">https://valorbuddy.com</a></p>
+              <p style={{margin: 0}}><b>Privacy Contact:</b> <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a></p>
             </div>
           </div>
         </section>
 
-        {/* Section 2: Independent Contractor Disclaimer */}
+        {/* 2. Relationship with Government Agencies */}
         <section className="privacyCard">
           <h2>2. Relationship with Government Agencies</h2>
-          <p>
-            <b>Non-Affiliation Notice:</b> ValorBuddy™ is an independent commercial software platform created by Tagus Technologies LLC. 
-            Tagus Technologies LLC is not the U.S. Department of Veterans Affairs (VA), Department of Defense (DoD), or any other federal or state agency. 
-            ValorBuddy provides AI-assisted navigation of publicly available federal benefits, military-to-civilian career alignment tools, and community resources.
-          </p>
-          <p>
-            Information generated or summarized by ValorBuddy does not constitute official VA adjudication, formal legal counsel, accredited claims representation 
-            (under 38 U.S.C. § 5901), or licensed medical/clinical diagnosis. For official decisions or formal claim filing, members should work directly with accredited 
-            Veterans Service Organizations (VSOs such as DAV, VFW, American Legion), state VA counselors, or licensed attorneys.
-          </p>
+          <div className="privacySection">
+            <p>
+              ValorBuddy operates independently of the United States government.
+            </p>
+            <p>
+              TAGUS Technologies LLC is not the VA, DoD, or any other government agency. ValorBuddy does not claim government endorsement, official partnership, certification, or authorization unless such a relationship has been formally established and accurately disclosed.
+            </p>
+            <h3>Government Resource Access</h3>
+            <p>
+              ValorBuddy may provide links to official, publicly accessible government websites, including:
+            </p>
+            <ul>
+              <li>U.S. Department of Veterans Affairs: <a href="https://www.va.gov" target="_blank" rel="noopener noreferrer">https://www.va.gov</a></li>
+              <li>Military OneSource: <a href="https://www.militaryonesource.mil" target="_blank" rel="noopener noreferrer">https://www.militaryonesource.mil</a></li>
+              <li>Other relevant federal, state, and local government resources.</li>
+            </ul>
+            <p>
+              These links are provided for informational and navigational purposes.
+            </p>
+            <p>
+              ValorBuddy does not have authorized access to restricted VA databases, internal government systems, protected benefits records, or government authentication infrastructure unless a separate, formally approved integration is established.
+            </p>
+            <p>
+              Users accessing government websites may be required to authenticate directly through those websites using their own credentials.
+            </p>
+            <p>
+              <strong>ValorBuddy does not request that users disclose their VA.gov, Login.gov, or ID.me passwords to the ValorBuddy AI assistant.</strong>
+            </p>
+            <h3>Benefits and Claims Disclaimer</h3>
+            <p>
+              Information provided by ValorBuddy is intended for general educational and informational purposes.
+            </p>
+            <p>
+              ValorBuddy does not:
+            </p>
+            <ul>
+              <li>Approve, deny, or adjudicate VA benefits claims.</li>
+              <li>Guarantee eligibility for government benefits.</li>
+              <li>Replace accredited Veterans Service Organizations, authorized claims representatives, attorneys, or government personnel.</li>
+              <li>Submit official government applications or claims on behalf of users unless a separately authorized capability is expressly provided.</li>
+            </ul>
+            <p>
+              Users should verify important information directly with the appropriate government agency or qualified professional.
+            </p>
+          </div>
         </section>
 
-        {/* Section 3: Information We Collect */}
+        {/* 3. Information We Collect */}
         <section className="privacyCard">
           <h2>3. Information We Collect</h2>
-          <p>We collect information solely to provide, personalize, protect, and fulfill the capabilities of ValorBuddy requested by you.</p>
-          
-          <h3>A. Information You Voluntarily Provide</h3>
-          <ul>
-            <li><b>Account & Profile Identity:</b> Full name, email address, password credentials (hashed with Argon2id), military branch (Army, Navy, Air Force, Marines, Coast Guard, Space Force), rank, service status (Veteran, Retired, Active Duty, Reserve, National Guard, Spouse, Caregiver), and residential city and state.</li>
-            <li><b>Military Service History & Goals:</b> Military Occupational Specialty (MOS/AFSC/Rating), military role title, years of service, verified clearance level, civilian education, professional certifications, target career goals, and business/entrepreneurial interests.</li>
-            <li><b>Uploaded Documents & Military Records:</b> DD-214 Certificates of Release or Discharge, VA disability rating decision letters, resumes, certification PDFs, and DOCX files uploaded to the Document Vault for analysis, translation, or personal reference.</li>
-            <li><b>Conversational AI Context & Memories:</b> Text messages, mission descriptions, goals, reminders, notes, and specific memory items you request your AI Battle Buddy to retain.</li>
-            <li><b>Support Communications:</b> Inquiries, feedback, and customer support correspondence.</li>
-          </ul>
-
-          <h3>B. Information Collected Through Device Permissions (Explicit Consent)</h3>
-          <ul>
-            <li><b>Location (Geographic):</b> When enabled, approximate or precise device coordinates are used exclusively to calculate distances to nearby VA medical centers, VA clinics, VFW posts, American Legion halls, and veteran community events. Location is never tracked continuously in the background or sold.</li>
-            <li><b>Microphone & Audio:</b> When voice input is active, audio streams are processed in real-time to convert your speech into text commands. Raw audio files are ephemeral and discarded immediately following speech-to-text processing.</li>
-            <li><b>Camera, Photos & Files:</b> Accessed solely when you initiate an upload for your profile portrait or vault documents.</li>
-            <li><b>Device Notifications:</b> Device notification push tokens utilized to deliver scheduled medication reminders, appointment alerts, and mission updates when enabled.</li>
-          </ul>
-
-          <h3>C. Technical & Diagnostic Information</h3>
-          <p>
-            When accessing ValorBuddy, our secure infrastructure automatically logs standard network information including device type, operating system version, browser family, IP address, request timestamps, and system performance metrics necessary for cybersecurity, rate limiting, and incident response.
-          </p>
-        </section>
-
-        {/* Section 4: AI & Zero-Training Guarantees */}
-        <section className="privacyCard">
-          <h2>4. Artificial Intelligence & Zero-Training Guarantees</h2>
-          <p>
-            ValorBuddy integrates state-of-the-art artificial intelligence orchestration to assist veterans with plain-English benefits explanation, 
-            military skills translation, resume building, and mission planning. Because we handle sensitive veteran data, we enforce rigorous AI boundaries:
-          </p>
-          <div className="privacyCallout">
-            <h3>Strict Zero-Training Covenant</h3>
+          <div className="privacySection">
             <p>
-              Tagus Technologies LLC maintains strict enterprise data protection agreements. <b>Under no circumstances are your uploaded documents, 
-              DD-214 records, disability percentages, private conversations, or veteran profile attributes used to train, retrain, improve, or fine-tune 
-              any public or commercial third-party foundation models</b> (including models operated by Google, OpenAI, Anthropic, or others).
+              ValorBuddy may collect and process information necessary to operate the platform, provide requested features, maintain security, and improve the user experience.
             </p>
-          </div>
-          <ul>
-            <li><b>Ephemeral Inference:</b> Data passed into language model APIs is processed in isolated execution contexts and is not retained or indexed by underlying AI infrastructure providers for secondary purposes.</li>
-            <li><b>Veteran Memory Visibility:</b> You retain total control over the long-term context memory utilized by your AI Battle Buddy. You can inspect your active memories, edit them, or trigger an instant full memory wipe at any time.</li>
-            <li><b>Advisory Nature:</b> AI outputs should always be reviewed by the member before formal submission to employers, government agencies, or healthcare providers.</li>
-          </ul>
-        </section>
-
-        {/* Section 5: Data Security Architecture */}
-        <section className="privacyCard">
-          <h2>5. Security Architecture & Technical Safeguards</h2>
-          <p>
-            Tagus Technologies LLC aligns its information security controls with federal standards, including principles from 
-            <b> NIST SP 800-53</b> (Security and Privacy Controls for Information Systems) and <b>NIST SP 800-171</b> (Protecting Controlled Unclassified Information):
-          </p>
-          <div className="privacyTableWrapper">
-            <table className="privacyTable">
-              <thead>
-                <tr>
-                  <th>Protection Layer</th>
-                  <th>Implementation Standard</th>
-                  <th>Scope</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td><b>Encryption in Transit</b></td>
-                  <td>TLS 1.3 / HTTPS Enforced</td>
-                  <td>All client-to-server, WebSocket, and API communications</td>
-                </tr>
-                <tr>
-                  <td><b>Encryption at Rest</b></td>
-                  <td>AES-256 Bit Encryption</td>
-                  <td>All databases, disk volumes, object stores, and backups</td>
-                </tr>
-                <tr>
-                  <td><b>Field-Level Encryption</b></td>
-                  <td>Dedicated AES-256 Field Cipher</td>
-                  <td>DD-214 document extracts, VA disability ratings, deployment details</td>
-                </tr>
-                <tr>
-                  <td><b>Credential Hashing</b></td>
-                  <td>Argon2id Cryptographic Hash</td>
-                  <td>All user and administrator passwords with random salt</td>
-                </tr>
-                <tr>
-                  <td><b>Multi-Factor Authentication</b></td>
-                  <td>TOTP RFC 6238 (Authenticator App)</td>
-                  <td>Mandatory for all administrators; available to all members</td>
-                </tr>
-                <tr>
-                  <td><b>Audit & Traceability</b></td>
-                  <td>Tamper-Evident Access Logs</td>
-                  <td>Retained for 365 days for forensic tracking & security events</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </section>
-
-        {/* Section 6: How Information Is Used & Third-Party Disclosure */}
-        <section className="privacyCard">
-          <h2>6. How Information Is Shared & Disclosed</h2>
-          <p>
-            <b>We Do Not Sell Your Information:</b> Tagus Technologies LLC does not sell, rent, broker, or trade member personal data, 
-            documents, or contact details to third parties, marketing firms, or commercial aggregators.
-          </p>
-          <p>We share information solely under the following limited circumstances:</p>
-          <ul>
-            <li><b>Sub-Processors & Cloud Providers:</b> We utilize vetted, enterprise-grade cloud providers for cloud hosting, managed database storage, secure authentication, transactional email, and mapping services. These providers operate under binding Data Processing Agreements and security terms.</li>
-            <li><b>Marketplace & Veteran Resource Partners:</b> When community partners, employers, or veteran vendors publish programs or services on ValorBuddy, they receive only <b>aggregated, anonymous metrics</b> (such as total impressions or clicks). Partners <b>never</b> receive searchable rosters of individual veterans, private profiles, disability data, or document vault contents. Direct referral occurs only when you affirmatively choose to contact a partner.</li>
-            <li><b>Legal & Protective Requirements:</b> We may disclose information only if required by a valid court subpoena, warrant, or statutory legal requirement, or when necessary to protect the immediate physical safety of any person, investigate criminal fraud, or defend against cyberattacks.</li>
-          </ul>
-        </section>
-
-        {/* Section 7: Data Retention & Purging Schedule */}
-        <section className="privacyCard">
-          <h2>7. Data Retention Schedule</h2>
-          <p>We adhere to strict data minimization principles. Personal information is retained only as long as necessary to fulfill active service:</p>
-          <ul>
-            <li><b>Account Profile & Vault Documents:</b> Retained while your account remains open and active. When you delete a document from the vault, it is permanently expunged from primary storage immediately.</li>
-            <li><b>AI Battle Buddy Context Memory:</b> Stored until you edit or delete individual memories or trigger a full context reset.</li>
-            <li><b>Password Reset Tokens:</b> Expire automatically within 30 minutes and are purged from system tables.</li>
-            <li><b>Security & Audit Logs:</b> Maintained for 365 days to meet federal security log retention standards, after which they are systematically deleted.</li>
-            <li><b>System Backups:</b> Encrypted rolling system snapshots cycle and overwrite automatically every 35 days.</li>
-          </ul>
-          <p>For more details, review our complete <a href="/data-retention-policy">Data Retention and Deletion Policy</a>.</p>
-        </section>
-
-        {/* Section 8: Your Rights & Account Deletion */}
-        <section className="privacyCard">
-          <h2>8. Your Rights & Account Deletion Controls</h2>
-          <p>You have full autonomy over your data on ValorBuddy. Under federal guidelines and applicable state privacy statutes, you have the right to:</p>
-          <ul>
-            <li><b>Access & Data Portability:</b> Review all personal profile attributes, service history, and uploaded files stored in your account.</li>
-            <li><b>Correction:</b> Update or rectify incorrect service, contact, or profile information directly within the Profile screen.</li>
-            <li><b>Granular Deletion:</b> Delete specific uploaded documents, memories, reminders, or favorite links at any time without deleting your full account.</li>
-            <li><b>Account Erasure (Right to be Forgotten):</b> You may permanently delete your entire ValorBuddy account and all associated records.</li>
-          </ul>
-          <div className="privacyCallout">
-            <h3>Permanent Account Deletion</h3>
+            <h3>A. Information Provided by Users</h3>
+            <p>Depending on the features used, this may include:</p>
+            <ul>
+              <li><strong>Account Information:</strong> Name, email address, authentication information, and user preferences.</li>
+              <li><strong>Veteran Profile Information:</strong> Military branch, service status, professional background, career interests, and other information voluntarily provided by users.</li>
+              <li><strong>Documents:</strong> Resumes, military service documents, benefits-related materials, and other files voluntarily uploaded through supported features.</li>
+              <li><strong>AI Conversations:</strong> Questions, messages, instructions, and information users voluntarily share while interacting with ValorBuddy.</li>
+              <li><strong>Reminders and Preferences:</strong> Appointment reminders, scheduled activities, personal goals, and other user-configured information.</li>
+              <li><strong>Support Requests:</strong> Information submitted when contacting customer support or providing feedback.</li>
+            </ul>
+            <p style={{background: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.25)', padding: '10px 14px', borderRadius: '6px'}}>
+              <strong>Notice:</strong> Users should avoid submitting unnecessary sensitive information, including Social Security numbers, financial account credentials, government login passwords, or unrelated medical records.
+            </p>
+            <h3>B. Device Permissions</h3>
+            <p>ValorBuddy may request device permissions when necessary for specific features.</p>
+            <ul>
+              <li><strong>Location:</strong> With applicable permission, location information may be used to help users find nearby Veteran resources, healthcare facilities, community organizations, or other relevant locations.</li>
+              <li><strong>Microphone:</strong> Microphone access may be requested to support voice-based interactions. Audio may be transmitted to authorized service providers for speech recognition or voice processing.</li>
+              <li><strong>Camera, Photos, and Files:</strong> Access may be requested when users choose to upload images, documents, or other supported files.</li>
+              <li><strong>Notifications:</strong> Notification permissions may be used to deliver reminders, alerts, and other user-requested notifications.</li>
+            </ul>
+            <p>Permissions are subject to the user's device settings and applicable operating system controls.</p>
+            <h3>C. Technical Information</h3>
             <p>
-              To permanently delete your ValorBuddy account, visit our self-service <a href="/delete-account">Account Deletion Page</a> 
-              or email <a href="mailto:privacy@valorbuddy.com?subject=ValorBuddy%20Account%20Deletion%20Request">privacy@valorbuddy.com</a>. 
-              Upon verified identity confirmation, your user credentials, profile records, AI memories, and stored documents will be permanently purged within 30 days.
+              ValorBuddy and its service providers may process technical information such as device type, operating system, IP address, application version, usage activity, error reports, and diagnostic information.
+            </p>
+            <p>
+              This information may be used to maintain functionality, troubleshoot problems, protect the platform, and prevent misuse.
             </p>
           </div>
         </section>
 
-        {/* Section 9: State Privacy Compliance */}
+        {/* 4. Artificial Intelligence and Data Processing */}
         <section className="privacyCard">
-          <h2>9. State Privacy Law Compliance (Texas TDPSA, CCPA/CPRA)</h2>
-          <p>
-            As a Texas-headquartered enterprise, Tagus Technologies LLC complies with the <b>Texas Data Privacy and Security Act (TDPSA)</b>, 
-            the <b>California Consumer Privacy Act as amended by the California Privacy Rights Act (CCPA/CPRA)</b>, 
-            and other state data protection frameworks:
-          </p>
-          <ul>
-            <li><b>Right to Opt-Out of Targeted Advertising & Sale:</b> We do not sell personal data or engage in targeted behavioral cross-context advertising.</li>
-            <li><b>Right to Non-Discrimination:</b> You will never receive degraded service or penalty for exercising any of your statutory privacy rights.</li>
-            <li><b>Sensitive Personal Data Consent:</b> We process sensitive military service indicators and disability ratings solely based on your affirmative submission to fulfill requested veteran support tools.</li>
-          </ul>
+          <h2>4. Artificial Intelligence and Data Processing</h2>
+          <div className="privacySection">
+            <p>
+              ValorBuddy uses artificial intelligence technologies to provide conversational assistance, information discovery, content explanations, career-related guidance, reminders, and other supported features.
+            </p>
+            <p>
+              AI responses are generated automatically and may contain errors, incomplete information, or outdated details.
+            </p>
+            <p>
+              Users should independently verify important information before making decisions involving government benefits, healthcare, legal matters, employment, or finances.
+            </p>
+            <h3>Third-Party AI Services</h3>
+            <p>
+              ValorBuddy may use external AI infrastructure and technology service providers to process requests and deliver AI-powered features.
+            </p>
+            <p>
+              Depending on the functionality used, relevant user inputs, conversation content, or uploaded materials may be transmitted to authorized providers for processing.
+            </p>
+            <p>
+              Such processing is subject to applicable service agreements, technical configurations, and privacy and security safeguards.
+            </p>
+            <p>
+              <strong>TAGUS Technologies LLC does not sell users' private conversations or uploaded documents to data brokers.</strong>
+            </p>
+            <p>
+              Any use of user information for AI model training must be consistent with applicable provider arrangements, user disclosures, and privacy requirements.
+            </p>
+            <h3>AI Limitations</h3>
+            <p>
+              ValorBuddy does not guarantee that AI-generated information will always be accurate, complete, or suitable for a particular purpose.
+            </p>
+            <p>
+              AI-generated content does not constitute official government advice, accredited benefits representation, medical diagnosis, or legal counsel.
+            </p>
+            <p>
+              Users remain responsible for reviewing information before relying on it or submitting it to third parties.
+            </p>
+          </div>
         </section>
 
-        {/* Section 10: Children's Privacy */}
+        {/* 5. Information Security */}
+        <section className="privacyCard">
+          <h2>5. Information Security</h2>
+          <div className="privacySection">
+            <p>
+              TAGUS Technologies LLC takes reasonable administrative, technical, and organizational measures designed to protect personal information against unauthorized access, disclosure, alteration, and loss.
+            </p>
+            <p>These measures may include:</p>
+            <ul>
+              <li>Access controls and authentication mechanisms.</li>
+              <li>Encryption where supported and appropriate.</li>
+              <li>Secure communication protocols.</li>
+              <li>Monitoring and security-related logging.</li>
+              <li>Restricted administrative access.</li>
+              <li>Security updates and maintenance.</li>
+              <li>Appropriate controls for third-party service providers.</li>
+            </ul>
+            <p>
+              No electronic system, internet transmission, or data storage environment can be guaranteed completely secure.
+            </p>
+            <p>
+              ValorBuddy does not represent that it has received FedRAMP authorization, VA Authority to Operate (ATO), or any other federal security certification unless such authorization has been formally granted.
+            </p>
+            <p>
+              References to recognized cybersecurity standards or security best practices do not constitute a claim of government certification.
+            </p>
+          </div>
+        </section>
+
+        {/* 6. How Information Is Shared and Disclosed */}
+        <section className="privacyCard">
+          <h2>6. How Information Is Shared and Disclosed</h2>
+          <div className="privacySection">
+            <p>
+              ValorBuddy does not sell personal information to data brokers.
+            </p>
+            <p>
+              Information may be shared with service providers or other parties when reasonably necessary to operate the platform, provide requested services, meet legal obligations, or protect users and systems.
+            </p>
+            <h3>A. Technology Service Providers</h3>
+            <p>Authorized service providers may process information to support:</p>
+            <ul>
+              <li>Cloud hosting and application infrastructure.</li>
+              <li>Database storage and authentication.</li>
+              <li>AI processing and voice functionality.</li>
+              <li>Notifications and transactional communications.</li>
+              <li>Mapping and location-based features.</li>
+              <li>Security monitoring and technical support.</li>
+            </ul>
+            <p>Information shared with these providers is limited according to the relevant service requirements and applicable safeguards.</p>
+            <h3>B. Veteran Resource and Community Partners</h3>
+            <p>
+              ValorBuddy may display resources, programs, services, or opportunities offered by independent Veteran organizations, employers, or community partners.
+            </p>
+            <p>
+              Displaying a partner's information does not automatically authorize that partner to access a user's private profile, uploaded documents, or AI conversations.
+            </p>
+            <p>
+              When users voluntarily contact an external organization or provide information through its services, the organization's own privacy practices may apply.
+            </p>
+            <h3>C. Legal and Safety Requirements</h3>
+            <p>
+              Information may be disclosed when required by applicable law, valid legal process, or when reasonably necessary to protect the rights, security, or safety of users, the platform, or others.
+            </p>
+            <h3>D. Government Agencies</h3>
+            <p>
+              ValorBuddy does not automatically share user profiles, uploaded military documents, or private conversations with the VA or other government agencies merely because users access government-related information through the platform.
+            </p>
+            <p>
+              Any future government data exchange would require an appropriate lawful basis, applicable authorization, and relevant security and privacy safeguards.
+            </p>
+          </div>
+        </section>
+
+        {/* 7. Data Retention */}
+        <section className="privacyCard">
+          <h2>7. Data Retention</h2>
+          <div className="privacySection">
+            <p>
+              ValorBuddy retains personal information for periods reasonably necessary to provide services, maintain security, comply with applicable laws, resolve disputes, and fulfill legitimate operational requirements.
+            </p>
+            <p>Retention periods may vary according to the type of information and the systems involved:</p>
+            <ul>
+              <li><strong>Account Information:</strong> Generally retained while an account remains active and for any additional period required for lawful or legitimate operational purposes.</li>
+              <li><strong>Uploaded Documents:</strong> Retained as needed to provide requested features until deleted or otherwise subject to applicable retention procedures.</li>
+              <li><strong>AI Conversations and Preferences:</strong> May be retained to support conversational functionality, personalization, troubleshooting, or user-requested features.</li>
+              <li><strong>Technical and Security Logs:</strong> May be retained for security monitoring, incident investigation, and operational purposes.</li>
+              <li><strong>Backups:</strong> Deleted information may remain temporarily in protected backup systems until the applicable backup retention cycle expires.</li>
+            </ul>
+            <p>Deletion from active systems does not necessarily result in immediate removal from all backups or third-party systems.</p>
+            <p>Users may contact <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a> for information about applicable retention and deletion procedures.</p>
+          </div>
+        </section>
+
+        {/* 8. User Privacy Rights and Account Deletion */}
+        <section className="privacyCard">
+          <h2>8. User Privacy Rights and Account Deletion</h2>
+          <div className="privacySection">
+            <p>ValorBuddy provides users with ways to manage personal information, subject to applicable law and available platform functionality. Users may request to:</p>
+            <ul>
+              <li>Access personal information associated with their account.</li>
+              <li>Correct inaccurate information.</li>
+              <li>Delete their account.</li>
+              <li>Request deletion of eligible personal information.</li>
+              <li>Withdraw certain permissions through device or application settings.</li>
+              <li>Contact TAGUS Technologies LLC regarding privacy concerns.</li>
+            </ul>
+            <h3>Account Deletion</h3>
+            <p>
+              Users may request account deletion through the available account deletion functionality at <a href="/delete-account">/delete-account</a> or by contacting:
+            </p>
+            <p>
+              <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a>
+            </p>
+            <p>
+              Following verification where necessary, TAGUS Technologies LLC will process eligible deletion requests in accordance with applicable law and operational requirements.
+            </p>
+            <p>
+              Certain information may be retained when legally required or reasonably necessary for security, fraud prevention, dispute resolution, or other permitted purposes.
+            </p>
+            <p>
+              For more information, users may consult the platform's <a href="/data-retention-policy">Data Retention and Deletion Policy</a>.
+            </p>
+          </div>
+        </section>
+
+        {/* 9. Applicable Privacy Laws */}
+        <section className="privacyCard">
+          <h2>9. Applicable Privacy Laws</h2>
+          <div className="privacySection">
+            <p>
+              TAGUS Technologies LLC seeks to handle personal information in accordance with applicable United States privacy and data protection requirements.
+            </p>
+            <p>
+              Depending on the user's location, the nature of the information, and applicable legal requirements, users may have rights concerning access, correction, deletion, or other processing of personal information.
+            </p>
+            <p>
+              These may include rights under applicable state privacy laws, including the Texas Data Privacy and Security Act and relevant California privacy legislation, where those laws apply.
+            </p>
+            <p>
+              Not all privacy rights or statutory provisions apply to every organization, user, or processing activity.
+            </p>
+            <p>
+              Users may submit privacy inquiries to <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a>.
+            </p>
+          </div>
+        </section>
+
+        {/* 10. Children's Privacy */}
         <section className="privacyCard">
           <h2>10. Children's Privacy</h2>
-          <p>
-            ValorBuddy is strictly intended for military veterans, active service members, and adult family members or designated caregivers. 
-            We do not knowingly collect, solicit, or maintain personal information from individuals under 13 years of age (or under 16 where required by state law). 
-            If we discover that a minor has submitted personal information, we will immediately take steps to permanently delete the data.
-          </p>
+          <div className="privacySection">
+            <p>
+              ValorBuddy is designed for adult Veterans, service members, caregivers, and family members aged 18 or older.
+            </p>
+            <p>
+              The platform is not directed toward children under 18.
+            </p>
+            <p>
+              TAGUS Technologies LLC does not knowingly solicit personal information from children for the purpose of providing independent ValorBuddy accounts.
+            </p>
+            <p>
+              If we become aware that personal information has been collected from a child in a manner inconsistent with applicable law, we will take appropriate steps to address or delete the information.
+            </p>
+            <p>
+              Parents or guardians may contact <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a> with relevant concerns.
+            </p>
+          </div>
         </section>
 
-        {/* Section 11: Third-Party Links */}
+        {/* 11. Third-Party Websites and Integration Limitations */}
         <section className="privacyCard">
-          <h2>11. Third-Party Websites & Integrations</h2>
-          <p>
-            ValorBuddy provides curated links to official government portals (such as VA.gov, eBenefits, Military OneSource), YouTube educational and relaxation videos, 
-            mapping services (Google Maps, Apple Maps), and partner veteran organizations. When clicking external links, you exit ValorBuddy and become subject to 
-            the respective third party's privacy terms. We encourage you to review their independent privacy disclosures.
-          </p>
+          <h2>11. Third-Party Websites and Integration Limitations</h2>
+          <div className="privacySection">
+            <p>
+              ValorBuddy may provide curated links to official government websites, publicly accessible Veteran resources, educational content, mapping services, and independent community organizations.
+            </p>
+            <p>Examples include:</p>
+            <ul>
+              <li>Official VA resources at <a href="https://www.va.gov" target="_blank" rel="noopener noreferrer">VA.gov</a>.</li>
+              <li><a href="https://www.militaryonesource.mil" target="_blank" rel="noopener noreferrer">Military OneSource</a>.</li>
+              <li>Google Maps and Apple Maps.</li>
+              <li>Educational or wellness-related content hosted on YouTube.</li>
+              <li>Publicly accessible resources provided by recognized Veteran support organizations.</li>
+            </ul>
+            <h3>Government Website Access</h3>
+            <p>
+              ValorBuddy provides navigational access to official, publicly accessible government websites through external links.
+            </p>
+            <p>
+              These links do not imply that ValorBuddy is officially approved, endorsed, sponsored, or technically integrated with the VA or another government agency.
+            </p>
+            <p>
+              ValorBuddy does not access restricted VA systems, retrieve confidential government records, or directly exchange information with VA databases without appropriate authorization.
+            </p>
+            <h3>Third-Party Service Limitations</h3>
+            <p>
+              External websites, applications, and services operate independently from ValorBuddy.
+            </p>
+            <p>
+              When users open third-party links, they may leave the ValorBuddy environment and become subject to the external provider's privacy policy, terms of service, and security practices.
+            </p>
+            <p>
+              ValorBuddy does not control the availability, accuracy, security, or content of independently operated external services.
+            </p>
+            <h3>Future Integrations</h3>
+            <p>
+              Any future direct integration with government systems, healthcare platforms, or other restricted services will be subject to applicable authorization, privacy, security, and technical requirements.
+            </p>
+            <p>
+              ValorBuddy will not represent such integrations as approved or operational unless they have been appropriately established.
+            </p>
+          </div>
         </section>
 
-        {/* Section 12: Changes to this Policy */}
+        {/* 12. Changes to This Privacy Policy */}
         <section className="privacyCard">
-          <h2>12. Changes & Policy Updates</h2>
-          <p>
-            We may periodically revise this Privacy Policy to reflect evolving platform capabilities, new federal requirements, or updated security protocols. 
-            Any modifications will be posted to this page with an updated "Last Revised" date. For material changes affecting the collection or handling of sensitive data, 
-            we will provide prominent in-app notification or direct email alert to registered account holders prior to implementation.
-          </p>
+          <h2>12. Changes to This Privacy Policy</h2>
+          <div className="privacySection">
+            <p>
+              TAGUS Technologies LLC may update this Privacy Policy to reflect changes in platform functionality, technology providers, privacy practices, legal requirements, or operational procedures.
+            </p>
+            <p>
+              When changes are made, the updated policy will be published with a revised effective or modification date.
+            </p>
+            <p>
+              Where required by applicable law, users will receive additional notice or be asked to provide consent before material changes affecting their personal information take effect.
+            </p>
+            <p>
+              Continued use of ValorBuddy is subject to the applicable <a href="/terms">Terms of Service</a> and privacy requirements.
+            </p>
+          </div>
         </section>
 
-        {/* Section 13: Corporate Contact Information */}
-        <section className="privacyCard privacyContact">
-          <h2>13. Corporate Contact & Privacy Officer</h2>
-          <p>For questions, privacy requests, data access inquiries, or compliance notices, please contact our dedicated Privacy & Federal Compliance Office:</p>
+        {/* 13. Corporate Contact and Privacy Inquiries */}
+        <section className="privacyCard">
+          <h2>13. Corporate Contact and Privacy Inquiries</h2>
           <div className="privacyContactGrid">
             <div className="privacyContactBox">
-              <h4>Corporate Headquarters</h4>
+              <h4>Entity & Privacy Contacts</h4>
               <p>
                 <b>TAGUS Technologies LLC</b><br/>
-                Attn: Privacy & Data Protection Office<br/>
                 219 Columbine Drive<br/>
-                Wylie, Texas 75098, USA
-              </p>
-            </div>
-            <div className="privacyContactBox">
-              <h4>Electronic Contact</h4>
-              <p>
+                Wylie, Texas 75098, United States<br/><br/>
                 <b>Privacy Inquiries:</b> <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a><br/>
-                <b>Corporate Office:</b> <a href="mailto:privacy@tagustechnologies.com">privacy@tagustechnologies.com</a><br/>
                 <b>General Support:</b> <a href="mailto:support@tagustechnologies.com">support@tagustechnologies.com</a><br/>
-                <b>Official Site:</b> <a href="https://valorbuddy.com" target="_blank" rel="noopener noreferrer">https://valorbuddy.com</a>
+                <b>Corporate Email:</b> <a href="mailto:privacy@tagustechnologies.com">privacy@tagustechnologies.com</a><br/>
+                <b>Website:</b> <a href="https://valorbuddy.com" target="_blank" rel="noopener noreferrer">https://valorbuddy.com</a>
               </p>
             </div>
             <div className="privacyContactBox">
-              <h4>Corporate Officers</h4>
+              <h4>Company Leadership</h4>
               <p>
                 <b>SSG Godson Onyeije, U.S. Army (Ret.)</b><br/>
                 President, Federal Programs<br/>
                 <a href="mailto:godson.onyeije@tagustechnologies.com">godson.onyeije@tagustechnologies.com</a><br/><br/>
                 <b>Eugene Ezenwa Ebem</b><br/>
-                Co-Founder & CTO<br/>
+                Co-Founder & Chief Technology Officer<br/>
                 <a href="mailto:eugene.ebem@tagustechnologies.com">eugene.ebem@tagustechnologies.com</a>
               </p>
             </div>
@@ -1327,11 +1474,14 @@ function PrivacyPolicy(){
       </main>
 
       <footer className="privacyFooter">
-        <span>© 2026 TAGUS Technologies LLC. All rights reserved. ValorBuddy™ is a registered trademark of TAGUS Technologies LLC.</span>
+        <span>© 2026 TAGUS Technologies LLC. All rights reserved. ValorBuddy™ is a product of TAGUS Technologies LLC.</span>
         <span>
           <a href="/terms">Terms of Service</a> · <a href="/data-retention-policy">Data Retention</a> · <a href="/delete-account">Delete Account</a> · <a href="/">Return Home</a>
         </span>
       </footer>
+      <div style={{textAlign: 'center', padding: '12px 20px 24px 20px', fontSize: '11px', color: '#64748b'}}>
+        Important: ValorBuddy is an independent, privately operated platform. It is not an official U.S. government application and is not endorsed by the U.S. Department of Veterans Affairs or any other government agency.
+      </div>
     </div>
   );
 }
