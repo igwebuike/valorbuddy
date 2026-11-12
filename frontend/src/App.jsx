@@ -692,6 +692,270 @@ function HealthSafetyNotice(){
 
 
 
+
+function TermsOfService(){
+  const updated = 'November 12, 2026';
+  return (
+    <div className="privacyPage">
+      <header className="privacyHeader">
+        <a className="privacyBrand" href="/" aria-label="Return to ValorBuddy home">
+          <img src={valorLogo} alt="ValorBuddy Logo" />
+          <span><b>ValorBuddy™</b><small>Your Digital Battle Buddy</small></span>
+        </a>
+        <nav className="privacyNav">
+          <a className="privacyHomeLink" href="/">Return to ValorBuddy</a>
+          <a href="/privacy-policy">Privacy Policy</a>
+          <a href="/data-retention-policy">Data Retention</a>
+          <a href="/delete-account">Delete Account</a>
+        </nav>
+      </header>
+
+      <main className="privacyShell">
+        <section className="privacyHero">
+          <span className="privacyEyebrow">TAGUS TECHNOLOGIES LLC · VETERAN-OWNED ENTERPRISE</span>
+          <h1>ValorBuddy™ Terms of Service</h1>
+          <p>
+            These Terms of Service ("Terms") govern your access to and use of ValorBuddy™ ("ValorBuddy", "the Service", "the Platform"), 
+            including our web application, mobile applications, APIs, and associated digital services operated by Tagus Technologies LLC 
+            ("Tagus", "we", "us", or "our"). By accessing, creating an account on, or using ValorBuddy, you acknowledge that you have read, 
+            understood, and agree to be legally bound by these Terms and our Privacy Policy.
+          </p>
+          <div className="privacyMeta">
+            <span><b>Publisher / Entity:</b> Tagus Technologies LLC</span>
+            <span><b>Effective Date:</b> {updated}</span>
+            <span><b>Last Revised:</b> {updated}</span>
+            <span><b>Jurisdiction:</b> State of Texas & United States Federal Law</span>
+          </div>
+        </section>
+
+        {/* Crisis & Emergency Notice */}
+        <div className="crisisNotice" role="alert">
+          <h3><Heart size={18} aria-hidden="true"/> Critical Emergency & Crisis Assistance Notice</h3>
+          <p>
+            <strong>ValorBuddy is NOT an emergency response service, suicide prevention hotline, medical provider, or 911 dispatcher.</strong>
+            {' '}If you or someone you know is in immediate crisis, having thoughts of self-harm, or experiencing a medical emergency, immediate help is available:
+          </p>
+          <p>
+            • <strong>Veterans Crisis Line:</strong> Dial <strong>988</strong>, then <strong>Press 1</strong> (Free, confidential, available 24/7/365)<br/>
+            • <strong>Crisis Text Line:</strong> Send a text message to <strong>838255</strong><br/>
+            • <strong>Emergency Services:</strong> Call <strong>911</strong> or go to the nearest emergency medical facility.
+          </p>
+        </div>
+
+        {/* Section 1: Non-Clinical, Non-Legal, Non-Agency Disclaimers */}
+        <section className="privacyCard">
+          <h2>1. Fundamental Service Boundaries & Disclaimers</h2>
+          <div className="privacySection">
+            <h3>1.1 Informational & Educational Navigation Only</h3>
+            <p>
+              ValorBuddy is an AI-assisted informational and educational tool designed to help United States military veterans, 
+              transitioning service members, caregivers, and their families understand and navigate publicly available resources, 
+              statutory provisions (such as Title 38 of the Code of Federal Regulations), and Department of Veterans Affairs (VA) benefit programs.
+            </p>
+          </div>
+          <div className="privacySection">
+            <h3>1.2 No Medical Advice or Healthcare Treatment</h3>
+            <p>
+              ValorBuddy does not provide medical advice, psychiatric counseling, clinical evaluations, or formal diagnoses. 
+              The platform is not a medical device, electronic health record system, or telemedicine provider. Information provided 
+              by the Service must never be used as a substitute for professional clinical judgment, diagnosis, or treatment by a licensed physician, 
+              psychiatrist, or VA medical center healthcare professional.
+            </p>
+          </div>
+          <div className="privacySection">
+            <h3>1.3 No Formal Legal Representation or Claims Filing</h3>
+            <p>
+              ValorBuddy and Tagus Technologies LLC are <strong>not</strong> accredited Veteran Service Organizations (VSOs), 
+              claims agents, or attorneys recognized under 38 U.S.C. § 5902. Use of ValorBuddy does <strong>not</strong> constitute 
+              the legal filing, formal submission, or administrative adjudication of a claim with the U.S. Department of Veterans Affairs. 
+              Veterans are encouraged to consult accredited VSO representatives, state/county veteran service officers, or accredited attorneys 
+              for formal claims representation.
+            </p>
+          </div>
+          <div className="privacySection">
+            <h3>1.4 Independence & No Government Endorsement</h3>
+            <p>
+              Tagus Technologies LLC is an independent, Veteran-owned commercial software enterprise. ValorBuddy is not endorsed, sponsored, 
+              operated by, or affiliated with the U.S. Department of Veterans Affairs (VA), Department of Defense (DoD), or any other federal agency.
+            </p>
+          </div>
+        </section>
+
+        {/* Section 2: Eligibility & Accounts */}
+        <section className="privacyCard">
+          <h2>2. Eligibility, Account Registration & Security</h2>
+          <div className="privacySection">
+            <h3>2.1 Eligibility</h3>
+            <p>
+              You must be at least 18 years of age (or the age of legal majority in your jurisdiction) to create an account or use ValorBuddy. 
+              By using the Service, you represent and warrant that you possess the legal authority to enter into these Terms.
+            </p>
+          </div>
+          <div className="privacySection">
+            <h3>2.2 Account Credentials & Security</h3>
+            <p>
+              When creating an account, you must provide accurate, current, and complete information. You are solely responsible for maintaining 
+              the confidentiality of your login credentials, passwords, and multi-factor authentication (MFA) devices. You agree to notify Tagus Technologies 
+              immediately at <a href="mailto:security@valorbuddy.com">security@valorbuddy.com</a> if you suspect unauthorized access or any security breach.
+            </p>
+          </div>
+        </section>
+
+        {/* Section 3: Permitted & Prohibited Conduct */}
+        <section className="privacyCard">
+          <h2>3. Acceptable Use & Prohibited Conduct</h2>
+          <p>
+            You agree to use ValorBuddy strictly for lawful personal or organizational purposes in accordance with these Terms. You agree that you will not:
+          </p>
+          <ul>
+            <li>Use the Service for any unlawful, fraudulent, defamatory, or deceptive purpose, including falsifying military discharge records or claims data;</li>
+            <li>Attempt to bypass, disable, probe, or test the vulnerability of any security control, rate limit, authentication mechanism, or network boundary;</li>
+            <li>Reverse engineer, decompile, disassemble, or extract source code from the Service;</li>
+            <li>Deploy automated crawlers, scrapers, bots, or data extraction scripts against the platform without express written authorization;</li>
+            <li>Upload or transmit malicious code, viruses, worms, or destructive payloads;</li>
+            <li>Transmit, upload, or store any classified, secret, or restricted military operational intelligence.</li>
+          </ul>
+        </section>
+
+        {/* Section 4: AI Engine & Zero-Training Pledge */}
+        <section className="privacyCard">
+          <h2>4. AI-Assisted Retrieval & Zero-Training Pledge</h2>
+          <div className="privacySection">
+            <h3>4.1 Nature of AI-Assisted Output</h3>
+            <p>
+              ValorBuddy utilizes artificial intelligence models with search grounding to summarize complex regulations and point users to public official sources. 
+              While we engineer rigorous guardrails and statutory verification checks, AI-generated outputs may occasionally contain discrepancies. 
+              Users must independently verify critical eligibility criteria, statutory deadlines, and medical requirements with official government portals (VA.gov) 
+              or authorized representatives.
+            </p>
+          </div>
+          <div className="privacySection">
+            <h3>4.2 Zero-AI Foundation Model Training Pledge</h3>
+            <p>
+              We firmly believe that military service data deserves the highest standard of respect. <strong>Your private conversations, 
+              uploaded documents, and personal service information are NEVER sold to commercial brokers and are NEVER used to train public AI foundation models.</strong>
+            </p>
+          </div>
+        </section>
+
+        {/* Section 5: Military Document Vault (DD-214) */}
+        <section className="privacyCard">
+          <h2>5. Military Document Storage & Field-Level Encryption</h2>
+          <p>
+            ValorBuddy provides an optional, encrypted document vault for veterans to organize their military service records (such as DD-214 certificates of release). 
+            Sensitive fields stored within the vault are protected with AES-256 field-level encryption at rest. 
+            You retain sole and exclusive ownership of all documents and records you upload. You may delete your stored documents at any time.
+          </p>
+        </section>
+
+        {/* Section 6: Commercial Trader Status & App Store Distribution */}
+        <section className="privacyCard">
+          <h2>6. Commercial Trader Status & Digital Distribution</h2>
+          <p>
+            In compliance with Google Play Store trader status requirements and international consumer protection standards:
+          </p>
+          <ul>
+            <li><strong>Trader Identity:</strong> Tagus Technologies LLC is a registered commercial legal entity (Wylie, Texas, USA) providing software services.</li>
+            <li><strong>Application Scope:</strong> These Terms apply to ValorBuddy across web, Android, and mobile distribution environments globally.</li>
+            <li><strong>Pricing & Subscriptions:</strong> ValorBuddy provides core educational features free of charge. Any optional premium tiers, professional memberships, or enterprise partner subscriptions will be clearly disclosed prior to purchase. In-app subscriptions on Android are governed by Google Play Billing policies.</li>
+          </ul>
+        </section>
+
+        {/* Section 7: Intellectual Property */}
+        <section className="privacyCard">
+          <h2>7. Intellectual Property Rights</h2>
+          <p>
+            The ValorBuddy name, brand emblem, custom military branch tactical themes, software code, user interface designs, and proprietary workflows 
+            are the exclusive intellectual property of Tagus Technologies LLC, protected under United States and international copyright, trademark, 
+            and intellectual property laws. Tagus grants you a limited, non-exclusive, non-transferable, revocable license to access and use the Service 
+            for personal, non-commercial purposes.
+          </p>
+        </section>
+
+        {/* Section 8: Termination & Account Deletion */}
+        <section className="privacyCard">
+          <h2>8. Termination & Account Deletion</h2>
+          <p>
+            You have the right to terminate your account and discontinue use of the Service at any time. You can request permanent account and data deletion 
+            through your in-app profile settings or directly at <a href="/delete-account">/delete-account</a>. 
+            Tagus Technologies LLC reserves the right to suspend or terminate accounts that breach these Terms, engage in fraudulent claims activity, 
+            or threaten platform integrity.
+          </p>
+        </section>
+
+        {/* Section 9: Disclaimer of Warranties */}
+        <section className="privacyCard">
+          <h2>9. Disclaimer of Warranties</h2>
+          <p style={{textTransform:'uppercase',fontSize:'13px',lineHeight:'1.6',color:'#94a3b8'}}>
+            TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS, 
+            WITHOUT WARRANTIES OF ANY KIND, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING BUT NOT LIMITED TO IMPLIED WARRANTIES 
+            OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. TAGUS TECHNOLOGIES LLC DOES NOT WARRANT THAT 
+            THE SERVICE WILL OPERATE UNINTERRUPTED, SECURE, OR ERROR-FREE, OR THAT ANY DEFECTS WILL BE TIMELY CORRECTED.
+          </p>
+        </section>
+
+        {/* Section 10: Limitation of Liability */}
+        <section className="privacyCard">
+          <h2>10. Limitation of Liability</h2>
+          <p style={{textTransform:'uppercase',fontSize:'13px',lineHeight:'1.6',color:'#94a3b8'}}>
+            TO THE FULLEST EXTENT PERMITTED BY LAW, IN NO EVENT SHALL TAGUS TECHNOLOGIES LLC, ITS AFFILIATES, OFFICERS, DIRECTORS, EMPLOYEES, 
+            AGENTS, OR ADVISORS BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING WITHOUT LIMITATION 
+            LOSS OF DATA, USE, GOODWILL, OR OTHER INTANGIBLE LOSSES, ARISING OUT OF OR IN CONNECTION WITH YOUR USE OF OR INABILITY TO USE THE SERVICE.
+          </p>
+        </section>
+
+        {/* Section 11: Governing Law & Jurisdiction */}
+        <section className="privacyCard">
+          <h2>11. Governing Law & Dispute Resolution</h2>
+          <p>
+            These Terms and any dispute arising out of or related to ValorBuddy shall be governed by and construed in accordance with the laws 
+            of the State of Texas, without regard to its conflict of law principles, and applicable federal laws of the United States. 
+            You agree to submit to the exclusive jurisdiction and venue of state and federal courts located in Collin County, Texas.
+          </p>
+        </section>
+
+        {/* Section 12: Contact & Entity Information */}
+        <section className="privacyCard">
+          <h2>12. Contact Information & Legal Notices</h2>
+          <div className="privacyContactGrid">
+            <div className="privacyContactBox">
+              <h4>Legal & Regulatory Inquiries</h4>
+              <p>
+                <b>Tagus Technologies LLC</b><br/>
+                Attn: Legal & Compliance Department<br/>
+                219 Columbine Drive, Wylie, TX 75098<br/>
+                <b>Email:</b> <a href="mailto:terms@valorbuddy.com">terms@valorbuddy.com</a><br/>
+                <b>Corporate:</b> <a href="mailto:legal@tagustechnologies.com">legal@tagustechnologies.com</a><br/>
+                <b>Privacy Office:</b> <a href="mailto:privacy@valorbuddy.com">privacy@valorbuddy.com</a><br/>
+                <b>Official Web:</b> <a href="https://valorbuddy.com" target="_blank" rel="noopener noreferrer">https://valorbuddy.com</a>
+              </p>
+            </div>
+            <div className="privacyContactBox">
+              <h4>Corporate Officers</h4>
+              <p>
+                <b>SSG Godson Onyeije, U.S. Army (Ret.)</b><br/>
+                President, Federal Programs<br/>
+                <a href="mailto:godson.onyeije@tagustechnologies.com">godson.onyeije@tagustechnologies.com</a><br/><br/>
+                <b>Eugene Ezenwa Ebem</b><br/>
+                Co-Founder & CTO<br/>
+                <a href="mailto:eugene.ebem@tagustechnologies.com">eugene.ebem@tagustechnologies.com</a>
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="privacyFooter">
+        <span>© 2026 TAGUS Technologies LLC. All rights reserved. ValorBuddy™ is a registered trademark of TAGUS Technologies LLC.</span>
+        <span>
+          <a href="/privacy-policy">Privacy Policy</a> · <a href="/data-retention-policy">Data Retention</a> · <a href="/delete-account">Delete Account</a> · <a href="/">Return Home</a>
+        </span>
+      </footer>
+    </div>
+  );
+}
+
+
 function PrivacyPolicy(){
   const updated = 'November 3, 2026';
   return (
@@ -702,6 +966,7 @@ function PrivacyPolicy(){
           <span><b>ValorBuddy™</b><small>Your Digital Battle Buddy</small></span>
         </a>
         <nav className="privacyNav">
+          <a href="/terms">Terms of Service</a>
           <a href="/data-retention-policy">Data Retention</a>
           <a href="/delete-account">Delete Account</a>
           <a className="privacyHomeLink" href="/">Return to ValorBuddy</a>
@@ -1064,7 +1329,7 @@ function PrivacyPolicy(){
       <footer className="privacyFooter">
         <span>© 2026 TAGUS Technologies LLC. All rights reserved. ValorBuddy™ is a registered trademark of TAGUS Technologies LLC.</span>
         <span>
-          <a href="/data-retention-policy">Data Retention</a> · <a href="/delete-account">Delete Account</a> · <a href="/">Return Home</a>
+          <a href="/terms">Terms of Service</a> · <a href="/data-retention-policy">Data Retention</a> · <a href="/delete-account">Delete Account</a> · <a href="/">Return Home</a>
         </span>
       </footer>
     </div>
@@ -1083,6 +1348,7 @@ function AccountDeletion(){
           <span><b>ValorBuddy™</b><small>Your Digital Battle Buddy</small></span>
         </a>
         <nav className="privacyNav">
+          <a href="/terms">Terms of Service</a>
           <a href="/privacy-policy">Privacy Policy</a>
           <a href="/data-retention-policy">Data Retention</a>
           <a className="privacyHomeLink" href="/">Return to ValorBuddy</a>
@@ -1146,7 +1412,7 @@ function AccountDeletion(){
       </main>
       <footer className="privacyFooter">
         <span>© 2026 TAGUS Technologies LLC. All rights reserved.</span>
-        <span><a href="/privacy-policy">Privacy Policy</a> · <a href="/data-retention-policy">Data Retention</a> · <a href="/">ValorBuddy Home</a></span>
+        <span><a href="/terms">Terms of Service</a> · <a href="/privacy-policy">Privacy Policy</a> · <a href="/data-retention-policy">Data Retention</a> · <a href="/">ValorBuddy Home</a></span>
       </footer>
     </div>
   );
@@ -1162,6 +1428,7 @@ function DataRetentionPolicy(){
           <span><b>ValorBuddy™</b><small>Your Digital Battle Buddy</small></span>
         </a>
         <nav className="privacyNav">
+          <a href="/terms">Terms of Service</a>
           <a href="/privacy-policy">Privacy Policy</a>
           <a href="/delete-account">Delete Account</a>
           <a className="privacyHomeLink" href="/">Return to ValorBuddy</a>
@@ -1263,7 +1530,7 @@ function DataRetentionPolicy(){
       </main>
       <footer className="privacyFooter">
         <span>© 2026 TAGUS Technologies LLC. All rights reserved.</span>
-        <span><a href="/privacy-policy">Privacy Policy</a> · <a href="/delete-account">Delete Account</a> · <a href="/">Return Home</a></span>
+        <span><a href="/terms">Terms of Service</a> · <a href="/privacy-policy">Privacy Policy</a> · <a href="/delete-account">Delete Account</a> · <a href="/">Return Home</a></span>
       </footer>
     </div>
   );
@@ -1275,6 +1542,9 @@ function App(){
   const hash = window.location.hash.toLowerCase();
   const screenParam = (query.get('screen') || query.get('page') || '').toLowerCase();
 
+  if(path === '/terms' || path === '/terms-of-service' || path === '/tos' || screenParam === 'terms' || screenParam === 'terms-of-service' || screenParam === 'tos' || hash === '#terms' || hash === '#terms-of-service' || hash === '#tos') {
+    return <TermsOfService/>;
+  }
   if(path === '/privacy' || path === '/privacy-policy' || screenParam === 'privacy' || screenParam === 'privacy-policy' || hash === '#privacy' || hash === '#privacy-policy') {
     return <PrivacyPolicy/>;
   }
@@ -1449,6 +1719,8 @@ function Auth({onLogin}){
       </form>
       <div className="tagusProductLine">ValorBuddy is a product of <b>Tagus Technologies LLC</b></div>
       <div className="authLegalLinks">
+        <a href="/terms" target="_blank" rel="noopener noreferrer">Terms of Service</a>
+        <span>·</span>
         <a href="/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
         <span>·</span>
         <a href="/data-retention-policy" target="_blank" rel="noopener noreferrer">Data Retention</a>
@@ -1580,6 +1852,8 @@ function Sidebar({user,screen,setScreen,mobileOpen,onLogout}){
           <span>Secure Sign Out</span>
         </button>
         <div className="sidebarLegalLinks">
+          <a href="/terms" target="_blank" rel="noopener noreferrer">Terms</a>
+          <span>·</span>
           <a href="/privacy-policy" target="_blank" rel="noopener noreferrer">Privacy</a>
           <span>·</span>
           <a href="/data-retention-policy" target="_blank" rel="noopener noreferrer">Data Retention</a>

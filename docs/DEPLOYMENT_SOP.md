@@ -105,3 +105,4 @@ Render and GitHub Actions are orchestrated via git webhooks and status checks:
 - **Never push untested code to `main`:** `main` is production. Only merge to `main` after staging sign-off.
 - **Never bypass failing security checks:** If Semgrep or Bandit fails, fix the code rather than modifying the scanner rules.
 - **Never expose credentials in logger outputs:** Verify CWE-532 compliance (tokens, passwords, and sensitive URLs must never be passed to `logger.info`, `logger.warning`, etc.).
+

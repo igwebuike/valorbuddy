@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ValorBuddy™ — Veteran Endorsement Letters</title>
+  <style>
+    @page {
+      size: letter portrait;
+      margin: 0.55in 0.75in 0.5in 0.75in;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: "Georgia", "Times New Roman", serif;
+      font-size: 9.75pt;
+      line-height: 1.4;
+      color: #1E293B;
+      background: #F1F5F9;
+    }
+
+    .letter-sheet {
+      background: #FFFFFF;
+      width: 8.5in;
+      min-height: 11in;
+      padding: 0.6in 0.75in 0.5in 0.75in;
+      margin: 24px auto;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      page-break-after: always;
+      page-break-inside: avoid;
+      break-after: page;
+      break-inside: avoid;
+    }
+
+    @media print {
+      body {
+        background: none;
+        padding: 0;
+        margin: 0;
+      }
+      .letter-sheet {
+        margin: 0;
+        box-shadow: none;
+        width: 100%;
+        min-height: auto;
+        height: auto;
+        padding: 0;
+        page-break-after: always;
+        page-break-inside: avoid;
+        break-after: page;
+        break-inside: avoid;
+      }
+      .no-print {
+        display: none !important;
+      }
+    }
+
+    /* Print toolbar */
+    .print-bar {
+      background: #0F172A;
+      color: #F8FAFC;
+      padding: 10px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .print-btn {
+      background: #C29B38;
+      color: #0F172A;
+      border: none;
+      padding: 7px 18px;
+      font-weight: 700;
+      font-size: 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .print-btn:hover {
+      background: #D4AF37;
+    }
+
+    /* Veteran Personal Letterhead */
+    .veteran-header {
+      margin-bottom: 8px;
+    }
+    .veteran-name {
+      font-size: 13.5pt;
+      font-weight: 700;
+      color: #0F172A;
+      letter-spacing: 0.5px;
+      margin-bottom: 2px;
+    }
+    .veteran-meta {
+      font-size: 9pt;
+      color: #475569;
+      line-height: 1.35;
+    }
+    .veteran-meta .date-line {
+      margin-top: 6px;
+      font-weight: 600;
+      color: #1E293B;
+    }
+
+    .divider-rule {
+      height: 1px;
+      background: #E2E8F0;
+      margin: 10px 0 14px 0;
+    }
+
+    /* Recipient */
+    .recipient-block {
+      margin-bottom: 12px;
+      font-size: 9.5pt;
+      line-height: 1.35;
+      color: #1E293B;
+    }
+
+    /* Subject */
+    .subject-line {
+      font-size: 10pt;
+      font-weight: 700;
+      color: #0F172A;
+      margin-bottom: 12px;
+    }
+
+    /* Salutation */
+    .salutation {
+      font-weight: 600;
+      margin-bottom: 10px;
+      font-size: 9.75pt;
+    }
+
+    /* Letter Body */
+    .letter-body p {
+      margin-bottom: 9px;
+      text-align: justify;
+      text-justify: inter-word;
+    }
+
+    /* Closing & Signature */
+    .closing-block {
+      margin-top: 10px;
+    }
+    .closing-text {
+      font-weight: 600;
+      margin-bottom: 28px; /* space for handwritten signature */
+      font-size: 9.75pt;
+    }
+    .signature-line {
+      border-bottom: 1px solid #334155;
+      width: 280px;
+      margin-bottom: 4px;
+    }
+    .signature-details {
+      font-size: 9pt;
+      color: #0F172A;
+      line-height: 1.35;
+    }
+
+    /* Footer */
+    .letter-footer {
+      border-top: 1px solid #E2E8F0;
+      padding-top: 6px;
+      margin-top: 12px;
+      display: flex;
+      justify-content: space-between;
+      font-size: 7.5pt;
+      color: #64748B;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Controls Bar -->
+  <div class="print-bar no-print">
+    <div>
+      <strong>ValorBuddy™</strong> · Veteran Letters of Support & Endorsement (4 Pages)
+    </div>
+    <div>
+      <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+    </div>
+  </div>
+
+  
+  <div class="letter-sheet" id="letter-1">
+    <div>
+      <!-- Personal Veteran Header -->
+      <div class="veteran-header">
+        <div class="veteran-name">[Full Name]</div>
+        <div class="veteran-meta">
+          [Military Rank], [Branch of Service]<br>
+          [Street Address or City, State, ZIP Code]<br>
+          [Email Address] &nbsp;·&nbsp; [Phone Number (Optional)]
+          <div class="date-line">[Date]</div>
+        </div>
+      </div>
+
+      <div class="divider-rule"></div>
+
+      <!-- Recipient Block -->
+      <div class="recipient-block">
+        Tagus Technologies LLC<br>
+        ValorBuddy™ Executive Team<br>
+        219 Columbine Drive<br>
+        Wylie, TX 75098
+      </div>
+
+      <!-- Subject Line -->
+      <div class="subject-line">
+        Subject: Letter of Support and Endorsement for ValorBuddy™
+      </div>
+
+      <!-- Salutation -->
+      <div class="salutation">
+        Dear ValorBuddy Executive Team,
+      </div>
+
+      <!-- Body -->
+      <div class="letter-body">
+        <p>I am writing to express my personal support and endorsement for ValorBuddy™ following my recent opportunity to test and evaluate the system. Having served in the [Branch of Service] and navigated the transition to civilian life, I know how frustrating it can be to search for clear answers across fragmented websites and phone lines. Testing ValorBuddy was a refreshing and genuinely encouraging experience.</p><p>From my first interaction with the platform, the user experience stood out. The interface is clean, fast, and remarkably easy to navigate on both my laptop and phone. What impressed me most was the conversational voice feature—being able to ask questions naturally and receive clear, direct answers without wading through pages of bureaucratic text made a huge difference. The responses were straightforward, practical, and grounded in official information.</p><p>For the first time, using a digital tool for veterans did not feel like a chore or an administrative hurdle. The platform feels built with genuine care for the person on the other side of the screen. I was able to test inquiries about benefit eligibility and local resources, and each response gave me exactly what I needed to take the next step.</p><p>I am very satisfied with the platform’s performance, reliability, and usability. I believe ValorBuddy will be an invaluable resource for transitioning service members, veterans, and military families. I fully support its official launch and look forward to seeing it made widely available to our military community.</p>
+      </div>
+    </div>
+
+    <div>
+      <!-- Closing & Signature -->
+      <div class="closing-block">
+        <div class="closing-text">Respectfully,</div>
+        <div class="signature-line"></div>
+        <div class="signature-details">
+          [Printed Name]<br>
+          [Military Rank and Branch of Service]<br>
+          [Date Signed]
+        </div>
+      </div>
+
+      <!-- Discreet Footer -->
+      <div class="letter-footer">
+        <div>Letter of Support and Endorsement for ValorBuddy™</div>
+        <div>Page 1 of 4</div>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="letter-sheet" id="letter-2">
+    <div>
+      <!-- Personal Veteran Header -->
+      <div class="veteran-header">
+        <div class="veteran-name">[Full Name]</div>
+        <div class="veteran-meta">
+          [Military Rank], [Branch of Service]<br>
+          [Street Address or City, State, ZIP Code]<br>
+          [Email Address] &nbsp;·&nbsp; [Phone Number (Optional)]
+          <div class="date-line">[Date]</div>
+        </div>
+      </div>
+
+      <div class="divider-rule"></div>
+
+      <!-- Recipient Block -->
+      <div class="recipient-block">
+        Tagus Technologies LLC<br>
+        ValorBuddy™ Executive Team<br>
+        219 Columbine Drive<br>
+        Wylie, TX 75098
+      </div>
+
+      <!-- Subject Line -->
+      <div class="subject-line">
+        Subject: Letter of Support and Endorsement for ValorBuddy™
+      </div>
+
+      <!-- Salutation -->
+      <div class="salutation">
+        Dear ValorBuddy Executive Team,
+      </div>
+
+      <!-- Body -->
+      <div class="letter-body">
+        <p>I am pleased to submit this letter of support and personal endorsement for ValorBuddy™. Over the past several weeks, I had the opportunity to evaluate the platform with a specific focus on its design, accessibility, and overall ease of navigation. As a [Branch of Service] veteran, I want to commend your team for creating an environment that feels respectful, purposeful, and remarkably intuitive to use.</p><p>Too many veteran-facing tools are cluttered, difficult to read, and overwhelming—especially for veterans dealing with service-connected injuries, visual fatigue, or cognitive stress. ValorBuddy takes the opposite approach. The layout is clean and uncluttered, the typography is legible, and the navigation flows logically from one topic to the next. The ability to select my own service branch theme was a meaningful touch that made the platform feel personal and culturally familiar, rather than generic software.</p><p>During my evaluation, I never felt lost or frustrated. Key options are easy to find, the voice guidance makes interaction effortless, and the calm visual presentation kept my stress level down. The deliberate inclusion of the Veterans Crisis Line (988, Press 1) at the top of the interface demonstrates that safety and veteran well-being were prioritized from the beginning.</p><p>A system is only as good as a veteran’s ability to use it comfortably, and ValorBuddy excels in this regard. I am completely satisfied with the thoughtful design choices and accessibility of the platform. I strongly endorse the upcoming launch of ValorBuddy™ and believe it sets a new standard for how veteran digital tools should look and feel.</p>
+      </div>
+    </div>
+
+    <div>
+      <!-- Closing & Signature -->
+      <div class="closing-block">
+        <div class="closing-text">Respectfully,</div>
+        <div class="signature-line"></div>
+        <div class="signature-details">
+          [Printed Name]<br>
+          [Military Rank and Branch of Service]<br>
+          [Date Signed]
+        </div>
+      </div>
+
+      <!-- Discreet Footer -->
+      <div class="letter-footer">
+        <div>Letter of Support and Endorsement for ValorBuddy™</div>
+        <div>Page 2 of 4</div>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="letter-sheet" id="letter-3">
+    <div>
+      <!-- Personal Veteran Header -->
+      <div class="veteran-header">
+        <div class="veteran-name">[Full Name]</div>
+        <div class="veteran-meta">
+          [Military Rank], [Branch of Service]<br>
+          [Street Address or City, State, ZIP Code]<br>
+          [Email Address] &nbsp;·&nbsp; [Phone Number (Optional)]
+          <div class="date-line">[Date]</div>
+        </div>
+      </div>
+
+      <div class="divider-rule"></div>
+
+      <!-- Recipient Block -->
+      <div class="recipient-block">
+        Tagus Technologies LLC<br>
+        ValorBuddy™ Executive Team<br>
+        219 Columbine Drive<br>
+        Wylie, TX 75098
+      </div>
+
+      <!-- Subject Line -->
+      <div class="subject-line">
+        Subject: Letter of Support and Endorsement for ValorBuddy™
+      </div>
+
+      <!-- Salutation -->
+      <div class="salutation">
+        Dear ValorBuddy Executive Team,
+      </div>
+
+      <!-- Body -->
+      <div class="letter-body">
+        <p>I am writing to provide my enthusiastic endorsement for ValorBuddy™ after reviewing its transition guidance, career resources, and benefits navigation capabilities. Leaving military service is one of the most challenging transitions an individual can experience. Having walked that path myself as a [Branch of Service] veteran, I can confidently state that ValorBuddy provides the kind of clear, reliable guidance that transitioning service members urgently need.</p><p>What impressed me most during my testing was how effectively the platform breaks down complex information. Navigating VA benefits—such as PACT Act presumptive eligibility, disability compensation basics, and healthcare priority groups—is notoriously complicated. ValorBuddy explains these programs in plain, understandable English and provides direct links to official sources. Furthermore, the military-to-civilian skills crosswalk helped articulate military duties in terms civilian employers actually understand, which is a major hurdle during transition.</p><p>Rather than giving generic advice, the system guided me step-by-step through organizing service information and identifying local resources. Having this level of structured support in one centralized, voice-enabled assistant saves countless hours of anxiety and second-guessing. It serves as an empowering bridge between military service and civilian life.</p><p>ValorBuddy has proven to be a practical, trustworthy companion for the transition journey. I am thoroughly satisfied with the depth and clarity of the resources provided. I wholeheartedly endorse the launch of ValorBuddy™ and urge you to bring this platform to active-duty personnel, veterans, and transition assistance programs as soon as possible.</p>
+      </div>
+    </div>
+
+    <div>
+      <!-- Closing & Signature -->
+      <div class="closing-block">
+        <div class="closing-text">Respectfully,</div>
+        <div class="signature-line"></div>
+        <div class="signature-details">
+          [Printed Name]<br>
+          [Military Rank and Branch of Service]<br>
+          [Date Signed]
+        </div>
+      </div>
+
+      <!-- Discreet Footer -->
+      <div class="letter-footer">
+        <div>Letter of Support and Endorsement for ValorBuddy™</div>
+        <div>Page 3 of 4</div>
+      </div>
+    </div>
+  </div>
+
+
+  <div class="letter-sheet" id="letter-4">
+    <div>
+      <!-- Personal Veteran Header -->
+      <div class="veteran-header">
+        <div class="veteran-name">[Full Name]</div>
+        <div class="veteran-meta">
+          [Military Rank], [Branch of Service]<br>
+          [Street Address or City, State, ZIP Code]<br>
+          [Email Address] &nbsp;·&nbsp; [Phone Number (Optional)]
+          <div class="date-line">[Date]</div>
+        </div>
+      </div>
+
+      <div class="divider-rule"></div>
+
+      <!-- Recipient Block -->
+      <div class="recipient-block">
+        Tagus Technologies LLC<br>
+        ValorBuddy™ Executive Team<br>
+        219 Columbine Drive<br>
+        Wylie, TX 75098
+      </div>
+
+      <!-- Subject Line -->
+      <div class="subject-line">
+        Subject: Letter of Support and Endorsement for ValorBuddy™
+      </div>
+
+      <!-- Salutation -->
+      <div class="salutation">
+        Dear ValorBuddy Executive Team,
+      </div>
+
+      <!-- Body -->
+      <div class="letter-body">
+        <p>I am pleased to offer this letter of endorsement and feedback for the ValorBuddy™ platform following my participation in evaluating the system. As an experienced [Branch of Service] veteran who actively mentors other veterans in my community, I evaluate new tools with a healthy degree of scrutiny. After putting ValorBuddy through its paces, I am convinced of its significant potential to make a positive impact across the veteran community.</p><p>ValorBuddy succeeds because it combines solid engineering with an authentic understanding of military culture. The platform does not attempt to replace accredited representatives or medical professionals; instead, it acts as an intelligent, non-intimidating on-ramp that helps veterans understand their options, organize their background, and take confident next steps. The responsiveness of the voice assistant and the accuracy of the cited guidance demonstrate that serious care was taken in developing this system.</p><p>As you prepare for official release, my primary recommendation is to ensure the platform is introduced directly to local veteran service organizations, post halls, and military family groups. The more grassroots exposure veterans have to this tool, the faster it will become a trusted companion for those who might otherwise fall through administrative cracks. The foundation you have built is rock-solid.</p><p>I am completely satisfied with the quality, integrity, and operational readiness of ValorBuddy™. It has my full endorsement for launch, and I look forward to recommending it to my fellow veterans, colleagues, and community organizations once it goes live.</p>
+      </div>
+    </div>
+
+    <div>
+      <!-- Closing & Signature -->
+      <div class="closing-block">
+        <div class="closing-text">Respectfully,</div>
+        <div class="signature-line"></div>
+        <div class="signature-details">
+          [Printed Name]<br>
+          [Military Rank and Branch of Service]<br>
+          [Date Signed]
+        </div>
+      </div>
+
+      <!-- Discreet Footer -->
+      <div class="letter-footer">
+        <div>Letter of Support and Endorsement for ValorBuddy™</div>
+        <div>Page 4 of 4</div>
+      </div>
+    </div>
+  </div>
+
+
+</body>
+</html>

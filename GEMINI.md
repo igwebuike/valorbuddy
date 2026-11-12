@@ -26,3 +26,4 @@
 - **CWE-532 Compliance:** Never write auth tokens, password reset tokens, or raw reset URLs to application logs (`logger.warning`, `logger.exception`, etc.).
 - **Dependency Auditing:** Maintain high/critical vulnerability-free status in `backend/requirements.txt` (`pip-audit`) and `frontend/package.json` (`npm audit`).
 - **Security Check Suite:** All code pushed to `security/v6-standardization` must pass Bandit (`bandit -r backend/app -x backend/tests -ll`) and Semgrep OWASP Top 10 rules.
+
